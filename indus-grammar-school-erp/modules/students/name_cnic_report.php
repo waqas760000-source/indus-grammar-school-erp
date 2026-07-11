@@ -31,7 +31,7 @@ try {
 $records = [];
 try {
     $sql = "
-        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.guardian_phone, c.class_name, c.section,
+        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.guardian_phone, s.academic_type, s.school_class, s.school_section, s.academy_program, s.academy_batch, c.class_name, c.section,
                d.roll_no, d.cnic_no, d.birth_cert_no, d.father_name, d.father_cnic, d.mother_cnic, d.student_mobile
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
@@ -186,7 +186,7 @@ try {
                         <td><?php echo sanitize($r['father_cnic'] ?: '-'); ?></td>
                         <td><?php echo sanitize($r['mother_cnic'] ?: '-'); ?></td>
                         <td><?php echo sanitize($r['student_mobile'] ?: $r['guardian_phone']); ?></td>
-                        <td><?php echo sanitize($r['class_name'] . ' - ' . $r['section']); ?></td>
+                        <td><?php echo sanitize(($r['class_name'] ?? $r['school_class'] ?? '-') . ' - ' . ($r['section'] ?? $r['school_section'] ?? 'A')); ?></td>
                         <td class="text-end d-print-none">
                             <a href="detail_report.php?view_id=<?php echo $r['id']; ?>" class="btn btn-sm btn-outline-primary" title="View Profile"><i class="fa-solid fa-eye"></i></a>
                         </td>

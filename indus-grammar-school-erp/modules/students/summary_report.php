@@ -220,7 +220,6 @@ try {
                 <option value="">All</option>
                 <option value="School" <?php echo ($search_academic_type === 'School') ? 'selected' : ''; ?>>School</option>
                 <option value="Academy" <?php echo ($search_academic_type === 'Academy') ? 'selected' : ''; ?>>Academy</option>
-                <option value="School + Academy" <?php echo ($search_academic_type === 'School + Academy') ? 'selected' : ''; ?>>School + Academy</option>
             </select>
         </div>
         <div class="col-md-2">

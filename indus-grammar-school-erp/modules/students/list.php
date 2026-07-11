@@ -1,7 +1,7 @@
 <?php
 /**
  * Indus Grammar School ERP - Students Directory (Simplified & Categorized)
- * Version 2.0.0
+ * Version 3.0.0
  */
 
 $pageTitle = 'Student Management';
@@ -18,8 +18,7 @@ $filters = [
     'class_id' => isset($_GET['class_id']) ? (int)$_GET['class_id'] : null,
     'status' => isset($_GET['status']) ? sanitize($_GET['status']) : null,
     'search' => isset($_GET['search']) ? sanitize($_GET['search']) : null,
-    'academic_type' => isset($_GET['academic_type']) ? sanitize($_GET['academic_type']) : null,
-    'academy_program' => isset($_GET['academy_program']) ? sanitize($_GET['academy_program']) : null
+    'academic_type' => isset($_GET['academic_type']) ? sanitize($_GET['academic_type']) : null
 ];
 
 // Pagination variables
@@ -53,7 +52,7 @@ if ($totalPages < 1) $totalPages = 1;
     <div class="card-body p-4">
         <form method="GET" action="list.php" class="row g-3">
             <!-- Search field -->
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-4">
                 <label for="search" class="form-label small fw-semibold text-muted">Search Student</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
@@ -62,36 +61,24 @@ if ($totalPages < 1) $totalPages = 1;
             </div>
 
             <!-- Academic Type Filter -->
-            <div class="col-12 col-sm-6 col-md-2">
+            <div class="col-12 col-sm-6 col-md-3">
                 <label for="academic_type" class="form-label small fw-semibold text-muted">Academic Type</label>
                 <select class="form-select bg-light" id="academic_type" name="academic_type">
                     <option value="">All Types</option>
                     <option value="School" <?php echo ($filters['academic_type'] === 'School') ? 'selected' : ''; ?>>School</option>
                     <option value="Academy" <?php echo ($filters['academic_type'] === 'Academy') ? 'selected' : ''; ?>>Academy</option>
-                    <option value="School + Academy" <?php echo ($filters['academic_type'] === 'School + Academy') ? 'selected' : ''; ?>>School + Academy</option>
                 </select>
             </div>
 
-            <!-- Class Filter (For School) -->
-            <div class="col-12 col-sm-6 col-md-2">
-                <label for="class_id" class="form-label small fw-semibold text-muted">School Class</label>
+            <!-- Class Filter -->
+            <div class="col-12 col-sm-6 col-md-3">
+                <label for="class_id" class="form-label small fw-semibold text-muted">Class & Section</label>
                 <select class="form-select bg-light" id="class_id" name="class_id">
                     <option value="">All Classes</option>
                     <?php foreach ($classes as $c): ?>
                         <option value="<?php echo $c['id']; ?>" <?php echo ($filters['class_id'] == $c['id']) ? 'selected' : ''; ?>>
                             <?php echo sanitize($c['class_name'] . ' - ' . $c['section']); ?>
                         </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-
-            <!-- Academy Program Filter -->
-            <div class="col-12 col-sm-6 col-md-2">
-                <label for="academy_program" class="form-label small fw-semibold text-muted">Academy Program</label>
-                <select class="form-select bg-light" id="academy_program" name="academy_program">
-                    <option value="">All Programs</option>
-                    <?php foreach(['9th Entry Test', '10th Entry Test', '1st Year Entry Test', '2nd Year Entry Test', 'MDCAT', 'ECAT', 'ICS Preparation', 'Pre-Medical', 'Pre-Engineering', 'Computer Courses', 'English Language', 'Spoken English', 'IELTS', 'Other'] as $prog): ?>
-                        <option value="<?php echo $prog; ?>" <?php echo ($filters['academy_program'] === $prog) ? 'selected' : ''; ?>><?php echo $prog; ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
@@ -108,10 +95,10 @@ if ($totalPages < 1) $totalPages = 1;
             </div>
 
             <!-- Actions buttons -->
-            <div class="col-12 col-md-1 d-flex align-items-end gap-2">
-                <button type="submit" class="btn btn-secondary w-100 py-2">Filter</button>
-                <?php if ($filters['class_id'] || $filters['status'] || $filters['search'] || $filters['academic_type'] || $filters['academy_program']): ?>
-                    <a href="list.php" class="btn btn-outline-secondary py-2 px-3" title="Clear Filters"><i class="fa-solid fa-filter-circle-xmark"></i></a>
+            <div class="col-12 text-end mt-3">
+                <button type="submit" class="btn btn-secondary px-4 py-2">Apply Filters</button>
+                <?php if ($filters['class_id'] || $filters['status'] || $filters['search'] || $filters['academic_type']): ?>
+                    <a href="list.php" class="btn btn-outline-secondary py-2 px-3" title="Clear Filters"><i class="fa-solid fa-filter-circle-xmark me-1"></i>Reset</a>
                 <?php endif; ?>
             </div>
         </form>
@@ -127,11 +114,11 @@ if ($totalPages < 1) $totalPages = 1;
                     <th>Admission No</th>
                     <th>Student Name</th>
                     <th>Academic Type</th>
-                    <th>Program / Class Details</th>
+                    <th>Class Details</th>
                     <th>Gender</th>
                     <th>Guardian Contact</th>
                     <th>Status</th>
-                    <th class="text-end">Actions</th>
+                    <th class="text-end text-muted d-print-none">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -158,20 +145,11 @@ if ($totalPages < 1) $totalPages = 1;
                                 $type = $student['academic_type'] ?? 'School';
                                 $typeBadge = 'bg-primary';
                                 if ($type === 'Academy') $typeBadge = 'bg-success';
-                                elseif ($type === 'School + Academy') $typeBadge = 'bg-warning text-dark';
                                 ?>
                                 <span class="badge <?php echo $typeBadge; ?> px-2 py-1 rounded"><?php echo sanitize($type); ?></span>
                             </td>
                             <td>
-                                <?php if ($type === 'School'): ?>
-                                    <div class="text-dark small"><i class="fa-solid fa-school me-1 text-muted"></i><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></div>
-                                <?php elseif ($type === 'Academy'): ?>
-                                    <div class="text-dark small"><i class="fa-solid fa-graduation-cap me-1 text-muted"></i><strong><?php echo sanitize($student['academy_program'] ?? '-'); ?></strong></div>
-                                    <div class="text-muted small" style="font-size: 0.7rem;">Batch: <?php echo sanitize($student['academy_batch'] ?? '-'); ?></div>
-                                <?php else: ?>
-                                    <div class="text-dark small mb-1"><i class="fa-solid fa-school me-1 text-muted"></i><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></div>
-                                    <div class="text-dark small"><i class="fa-solid fa-graduation-cap me-1 text-muted"></i><strong><?php echo sanitize($student['academy_program'] ?? '-'); ?></strong> (<?php echo sanitize($student['academy_batch'] ?? '-'); ?>)</div>
-                                <?php endif; ?>
+                                <div class="text-dark small"><i class="fa-solid fa-school me-1 text-muted"></i><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></div>
                             </td>
                             <td><?php echo sanitize($student['gender']); ?></td>
                             <td>
@@ -190,7 +168,7 @@ if ($totalPages < 1) $totalPages = 1;
                                 ?>
                                 <span class="badge <?php echo $badgeClass; ?> px-3 py-2 rounded-pill"><?php echo $status; ?></span>
                             </td>
-                            <td class="text-end">
+                            <td class="text-end d-print-none">
                                 <div class="btn-group">
                                     <a href="profile_report.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-secondary btn-sm" title="View Profile">
                                         <i class="fa-regular fa-user"></i>
@@ -220,17 +198,17 @@ if ($totalPages < 1) $totalPages = 1;
     <nav aria-label="Page navigation" class="mb-4">
         <ul class="pagination justify-content-center">
             <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
-                <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>">Previous</a>
+                <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?>">Previous</a>
             </li>
             
             <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                 <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>"><?php echo $i; ?></a>
+                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?>"><?php echo $i; ?></a>
                 </li>
             <?php endfor; ?>
             
             <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
-                <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>">Next</a>
+                <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?>">Next</a>
             </li>
         </ul>
     </nav>

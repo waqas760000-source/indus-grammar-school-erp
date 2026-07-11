@@ -44,18 +44,12 @@ class Student {
                 $params['school_class'] = $filters['school_class'];
             }
 
-            if (!empty($filters['academy_program'])) {
-                $sql .= " AND s.academy_program = :academy_program";
-                $params['academy_program'] = $filters['academy_program'];
-            }
-
             if (!empty($filters['search'])) {
                 $sql .= " AND (s.first_name LIKE :search 
                                OR s.last_name LIKE :search 
                                OR s.admission_no LIKE :search 
                                OR s.academic_type LIKE :search
                                OR s.school_class LIKE :search
-                               OR s.academy_program LIKE :search
                                OR s.guardian_name LIKE :search)";
                 $params['search'] = '%' . $filters['search'] . '%';
             }
@@ -112,18 +106,12 @@ class Student {
                 $params['school_class'] = $filters['school_class'];
             }
 
-            if (!empty($filters['academy_program'])) {
-                $sql .= " AND s.academy_program = :academy_program";
-                $params['academy_program'] = $filters['academy_program'];
-            }
-
             if (!empty($filters['search'])) {
                 $sql .= " AND (s.first_name LIKE :search 
                                OR s.last_name LIKE :search 
                                OR s.admission_no LIKE :search 
                                OR s.academic_type LIKE :search
                                OR s.school_class LIKE :search
-                               OR s.academy_program LIKE :search
                                OR s.guardian_name LIKE :search)";
                 $params['search'] = '%' . $filters['search'] . '%';
             }
@@ -173,12 +161,12 @@ class Student {
                         admission_no, first_name, last_name, gender, date_of_birth, 
                         enrollment_date, class_id, status, guardian_name, 
                         guardian_phone, guardian_email, address,
-                        academic_type, school_class, school_section, academy_program, academy_batch
+                        academic_type, school_class, school_section
                     ) VALUES (
                         :admission_no, :first_name, :last_name, :gender, :date_of_birth, 
                         :enrollment_date, :class_id, :status, :guardian_name, 
                         :guardian_phone, :guardian_email, :address,
-                        :academic_type, :school_class, :school_section, :academy_program, :academy_batch
+                        :academic_type, :school_class, :school_section
                     )";
             
             $stmt = $db->prepare($sql);
@@ -197,9 +185,7 @@ class Student {
                 'address' => $data['address'],
                 'academic_type' => $data['academic_type'] ?? 'School',
                 'school_class' => $data['school_class'] ?? null,
-                'school_section' => $data['school_section'] ?? null,
-                'academy_program' => $data['academy_program'] ?? null,
-                'academy_batch' => $data['academy_batch'] ?? null
+                'school_section' => $data['school_section'] ?? null
             ]);
 
             return (int)$db->lastInsertId();
@@ -233,9 +219,7 @@ class Student {
                         address = :address,
                         academic_type = :academic_type,
                         school_class = :school_class,
-                        school_section = :school_section,
-                        academy_program = :academy_program,
-                        academy_batch = :academy_batch
+                        school_section = :school_section
                     WHERE id = :id";
             
             $stmt = $db->prepare($sql);
@@ -254,9 +238,7 @@ class Student {
                 'address' => $data['address'],
                 'academic_type' => $data['academic_type'] ?? 'School',
                 'school_class' => $data['school_class'] ?? null,
-                'school_section' => $data['school_section'] ?? null,
-                'academy_program' => $data['academy_program'] ?? null,
-                'academy_batch' => $data['academy_batch'] ?? null
+                'school_section' => $data['school_section'] ?? null
             ]);
         } catch (PDOException $e) {
             error_log("Student::update error: " . $e->getMessage());

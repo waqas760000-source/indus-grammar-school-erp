@@ -152,12 +152,7 @@ if ($selectedId > 0) {
             <div>
                 <h3 class="fw-bold text-dark mb-1"><?php echo sanitize($student['first_name'] . ' ' . $student['last_name']); ?></h3>
                 <span class="badge bg-secondary px-3 rounded-pill">Type: <?php echo sanitize($student['academic_type'] ?? 'School'); ?></span>
-                <?php if (($student['academic_type'] ?? 'School') !== 'Academy'): ?>
-                    <span class="badge bg-info px-3 rounded-pill">School Class: <?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></span>
-                <?php endif; ?>
-                <?php if (($student['academic_type'] ?? 'School') !== 'School'): ?>
-                    <span class="badge bg-dark px-3 rounded-pill">Academy: <?php echo sanitize($student['academy_program'] ?? '-'); ?> (<?php echo sanitize($student['academy_batch'] ?? '-'); ?>)</span>
-                <?php endif; ?>
+                <span class="badge bg-info px-3 rounded-pill">Class: <?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></span>
             </div>
         </div>
         <div class="mt-3 mt-md-0 d-print-none">
@@ -226,13 +221,7 @@ if ($selectedId > 0) {
             <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-graduation-cap me-2 text-primary"></i>Academic Profile</h5>
             <div class="row g-3">
                 <div class="col-md-4"><span class="text-muted small d-block">Academic Type</span><strong class="text-dark"><?php echo sanitize($student['academic_type'] ?? 'School'); ?></strong></div>
-                <?php if (($student['academic_type'] ?? 'School') !== 'Academy'): ?>
-                    <div class="col-md-4"><span class="text-muted small d-block">School Class & Section</span><strong class="text-dark"><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></strong></div>
-                <?php endif; ?>
-                <?php if (($student['academic_type'] ?? 'School') !== 'School'): ?>
-                    <div class="col-md-4"><span class="text-muted small d-block">Academy Program</span><strong class="text-dark"><?php echo sanitize($student['academy_program'] ?? '-'); ?></strong></div>
-                    <div class="col-md-4"><span class="text-muted small d-block">Academy Batch</span><strong class="text-dark"><?php echo sanitize($student['academy_batch'] ?? '-'); ?></strong></div>
-                <?php endif; ?>
+                <div class="col-md-4"><span class="text-muted small d-block">Class & Section</span><strong class="text-dark"><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></strong></div>
                 <div class="col-md-4"><span class="text-muted small d-block">Previous School class</span><strong class="text-dark"><?php echo sanitize($details['prev_school'] ?: '-'); ?> (Class: <?php echo sanitize($details['prev_class'] ?: '-'); ?>)</strong></div>
                 <div class="col-md-4"><span class="text-muted small d-block">Result / Obtained marks</span><strong class="text-dark"><?php echo sanitize($details['prev_result'] ?: '-'); ?></strong></div>
                 <div class="col-md-4"><span class="text-muted small d-block">Leaving Certificate No</span><strong class="text-dark"><?php echo sanitize($details['leaving_cert_no'] ?: '-'); ?></strong></div>

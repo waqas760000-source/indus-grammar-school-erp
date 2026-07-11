@@ -309,13 +309,7 @@ try {
                     <table class="id-card-info-table">
                         <tr><td class="label">Admission No:</td><td class="value"><?php echo sanitize($row['admission_no']); ?></td></tr>
                         <tr><td class="label">Roll Number:</td><td class="value"><?php echo sanitize($row['roll_no'] ?: '-'); ?></td></tr>
-                        <?php if (($row['academic_type'] ?? 'School') !== 'Academy'): ?>
-                            <tr><td class="label">Class & Sec:</td><td class="value"><?php echo sanitize(($row['class_name'] ?? $row['school_class'] ?? '-') . ' - ' . ($row['section'] ?? $row['school_section'] ?? 'A')); ?></td></tr>
-                        <?php endif; ?>
-                        <?php if (($row['academic_type'] ?? 'School') !== 'School'): ?>
-                            <tr><td class="label">Program:</td><td class="value"><?php echo sanitize($row['academy_program'] ?? '-'); ?></td></tr>
-                            <tr><td class="label">Batch:</td><td class="value"><?php echo sanitize($row['academy_batch'] ?? '-'); ?></td></tr>
-                        <?php endif; ?>
+                        <tr><td class="label">Class & Sec:</td><td class="value"><?php echo sanitize(($row['class_name'] ?? $row['school_class'] ?? '-') . ' - ' . ($row['section'] ?? $row['school_section'] ?? 'A')); ?></td></tr>
                         <tr><td class="label">Blood Group:</td><td class="value"><?php echo sanitize($row['blood_group'] ?: '-'); ?></td></tr>
                         <tr><td class="label">Emergency:</td><td class="value"><?php echo sanitize($row['emergency_contact'] ?: '-'); ?></td></tr>
                         <tr><td class="label">Academic Session:</td><td class="value"><?php echo sanitize($row['academic_session'] ?: '-'); ?></td></tr>

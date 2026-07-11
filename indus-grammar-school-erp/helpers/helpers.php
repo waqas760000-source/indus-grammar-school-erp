@@ -153,3 +153,15 @@ function currentUser(): ?array {
         'role_name' => $_SESSION['role_name']
     ];
 }
+
+/**
+ * Safely format and display a value or its default fallback.
+ * Prevents Undefined offset and null access warnings.
+ *
+ * @param mixed $val
+ * @param string $default
+ * @return string
+ */
+function displayValue($val, string $default = '—'): string {
+    return (!isset($val) || trim((string)$val) === '') ? htmlspecialchars($default) : htmlspecialchars((string)$val);
+}

@@ -14,7 +14,7 @@ if ($studentId <= 0) {
 
 try {
     $db = Database::getConnection();
-    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
+    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
     $stmt->execute(['sid' => $studentId]);
     $student = $stmt->fetch();
 } catch (Exception $e) {
@@ -79,7 +79,7 @@ if (!$student) {
         </div>
         <div class="info-row">
             <span class="info-label">Class:</span>
-            <span class="info-value"><?php echo htmlspecialchars($student['class_name'] . ' - ' . $student['section']); ?></span>
+            <span class="info-value"><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></span>
         </div>
         <div class="info-row">
             <span class="info-label">Guardian Phone:</span>

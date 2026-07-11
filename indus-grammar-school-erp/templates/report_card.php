@@ -18,7 +18,7 @@ try {
     $db = Database::getConnection();
     
     // Fetch Student Info
-    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
+    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
     $stmt->execute(['sid' => $studentId]);
     $student = $stmt->fetch();
     
@@ -99,7 +99,10 @@ $finalGrade = ExamService::getGrading($percentage);
         </div>
         <div class="col-6 text-end">
             <table class="table table-sm table-borderless ms-auto" style="width: auto;">
-                <tr><td class="text-muted text-start" width="130">Class-Section:</td><td class="fw-bold text-end"><?php echo htmlspecialchars($student['class_name'] . ' - ' . $student['section']); ?></td></tr>
+                <tr>
+                    <td class="text-muted text-start" width="130">Class-Section:</td>
+                    <td class="fw-bold text-end"><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></td>
+                </tr>
                 <tr><td class="text-muted text-start">Academic Year:</td><td class="fw-semibold text-end"><?php echo htmlspecialchars($exam['academic_year']); ?></td></tr>
             </table>
         </div>

@@ -1,7 +1,7 @@
 <?php
 /**
- * Indus Grammar School ERP - Master Student Registration Form
- * Version 4.0.0 (School & Academy Hybrid Support)
+ * Indus Grammar School ERP - Simplified Student Registration Form
+ * Version 5.0.0
  */
 
 // 1. App Bootstrap & Authorization (Processed BEFORE any output/redirects)
@@ -70,10 +70,16 @@ if ($studentId === 0) {
     $nextRollNo = sprintf("%s-%s-%04d", PREFIX_ROLL_NO, $year, $nextNum);
 }
 
-// Classes checklist
-$classes = [];
+// Load dynamic sections from classes
+$sections = ['A', 'B', 'C', 'D', 'E'];
 try {
-    $classes = $db->query("SELECT * FROM classes ORDER BY class_name ASC, section ASC")->fetchAll();
+    $stmtSec = $db->query("SELECT DISTINCT section FROM classes WHERE section != '' ORDER BY section ASC");
+    $dbSections = $stmtSec->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($dbSections as $ds) {
+        if (!in_array($ds, $sections)) {
+            $sections[] = $ds;
+        }
+    }
 } catch (Exception $e) {}
 
 // Handle POST actions (processed before any HTML output is sent)
@@ -125,33 +131,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Please fill in all required basic student fields.");
             }
             
-            // Academic Type required field & specific validations
+            // Academic Fields
             $academic_type = sanitize($_POST['academic_type'] ?? 'School');
-            $class_id = (int)($_POST['class_id'] ?? 0);
-            $academy_program = sanitize($_POST['academy_program'] ?? '');
-            $academy_batch = sanitize($_POST['academy_batch'] ?? '');
+            $school_class = sanitize($_POST['school_class'] ?? '');
+            $school_section = sanitize($_POST['school_section'] ?? '');
             
-            $school_class = null;
-            $school_section = null;
-            
-            if ($academic_type === 'School' || $academic_type === 'School + Academy') {
-                if ($class_id <= 0) {
-                    throw new Exception("School Class and Section are required for School students.");
-                }
-                // Resolve Class Name and Section Name from classes table
-                $stmtCls = $db->prepare("SELECT class_name, section FROM classes WHERE id = ?");
-                $stmtCls->execute([$class_id]);
-                $clsRow = $stmtCls->fetch();
-                if ($clsRow) {
-                    $school_class = $clsRow['class_name'];
-                    $school_section = $clsRow['section'];
-                }
+            if (!$school_class || !$school_section) {
+                throw new Exception("Class and Section are required fields.");
             }
             
-            if ($academic_type === 'Academy' || $academic_type === 'School + Academy') {
-                if (!$academy_program || !$academy_batch) {
-                    throw new Exception("Academy Program and Batch are required for Academy students.");
-                }
+            // Dynamic Lookup/Insert of selected class and section combination
+            $stmtCls = $db->prepare("SELECT id FROM classes WHERE class_name = ? AND section = ?");
+            $stmtCls->execute([$school_class, $school_section]);
+            $class_id = $stmtCls->fetchColumn();
+            
+            if (!$class_id) {
+                $stmtInsert = $db->prepare("INSERT INTO classes (class_name, section) VALUES (?, ?)");
+                $stmtInsert->execute([$school_class, $school_section]);
+                $class_id = (int)$db->lastInsertId();
             }
             
             // Capture identifiers
@@ -163,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new Exception("Admission Number is a required field.");
             }
             
-            // Convert empty inputs to NULL for unique database index mapping compat
+            // Convert empty inputs to NULL for unique database index mapping compatibility
             $roll_no = ($roll_no === '') ? null : $roll_no;
             $cnic_no = ($cnic_no === '') ? null : $cnic_no;
             
@@ -174,10 +171,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $father_cnic = sanitize($_POST['father_cnic'] ?? '');
             if ($father_cnic && !preg_match('/^\d{5}-\d{7}-\d{1}$/', $father_cnic)) {
                 throw new Exception("Father CNIC format must be XXXXX-XXXXXXX-X.");
-            }
-            $mother_cnic = sanitize($_POST['mother_cnic'] ?? '');
-            if ($mother_cnic && !preg_match('/^\d{5}-\d{7}-\d{1}$/', $mother_cnic)) {
-                throw new Exception("Mother CNIC format must be XXXXX-XXXXXXX-X.");
             }
             
             $guardian_email = sanitize($_POST['guardian_email'] ?? '');
@@ -214,10 +207,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmtSt = $db->prepare("
                     INSERT INTO students (
                         admission_no, first_name, last_name, gender, date_of_birth, enrollment_date, class_id, status, guardian_name, guardian_phone, guardian_email, address,
-                        academic_type, school_class, school_section, academy_program, academy_batch
+                        academic_type, school_class, school_section
                     ) VALUES (
                         :adm, :fn, :ln, :gen, :dob, :enr, :cid, :stat, :gname, :gphone, :gemail, :addr,
-                        :academic_type, :school_class, :school_section, :academy_program, :academy_batch
+                        :academic_type, :school_class, :school_section
                     )
                 ");
                 $stmtSt->execute([
@@ -227,7 +220,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'gen' => $gender,
                     'dob' => $dob,
                     'enr' => sanitize($_POST['admission_date'] ?? date('Y-m-d')),
-                    'cid' => ($class_id > 0) ? $class_id : null,
+                    'cid' => $class_id,
                     'stat' => $status,
                     'gname' => $guardian_name,
                     'gphone' => $guardian_phone,
@@ -235,9 +228,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'addr' => sanitize($_POST['current_address'] ?? ''),
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
-                    'school_section' => $school_section,
-                    'academy_program' => $academy_program ?: null,
-                    'academy_batch' => $academy_batch ?: null
+                    'school_section' => $school_section
                 ]);
                 $currStudentId = (int)$db->lastInsertId();
             } else {
@@ -269,8 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         admission_no = :adm, first_name = :fn, last_name = :ln, gender = :gen, date_of_birth = :dob, 
                         class_id = :cid, status = :stat, guardian_name = :gname, guardian_phone = :gphone, 
                         guardian_email = :gemail, address = :addr,
-                        academic_type = :academic_type, school_class = :school_class, school_section = :school_section, 
-                        academy_program = :academy_program, academy_batch = :academy_batch
+                        academic_type = :academic_type, school_class = :school_class, school_section = :school_section
                     WHERE id = :id
                 ");
                 $stmtSt->execute([
@@ -280,7 +270,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'ln' => $last_name,
                     'gen' => $gender,
                     'dob' => $dob,
-                    'cid' => ($class_id > 0) ? $class_id : null,
+                    'cid' => $class_id,
                     'stat' => $status,
                     'gname' => $guardian_name,
                     'gphone' => $guardian_phone,
@@ -288,97 +278,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'addr' => sanitize($_POST['current_address'] ?? ''),
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
-                    'school_section' => $school_section,
-                    'academy_program' => $academy_program ?: null,
-                    'academy_batch' => $academy_batch ?: null
+                    'school_section' => $school_section
                 ]);
             }
             
-            // Upload documents
+            // Upload student photo doc
             $docErr = '';
             $docStudentPhoto = uploadStudentDoc('doc_student_photo', $currStudentId, 'std', $docErr);
-            $docFatherCnic = uploadStudentDoc('doc_father_cnic', $currStudentId, 'fcnic', $docErr);
-            $docMotherCnic = uploadStudentDoc('doc_mother_cnic', $currStudentId, 'mcnic', $docErr);
-            $docBForm = uploadStudentDoc('doc_bform', $currStudentId, 'bform', $docErr);
-            $docBirthCert = uploadStudentDoc('doc_birth_cert', $currStudentId, 'birth', $docErr);
-            $docLeavingCert = uploadStudentDoc('doc_leaving_cert', $currStudentId, 'leaving', $docErr);
-            $docPrevResult = uploadStudentDoc('doc_prev_result', $currStudentId, 'result', $docErr);
-            $docMedicalCert = uploadStudentDoc('doc_medical_cert', $currStudentId, 'medical', $docErr);
-            $docOther = uploadStudentDoc('doc_other', $currStudentId, 'other', $docErr);
-            
             if ($docErr) throw new Exception($docErr);
             
-            // Load existing files if updating and no new upload was provided
             if ($action === 'update' && $details) {
                 $docStudentPhoto = $docStudentPhoto ?: $details['doc_student_photo'];
-                $docFatherCnic = $docFatherCnic ?: $details['doc_father_cnic'];
-                $docMotherCnic = $docMotherCnic ?: $details['doc_mother_cnic'];
-                $docBForm = $docBForm ?: $details['doc_bform'];
-                $docBirthCert = $docBirthCert ?: $details['doc_birth_cert'];
-                $docLeavingCert = $docLeavingCert ?: $details['doc_leaving_cert'];
-                $docPrevResult = $docPrevResult ?: $details['doc_prev_result'];
-                $docMedicalCert = $docMedicalCert ?: $details['doc_medical_cert'];
-                $docOther = $docOther ?: $details['doc_other'];
             }
             
             // 2. Insert/Update student_registration_details
             $stmtDet = $db->prepare("
                 INSERT INTO student_registration_details (
                     student_id, roll_no, admission_date, academic_session, campus,
-                    blood_group, religion, nationality, cnic_no, birth_cert_no, birth_place, student_mobile, student_email,
-                    father_name, father_cnic, father_mobile, father_occupation, father_office, father_income, father_email, father_photo,
-                    mother_name, mother_cnic, mother_mobile, mother_occupation, mother_email, mother_photo,
-                    guardian_relationship, guardian_cnic, guardian_address, current_address, permanent_address, city, province, postal_code, country,
-                    prev_school, prev_class, prev_roll_no, prev_result, leaving_cert_no, test_marks,
-                    medical_condition, allergies, disability, emergency_contact, doctor_name, doctor_contact,
-                    transport_required, transport_route, pickup_point, drop_point, transport_vehicle, transport_driver,
-                    sponsor_required, sponsor_name, sponsor_org, sponsor_contact, sponsor_amount,
-                    fee_plan, fee_admission, fee_monthly, fee_discount, fee_scholarship, fee_fine, fee_security,
-                    remarks, special_notes, doc_student_photo, doc_father_cnic, doc_mother_cnic, doc_bform, doc_birth_cert,
-                    doc_leaving_cert, doc_prev_result, doc_medical_cert, doc_other,
-                    academic_type, school_class, school_section, academy_program, academy_batch
+                    cnic_no, student_mobile, student_email,
+                    father_name, father_cnic, father_mobile,
+                    guardian_relationship, guardian_cnic, guardian_address, current_address, permanent_address,
+                    fee_plan, fee_admission, fee_monthly,
+                    remarks, doc_student_photo,
+                    academic_type, school_class, school_section
                 ) VALUES (
                     :sid, :roll, :adate, :sess, :camp,
-                    :bg, :rel, :nat, :cnic, :bcert, :bplace, :smob, :sem,
-                    :fname, :fcnic, :fmob, :focc, :foff, :finc, :fem, :fphoto,
-                    :mname, :mcnic, :mmob, :mocc, :mem, :mphoto,
-                    :grel, :gcnic, :gaddr, :curr_addr, :perm_addr, :city, :prov, :pcode, :country,
-                    :pschool, :pclass, :proll, :presult, :lcert, :tmarks,
-                    :mcond, :aller, :disab, :econtact, :docname, :doccontact,
-                    :treq, :troute, :tpick, :tdrop, :tveh, :tdrv,
-                    :sreq, :sname, :sorg, :scont, :samt,
-                    :fplan, :fadm, :fmonth, :fdisc, :fschol, :ffine, :fsec,
-                    :rem, :notes, :d_std, :d_fcnic, :d_mcnic, :d_bform, :d_bcert,
-                    :d_lcert, :d_pres, :d_med, :d_oth,
-                    :academic_type, :school_class, :school_section, :academy_program, :academy_batch
+                    :cnic, :smob, :sem,
+                    :fname, :fcnic, :fmob,
+                    :grel, :gcnic, :gaddr, :curr_addr, :perm_addr,
+                    :fplan, :fadm, :fmonth,
+                    :rem, :d_std,
+                    :academic_type, :school_class, :school_section
                 ) ON DUPLICATE KEY UPDATE 
                     roll_no = VALUES(roll_no), admission_date = VALUES(admission_date), academic_session = VALUES(academic_session),
-                    campus = VALUES(campus), blood_group = VALUES(blood_group), religion = VALUES(religion),
-                    nationality = VALUES(nationality), cnic_no = VALUES(cnic_no), birth_cert_no = VALUES(birth_cert_no),
-                    birth_place = VALUES(birth_place), student_mobile = VALUES(student_mobile), student_email = VALUES(student_email),
+                    campus = VALUES(campus), cnic_no = VALUES(cnic_no), student_mobile = VALUES(student_mobile), student_email = VALUES(student_email),
                     father_name = VALUES(father_name), father_cnic = VALUES(father_cnic), father_mobile = VALUES(father_mobile),
-                    father_occupation = VALUES(father_occupation), father_office = VALUES(father_office), father_income = VALUES(father_income),
-                    father_email = VALUES(father_email), father_photo = VALUES(father_photo), mother_name = VALUES(mother_name),
-                    mother_cnic = VALUES(mother_cnic), mother_mobile = VALUES(mother_mobile), mother_occupation = VALUES(mother_occupation),
-                    mother_email = VALUES(mother_email), mother_photo = VALUES(mother_photo), guardian_relationship = VALUES(guardian_relationship),
-                    guardian_cnic = VALUES(guardian_cnic), guardian_address = VALUES(guardian_address), current_address = VALUES(current_address),
-                    permanent_address = VALUES(permanent_address), city = VALUES(city), province = VALUES(province), postal_code = VALUES(postal_code),
-                    country = VALUES(country), prev_school = VALUES(prev_school), prev_class = VALUES(prev_class), prev_roll_no = VALUES(prev_roll_no),
-                    prev_result = VALUES(prev_result), leaving_cert_no = VALUES(leaving_cert_no), test_marks = VALUES(test_marks),
-                    medical_condition = VALUES(medical_condition), allergies = VALUES(allergies), disability = VALUES(disability),
-                    emergency_contact = VALUES(emergency_contact), doctor_name = VALUES(doctor_name), doctor_contact = VALUES(doctor_contact),
-                    transport_required = VALUES(transport_required), transport_route = VALUES(transport_route), pickup_point = VALUES(pickup_point),
-                    drop_point = VALUES(drop_point), transport_vehicle = VALUES(transport_vehicle), transport_driver = VALUES(transport_driver),
-                    sponsor_required = VALUES(sponsor_required), sponsor_name = VALUES(sponsor_name), sponsor_org = VALUES(sponsor_org),
-                    sponsor_contact = VALUES(sponsor_contact), sponsor_amount = VALUES(sponsor_amount), fee_plan = VALUES(fee_plan),
-                    fee_admission = VALUES(fee_admission), fee_monthly = VALUES(fee_monthly), fee_discount = VALUES(fee_discount),
-                    fee_scholarship = VALUES(fee_scholarship), fee_fine = VALUES(fee_fine), fee_security = VALUES(fee_security),
-                    remarks = VALUES(remarks), special_notes = VALUES(special_notes), doc_student_photo = VALUES(doc_student_photo),
-                    doc_father_cnic = VALUES(doc_father_cnic), doc_mother_cnic = VALUES(doc_mother_cnic), doc_bform = VALUES(doc_bform),
-                    doc_birth_cert = VALUES(doc_birth_cert), doc_leaving_cert = VALUES(doc_leaving_cert), doc_prev_result = VALUES(doc_prev_result),
-                    doc_medical_cert = VALUES(doc_medical_cert), doc_other = VALUES(doc_other),
-                    academic_type = VALUES(academic_type), school_class = VALUES(school_class), school_section = VALUES(school_section),
-                    academy_program = VALUES(academy_program), academy_batch = VALUES(academy_batch)
+                    guardian_relationship = VALUES(guardian_relationship), guardian_cnic = VALUES(guardian_cnic), guardian_address = VALUES(guardian_address),
+                    current_address = VALUES(current_address), permanent_address = VALUES(permanent_address),
+                    fee_plan = VALUES(fee_plan), fee_admission = VALUES(fee_admission), fee_monthly = VALUES(fee_monthly),
+                    remarks = VALUES(remarks), doc_student_photo = VALUES(doc_student_photo),
+                    academic_type = VALUES(academic_type), school_class = VALUES(school_class), school_section = VALUES(school_section)
             ");
             
             $stmtDet->execute([
@@ -387,83 +326,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'adate' => sanitize($_POST['admission_date'] ?? date('Y-m-d')),
                 'sess' => sanitize($_POST['academic_session'] ?? ''),
                 'camp' => sanitize($_POST['campus'] ?? ''),
-                'bg' => sanitize($_POST['blood_group'] ?? ''),
-                'rel' => sanitize($_POST['religion'] ?? ''),
-                'nat' => sanitize($_POST['nationality'] ?? ''),
                 'cnic' => $cnic_no,
-                'bcert' => sanitize($_POST['birth_certificate_number'] ?? ''),
-                'bplace' => sanitize($_POST['place_of_birth'] ?? ''),
                 'smob' => sanitize($_POST['student_mobile'] ?? ''),
                 'sem' => $student_email,
                 'fname' => sanitize($_POST['father_name'] ?? ''),
                 'fcnic' => $father_cnic,
                 'fmob' => sanitize($_POST['father_mobile'] ?? ''),
-                'focc' => sanitize($_POST['father_occupation'] ?? ''),
-                'foff' => sanitize($_POST['office_address'] ?? ''),
-                'finc' => (float)($_POST['monthly_income'] ?? 0.00),
-                'fem' => sanitize($_POST['father_email'] ?? ''),
-                'fphoto' => $docFatherCnic ?: '',
-                'mname' => sanitize($_POST['mother_name'] ?? ''),
-                'mcnic' => $mother_cnic,
-                'mmob' => sanitize($_POST['mother_mobile'] ?? ''),
-                'mocc' => sanitize($_POST['mother_occupation'] ?? ''),
-                'mem' => sanitize($_POST['mother_email'] ?? ''),
-                'mphoto' => $docMotherCnic ?: '',
                 'grel' => sanitize($_POST['relationship'] ?? ''),
                 'gcnic' => sanitize($_POST['guardian_cnic'] ?? ''),
                 'gaddr' => sanitize($_POST['guardian_address'] ?? ''),
                 'curr_addr' => sanitize($_POST['current_address'] ?? ''),
                 'perm_addr' => sanitize($_POST['permanent_address'] ?? ''),
-                'city' => sanitize($_POST['city'] ?? ''),
-                'prov' => sanitize($_POST['province'] ?? ''),
-                'pcode' => sanitize($_POST['postal_code'] ?? ''),
-                'country' => sanitize($_POST['country'] ?? ''),
-                'pschool' => sanitize($_POST['previous_school'] ?? ''),
-                'pclass' => sanitize($_POST['previous_class'] ?? ''),
-                'proll' => sanitize($_POST['previous_roll_number'] ?? ''),
-                'presult' => sanitize($_POST['previous_result'] ?? ''),
-                'lcert' => sanitize($_POST['leaving_certificate_number'] ?? ''),
-                'tmarks' => (float)($_POST['admission_test_marks'] ?? 0.00),
-                'mcond' => sanitize($_POST['medical_condition'] ?? ''),
-                'aller' => sanitize($_POST['allergies'] ?? ''),
-                'disab' => sanitize($_POST['disability'] ?? ''),
-                'econtact' => sanitize($_POST['emergency_contact'] ?? ''),
-                'docname' => sanitize($_POST['doctor_name'] ?? ''),
-                'doccontact' => sanitize($_POST['doctor_contact'] ?? ''),
-                'treq' => isset($_POST['transport_required']) ? 1 : 0,
-                'troute' => sanitize($_POST['transport_route'] ?? ''),
-                'tpick' => sanitize($_POST['pickup_point'] ?? ''),
-                'tdrop' => sanitize($_POST['drop_point'] ?? ''),
-                'tveh' => sanitize($_POST['transport_vehicle'] ?? ''),
-                'tdrv' => sanitize($_POST['transport_driver'] ?? ''),
-                'sreq' => isset($_POST['sponsor_required']) ? 1 : 0,
-                'sname' => sanitize($_POST['sponsor_name'] ?? ''),
-                'sorg' => sanitize($_POST['sponsor_org'] ?? ''),
-                'scont' => sanitize($_POST['sponsor_contact'] ?? ''),
-                'samt' => (float)($_POST['sponsor_amount'] ?? 0.00),
                 'fplan' => sanitize($_POST['fee_plan'] ?? ''),
                 'fadm' => (float)($_POST['fee_admission'] ?? 0.00),
                 'fmonth' => (float)($_POST['fee_monthly'] ?? 0.00),
-                'fdisc' => (float)($_POST['fee_discount'] ?? 0.00),
-                'fschol' => (float)($_POST['fee_scholarship'] ?? 0.00),
-                'ffine' => (float)($_POST['fee_fine'] ?? 0.00),
-                'fsec' => (float)($_POST['fee_security'] ?? 0.00),
                 'rem' => sanitize($_POST['remarks'] ?? ''),
-                'notes' => sanitize($_POST['special_notes'] ?? ''),
                 'd_std' => $docStudentPhoto ?: '',
-                'd_fcnic' => $docFatherCnic ?: '',
-                'd_mcnic' => $docMotherCnic ?: '',
-                'd_bform' => $docBForm ?: '',
-                'd_bcert' => $docBirthCert ?: '',
-                'd_lcert' => $docLeavingCert ?: '',
-                'd_pres' => $docPrevResult ?: '',
-                'd_med' => $docMedicalCert ?: '',
-                'd_oth' => $docOther ?: '',
                 'academic_type' => $academic_type,
                 'school_class' => $school_class,
-                'school_section' => $school_section,
-                'academy_program' => $academy_program ?: null,
-                'academy_batch' => $academy_batch ?: null
+                'school_section' => $school_section
             ]);
             
             // Record audit logs
@@ -549,7 +430,7 @@ include_once __DIR__ . '/../../includes/header.php';
     </div>
 </div>
 
-<!-- Progressive Wizard form layout -->
+<!-- Progressive form layout -->
 <form id="registrationForm" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
     <input type="hidden" name="action" id="formAction" value="<?php echo ($studentId > 0) ? 'update' : 'save'; ?>">
     <input type="hidden" name="student_id" value="<?php echo $studentId; ?>">
@@ -575,90 +456,65 @@ include_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- Stepper Accordion Sections -->
-    <div class="accordion" id="registrationStepper">
+    <!-- 4 Clean Stacked cards layout -->
+    <div class="row g-4">
         
-        <!-- SECTION 1: Admission & Program Identifiers -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#secAdmission">
-                    <i class="fa-solid fa-school text-primary me-2"></i> 1. Admission & System Identifiers
-                </button>
-            </h2>
-            <div id="secAdmission" class="accordion-collapse collapse show" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
+        <!-- CARD 1: Academic Placement -->
+        <div class="col-md-6 col-lg-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-school text-primary me-2"></i> 1. Academic Placement</h5>
+                </div>
+                <div class="card-body bg-white p-4">
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Admission Number (Required) *</label>
-                            <input type="text" class="form-control <?php echo $isSuperAdmin ? '' : 'bg-light'; ?>" name="admission_no" value="<?php echo sanitize($nextAdmissionNo); ?>" placeholder="ADM-2026-0001" <?php echo $isSuperAdmin ? '' : 'readonly'; ?> required>
-                            <?php if (!$isSuperAdmin): ?>
-                                <small class="text-muted d-block mt-1"><i class="fa-solid fa-circle-info me-1"></i>Admission Number edits are restricted to Super Admins.</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Academic Type *</label>
                             <select class="form-select" name="academic_type" id="academicTypeSelect" required>
                                 <option value="School" <?php echo (($student['academic_type'] ?? 'School') === 'School') ? 'selected' : ''; ?>>School</option>
                                 <option value="Academy" <?php echo (($student['academic_type'] ?? '') === 'Academy') ? 'selected' : ''; ?>>Academy</option>
-                                <option value="School + Academy" <?php echo (($student['academic_type'] ?? '') === 'School + Academy') ? 'selected' : ''; ?>>School + Academy</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Roll Number</label>
-                            <input type="text" class="form-control" id="rollNumberInput" name="roll_no" value="<?php echo sanitize($nextRollNo); ?>" placeholder="10-A-001">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Admission Number *</label>
+                            <input type="text" class="form-control <?php echo $isSuperAdmin ? '' : 'bg-light'; ?>" name="admission_no" value="<?php echo sanitize($nextAdmissionNo); ?>" placeholder="ADM-2026-0001" <?php echo $isSuperAdmin ? '' : 'readonly'; ?> required>
                         </div>
-
-                        <!-- School Class Group -->
-                        <div class="col-md-6 school-group-field" style="transition: all 0.3s ease;">
-                            <label class="form-label small fw-semibold text-muted">School Class *</label>
-                            <select class="form-select" name="class_id" id="classSelect">
-                                <option value="">— Select School Class —</option>
-                                <?php foreach ($classes as $c): ?>
-                                    <option value="<?php echo $c['id']; ?>" data-section="<?php echo sanitize($c['section']); ?>" <?php echo (($student['class_id'] ?? 0) == $c['id']) ? 'selected' : ''; ?>>
-                                        <?php echo sanitize($c['class_name']); ?>
-                                    </option>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Class *</label>
+                            <select class="form-select" name="school_class" id="schoolClassSelect" required>
+                                <option value="">— Select Class —</option>
+                                <?php foreach (['Play Group', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'] as $cls): ?>
+                                    <option value="<?php echo $cls; ?>" <?php echo (($student['school_class'] ?? '') === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6 school-group-field" style="transition: all 0.3s ease;">
-                            <label class="form-label small fw-semibold text-muted">School Section</label>
-                            <input type="text" class="form-control bg-light" id="sectionInput" name="section_name" readonly value="" placeholder="Auto Selected">
-                        </div>
-
-                        <!-- Academy Program Group -->
-                        <div class="col-md-6 academy-group-field" style="transition: all 0.3s ease; display: none;">
-                            <label class="form-label small fw-semibold text-muted">Academy Program *</label>
-                            <select class="form-select" name="academy_program" id="academyProgramSelect">
-                                <option value="">— Select Academy Program —</option>
-                                <?php foreach(['9th Entry Test', '10th Entry Test', '1st Year Entry Test', '2nd Year Entry Test', 'MDCAT', 'ECAT', 'ICS Preparation', 'Pre-Medical', 'Pre-Engineering', 'Computer Courses', 'English Language', 'Spoken English', 'IELTS', 'Other'] as $prog): ?>
-                                    <option value="<?php echo $prog; ?>" <?php echo (($student['academy_program'] ?? '') === $prog) ? 'selected' : ''; ?>><?php echo $prog; ?></option>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Section *</label>
+                            <select class="form-select" name="school_section" id="schoolSectionSelect" required>
+                                <option value="">— Select Section —</option>
+                                <?php foreach ($sections as $sec): ?>
+                                    <option value="<?php echo $sec; ?>" <?php echo (($student['school_section'] ?? '') === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-6 academy-group-field" style="transition: all 0.3s ease; display: none;">
-                            <label class="form-label small fw-semibold text-muted">Academy Batch *</label>
-                            <input type="text" class="form-control" name="academy_batch" id="academyBatchInput" value="<?php echo sanitize($student['academy_batch'] ?? ''); ?>" placeholder="e.g. Morning Batch A">
-                        </div>
-
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Admission Date *</label>
                             <input type="date" class="form-control" name="admission_date" value="<?php echo $student['enrollment_date'] ?? date('Y-m-d'); ?>" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Academic Session *</label>
                             <select class="form-select" name="academic_session" required>
                                 <option value="2026-2027" <?php echo (($details['academic_session'] ?? '') === '2026-2027') ? 'selected' : ''; ?>>2026-2027</option>
                                 <option value="2025-2026" <?php echo (($details['academic_session'] ?? '') === '2025-2026') ? 'selected' : ''; ?>>2025-2026</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Campus *</label>
                             <select class="form-select" name="campus" required>
                                 <option value="Main Campus" <?php echo (($details['campus'] ?? '') === 'Main Campus') ? 'selected' : ''; ?>>Main Campus</option>
                                 <option value="City Campus" <?php echo (($details['campus'] ?? '') === 'City Campus') ? 'selected' : ''; ?>>City Campus</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Status *</label>
                             <select class="form-select" name="status" required>
                                 <option value="Active" <?php echo (($student['status'] ?? 'Active') === 'Active') ? 'selected' : ''; ?>>Active</option>
@@ -666,540 +522,143 @@ include_once __DIR__ . '/../../includes/header.php';
                                 <option value="Graduated" <?php echo (($student['status'] ?? '') === 'Graduated') ? 'selected' : ''; ?>>Graduated</option>
                             </select>
                         </div>
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold text-muted">Roll Number</label>
+                            <input type="text" class="form-control" name="roll_no" value="<?php echo sanitize($nextRollNo); ?>" placeholder="e.g. 10-A-001">
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION 2: Student Personal Information -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secStudent">
-                    <i class="fa-solid fa-user text-primary me-2"></i> 2. Student Personal Information
-                </button>
-            </h2>
-            <div id="secStudent" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
+        <!-- CARD 2: Student Personal Info -->
+        <div class="col-md-6 col-lg-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-user text-primary me-2"></i> 2. Personal Information</h5>
+                </div>
+                <div class="card-body bg-white p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">First Name *</label>
-                            <input type="text" class="form-control" name="first_name" value="<?php echo sanitize($student['first_name'] ?? $_POST['first_name'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="first_name" value="<?php echo sanitize($student['first_name'] ?? ''); ?>" required placeholder="e.g. Zain">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Last Name *</label>
-                            <input type="text" class="form-control" name="last_name" value="<?php echo sanitize($student['last_name'] ?? $_POST['last_name'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="last_name" value="<?php echo sanitize($student['last_name'] ?? ''); ?>" required placeholder="e.g. Khan">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Gender *</label>
                             <select class="form-select" name="gender" required>
-                                <option value="Male" <?php echo (($student['gender'] ?? $_POST['gender'] ?? '') === 'Male') ? 'selected' : ''; ?>>Male</option>
-                                <option value="Female" <?php echo (($student['gender'] ?? $_POST['gender'] ?? '') === 'Female') ? 'selected' : ''; ?>>Female</option>
-                                <option value="Other" <?php echo (($student['gender'] ?? $_POST['gender'] ?? '') === 'Other') ? 'selected' : ''; ?>>Other</option>
+                                <option value="Male" <?php echo (($student['gender'] ?? '') === 'Male') ? 'selected' : ''; ?>>Male</option>
+                                <option value="Female" <?php echo (($student['gender'] ?? '') === 'Female') ? 'selected' : ''; ?>>Female</option>
+                                <option value="Other" <?php echo (($student['gender'] ?? '') === 'Other') ? 'selected' : ''; ?>>Other</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Date of Birth *</label>
-                            <input type="date" class="form-control" id="dobInput" name="date_of_birth" value="<?php echo $student['date_of_birth'] ?? $_POST['date_of_birth'] ?? ''; ?>" required>
+                            <input type="date" class="form-control" id="dobInput" name="date_of_birth" value="<?php echo $student['date_of_birth'] ?? ''; ?>" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Age (Auto Calculated)</label>
                             <input type="text" class="form-control bg-light" id="ageInput" readonly value="">
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Blood Group</label>
-                            <select class="form-select" name="blood_group">
-                                <option value="">— Select —</option>
-                                <?php foreach(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as $bg): ?>
-                                    <option value="<?php echo $bg; ?>" <?php echo (($details['blood_group'] ?? $_POST['blood_group'] ?? '') === $bg) ? 'selected' : ''; ?>><?php echo $bg; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Religion</label>
-                            <input type="text" class="form-control" name="religion" value="<?php echo sanitize($details['religion'] ?? $_POST['religion'] ?? 'Islam'); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Nationality</label>
-                            <input type="text" class="form-control" name="nationality" value="<?php echo sanitize($details['nationality'] ?? $_POST['nationality'] ?? 'Pakistani'); ?>">
-                        </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">B-Form / CNIC Number *</label>
-                            <input type="text" class="form-control" name="cnic_no" placeholder="35201-1234567-1" value="<?php echo sanitize($details['cnic_no'] ?? $_POST['cnic_no'] ?? ''); ?>" required>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Birth Certificate Number</label>
-                            <input type="text" class="form-control" name="birth_certificate_number" value="<?php echo sanitize($details['birth_cert_no'] ?? $_POST['birth_certificate_number'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Place of Birth</label>
-                            <input type="text" class="form-control" name="place_of_birth" value="<?php echo sanitize($details['birth_place'] ?? $_POST['place_of_birth'] ?? ''); ?>">
+                            <input type="text" class="form-control" name="cnic_no" placeholder="35201-1234567-1" value="<?php echo sanitize($details['cnic_no'] ?? ''); ?>" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Student Mobile</label>
-                            <input type="tel" class="form-control" name="student_mobile" value="<?php echo sanitize($details['student_mobile'] ?? $_POST['student_mobile'] ?? ''); ?>">
+                            <input type="tel" class="form-control" name="student_mobile" value="<?php echo sanitize($details['student_mobile'] ?? ''); ?>">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Student Email</label>
-                            <input type="email" class="form-control" name="student_email" value="<?php echo sanitize($details['student_email'] ?? $_POST['student_email'] ?? ''); ?>">
+                            <input type="email" class="form-control" name="student_email" value="<?php echo sanitize($details['student_email'] ?? ''); ?>">
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION 3: Father Information -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secFather">
-                    <i class="fa-solid fa-user-tie text-primary me-2"></i> 3. Father Information
-                </button>
-            </h2>
-            <div id="secFather" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
+        <!-- CARD 3: Parent & Contact Details -->
+        <div class="col-md-6 col-lg-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-user-tie text-primary me-2"></i> 3. Parents & Contact Details</h5>
+                </div>
+                <div class="card-body bg-white p-4">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Father Name *</label>
-                            <input type="text" class="form-control" name="father_name" value="<?php echo sanitize($details['father_name'] ?? $_POST['father_name'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="father_name" value="<?php echo sanitize($details['father_name'] ?? ''); ?>" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Father CNIC *</label>
-                            <input type="text" class="form-control" name="father_cnic" placeholder="35201-1234567-1" value="<?php echo sanitize($details['father_cnic'] ?? $_POST['father_cnic'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="father_cnic" placeholder="35201-1234567-1" value="<?php echo sanitize($details['father_cnic'] ?? ''); ?>" required>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Father Mobile *</label>
-                            <input type="tel" class="form-control" name="father_mobile" value="<?php echo sanitize($details['father_mobile'] ?? $_POST['father_mobile'] ?? ''); ?>" required>
+                            <input type="tel" class="form-control" name="father_mobile" value="<?php echo sanitize($details['father_mobile'] ?? ''); ?>" required>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Father Occupation</label>
-                            <input type="text" class="form-control" name="father_occupation" value="<?php echo sanitize($details['father_occupation'] ?? $_POST['father_occupation'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Monthly Income (Rs.)</label>
-                            <input type="number" class="form-control" name="monthly_income" value="<?php echo (float)($details['father_income'] ?? $_POST['monthly_income'] ?? 0.00); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Office Address</label>
-                            <textarea class="form-control" name="office_address" rows="2"><?php echo sanitize($details['father_office'] ?? $_POST['office_address'] ?? ''); ?></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Father Email</label>
-                            <input type="email" class="form-control" name="father_email" value="<?php echo sanitize($details['father_email'] ?? $_POST['father_email'] ?? ''); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 4: Mother Information -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secMother">
-                    <i class="fa-solid fa-person-breastfeeding text-primary me-2"></i> 4. Mother Information
-                </button>
-            </h2>
-            <div id="secMother" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Mother Name</label>
-                            <input type="text" class="form-control" name="mother_name" value="<?php echo sanitize($details['mother_name'] ?? $_POST['mother_name'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Mother CNIC</label>
-                            <input type="text" class="form-control" name="mother_cnic" placeholder="35201-1234567-1" value="<?php echo sanitize($details['mother_cnic'] ?? $_POST['mother_cnic'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Mother Mobile</label>
-                            <input type="tel" class="form-control" name="mother_mobile" value="<?php echo sanitize($details['mother_mobile'] ?? $_POST['mother_mobile'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Occupation</label>
-                            <input type="text" class="form-control" name="mother_occupation" value="<?php echo sanitize($details['mother_occupation'] ?? $_POST['mother_occupation'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Mother Email</label>
-                            <input type="email" class="form-control" name="mother_email" value="<?php echo sanitize($details['mother_email'] ?? $_POST['mother_email'] ?? ''); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 5: Guardian Information -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secGuardian">
-                    <i class="fa-solid fa-user-shield text-primary me-2"></i> 5. Guardian Information
-                </button>
-            </h2>
-            <div id="secGuardian" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Guardian Name *</label>
-                            <input type="text" class="form-control" name="guardian_name" value="<?php echo sanitize($student['guardian_name'] ?? $_POST['guardian_name'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="guardian_name" value="<?php echo sanitize($student['guardian_name'] ?? ''); ?>" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Guardian Phone *</label>
+                            <input type="tel" class="form-control" name="guardian_phone" value="<?php echo sanitize($student['guardian_phone'] ?? ''); ?>" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Relationship *</label>
-                            <input type="text" class="form-control" name="relationship" placeholder="Father, Uncle, Mother..." value="<?php echo sanitize($details['guardian_relationship'] ?? $_POST['relationship'] ?? ''); ?>" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Guardian CNIC</label>
-                            <input type="text" class="form-control" name="guardian_cnic" placeholder="35201-1234567-1" value="<?php echo sanitize($details['guardian_cnic'] ?? $_POST['guardian_cnic'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Guardian Mobile *</label>
-                            <input type="tel" class="form-control" name="guardian_phone" value="<?php echo sanitize($student['guardian_phone'] ?? $_POST['guardian_phone'] ?? ''); ?>" required>
+                            <input type="text" class="form-control" name="relationship" placeholder="Father, Uncle, Mother..." value="<?php echo sanitize($details['guardian_relationship'] ?? ''); ?>" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label small fw-semibold text-muted">Guardian Address</label>
-                            <textarea class="form-control" name="guardian_address" rows="2"><?php echo sanitize($details['guardian_address'] ?? $_POST['guardian_address'] ?? ''); ?></textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 6: Address Information -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secAddress">
-                    <i class="fa-solid fa-location-dot text-primary me-2"></i> 6. Address Information
-                </button>
-            </h2>
-            <div id="secAddress" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Current Address *</label>
-                            <textarea class="form-control" name="current_address" rows="2" required><?php echo sanitize($details['current_address'] ?? $student['address'] ?? $_POST['current_address'] ?? ''); ?></textarea>
+                            <textarea class="form-control" name="current_address" rows="2" required><?php echo sanitize($details['current_address'] ?? $student['address'] ?? ''); ?></textarea>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-12">
                             <label class="form-label small fw-semibold text-muted">Permanent Address</label>
-                            <textarea class="form-control" name="permanent_address" rows="2"><?php echo sanitize($details['permanent_address'] ?? $_POST['permanent_address'] ?? ''); ?></textarea>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">City</label>
-                            <input type="text" class="form-control" name="city" value="<?php echo sanitize($details['city'] ?? $_POST['city'] ?? 'Lahore'); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Province</label>
-                            <input type="text" class="form-control" name="province" value="<?php echo sanitize($details['province'] ?? $_POST['province'] ?? 'Punjab'); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Postal Code</label>
-                            <input type="text" class="form-control" name="postal_code" value="<?php echo sanitize($details['postal_code'] ?? $_POST['postal_code'] ?? '54000'); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Country</label>
-                            <input type="text" class="form-control" name="country" value="<?php echo sanitize($details['country'] ?? $_POST['country'] ?? 'Pakistan'); ?>">
+                            <textarea class="form-control" name="permanent_address" rows="2"><?php echo sanitize($details['permanent_address'] ?? ''); ?></textarea>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- SECTION 7: Prior Academic History -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secAcademic">
-                    <i class="fa-solid fa-graduation-cap text-primary me-2"></i> 7. Prior Academic History
-                </button>
-            </h2>
-            <div id="secAcademic" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Previous School</label>
-                            <input type="text" class="form-control" name="previous_school" value="<?php echo sanitize($details['prev_school'] ?? $_POST['previous_school'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Previous Class</label>
-                            <input type="text" class="form-control" name="previous_class" value="<?php echo sanitize($details['prev_class'] ?? $_POST['previous_class'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Previous Roll Number</label>
-                            <input type="text" class="form-control" name="previous_roll_number" value="<?php echo sanitize($details['prev_roll_no'] ?? $_POST['previous_roll_number'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Previous Result</label>
-                            <input type="text" class="form-control" name="previous_result" value="<?php echo sanitize($details['prev_result'] ?? $_POST['previous_result'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">School Leaving Certificate Number</label>
-                            <input type="text" class="form-control" name="leaving_certificate_number" value="<?php echo sanitize($details['leaving_cert_no'] ?? $_POST['leaving_certificate_number'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Admission Test Marks (%)</label>
-                            <input type="number" class="form-control" name="admission_test_marks" value="<?php echo (float)($details['test_marks'] ?? $_POST['admission_test_marks'] ?? 0.00); ?>">
-                        </div>
-                    </div>
+        <!-- CARD 4: Fees & Photograph -->
+        <div class="col-md-6 col-lg-6">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                    <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-receipt text-primary me-2"></i> 4. Fees & Document File</h5>
                 </div>
-            </div>
-        </div>
-
-        <!-- SECTION 8: Medical Profile -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secMedical">
-                    <i class="fa-solid fa-heart-pulse text-primary me-2"></i> 8. Medical Profile
-                </button>
-            </h2>
-            <div id="secMedical" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
+                <div class="card-body bg-white p-4">
                     <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Medical Condition</label>
-                            <input type="text" class="form-control" name="medical_condition" value="<?php echo sanitize($details['medical_condition'] ?? $_POST['medical_condition'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Allergies</label>
-                            <input type="text" class="form-control" name="allergies" value="<?php echo sanitize($details['allergies'] ?? $_POST['allergies'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Disability</label>
-                            <input type="text" class="form-control" name="disability" value="<?php echo sanitize($details['disability'] ?? $_POST['disability'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Emergency Contact Phone</label>
-                            <input type="tel" class="form-control" name="emergency_contact" value="<?php echo sanitize($details['emergency_contact'] ?? $_POST['emergency_contact'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Doctor Name</label>
-                            <input type="text" class="form-control" name="doctor_name" value="<?php echo sanitize($details['doctor_name'] ?? $_POST['doctor_name'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Doctor Contact Phone</label>
-                            <input type="tel" class="form-control" name="doctor_contact" value="<?php echo sanitize($details['doctor_contact'] ?? $_POST['doctor_contact'] ?? ''); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 9: School Transport -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secTransport">
-                    <i class="fa-solid fa-bus text-primary me-2"></i> 9. School Transport
-                </button>
-            </h2>
-            <div id="secTransport" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-12 mb-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="transport_required" name="transport_required" <?php echo (!empty($details['transport_required']) || !empty($_POST['transport_required'])) ? 'checked' : ''; ?>>
-                                <label class="form-check-label fw-semibold text-dark" for="transport_required">Transport Service Required</label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Route</label>
-                            <input type="text" class="form-control" name="transport_route" value="<?php echo sanitize($details['transport_route'] ?? $_POST['transport_route'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Pickup Point</label>
-                            <input type="text" class="form-control" name="pickup_point" value="<?php echo sanitize($details['pickup_point'] ?? $_POST['pickup_point'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Drop Point</label>
-                            <input type="text" class="form-control" name="drop_point" value="<?php echo sanitize($details['drop_point'] ?? $_POST['drop_point'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Vehicle Details</label>
-                            <input type="text" class="form-control" name="transport_vehicle" value="<?php echo sanitize($details['transport_vehicle'] ?? $_POST['transport_vehicle'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Driver Contact / Name</label>
-                            <input type="text" class="form-control" name="transport_driver" value="<?php echo sanitize($details['transport_driver'] ?? $_POST['transport_driver'] ?? ''); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 10: Sponsor Details -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secSponsor">
-                    <i class="fa-solid fa-handshake-angle text-primary me-2"></i> 10. Sponsor Details
-                </button>
-            </h2>
-            <div id="secSponsor" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-12 mb-2">
-                            <div class="form-check form-switch">
-                                <input class="form-check-input" type="checkbox" id="sponsor_required" name="sponsor_required" <?php echo (!empty($details['sponsor_required']) || !empty($_POST['sponsor_required'])) ? 'checked' : ''; ?>>
-                                <label class="form-check-label fw-semibold text-dark" for="sponsor_required">Sponsored Registration</label>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Sponsor Name</label>
-                            <input type="text" class="form-control" name="sponsor_name" value="<?php echo sanitize($details['sponsor_name'] ?? $_POST['sponsor_name'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Organization</label>
-                            <input type="text" class="form-control" name="sponsor_org" value="<?php echo sanitize($details['sponsor_org'] ?? $_POST['sponsor_org'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Sponsor Contact</label>
-                            <input type="text" class="form-control" name="sponsor_contact" value="<?php echo sanitize($details['sponsor_contact'] ?? $_POST['sponsor_contact'] ?? ''); ?>">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Sponsor Amount (Rs.)</label>
-                            <input type="number" class="form-control" name="sponsor_amount" value="<?php echo (float)($details['sponsor_amount'] ?? $_POST['sponsor_amount'] ?? 0.00); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 11: Document Attachments -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secDocuments">
-                    <i class="fa-solid fa-file-arrow-up text-primary me-2"></i> 11. Document Attachments
-                </button>
-            </h2>
-            <div id="secDocuments" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Student Photograph</label>
-                            <input type="file" class="form-control" name="doc_student_photo" accept="image/*" onchange="previewImage(this, 'photoPreview')">
-                            <?php if (!empty($details['doc_student_photo'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Photo present (<?php echo basename($details['doc_student_photo']); ?>)</small>
-                            <?php endif; ?>
-                            <div class="mt-2">
-                                <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? APP_URL . '/' . $details['doc_student_photo'] : 'https://placehold.co/120x150?text=No+Photo'; ?>" class="img-thumbnail" style="max-height: 150px;">
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Father CNIC Doc</label>
-                            <input type="file" class="form-control" name="doc_father_cnic" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_father_cnic'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Mother CNIC Doc</label>
-                            <input type="file" class="form-control" name="doc_mother_cnic" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_mother_cnic'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">B-Form Doc</label>
-                            <input type="file" class="form-control" name="doc_bform" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_bform'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Birth Certificate Doc</label>
-                            <input type="file" class="form-control" name="doc_birth_cert" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_birth_cert'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Leaving Certificate Doc</label>
-                            <input type="file" class="form-control" name="doc_leaving_cert" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_leaving_cert'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Previous Result Doc</label>
-                            <input type="file" class="form-control" name="doc_prev_result" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_prev_result'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Medical Certificate Doc</label>
-                            <input type="file" class="form-control" name="doc_medical_cert" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_medical_cert'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Other Documents</label>
-                            <input type="file" class="form-control" name="doc_other" accept=".jpg,.jpeg,.png,.pdf">
-                            <?php if (!empty($details['doc_other'])): ?>
-                                <small class="text-success d-block mt-1"><i class="fa-solid fa-circle-check me-1"></i>Doc present</small>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 12: Fee Configuration -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secFees">
-                    <i class="fa-solid fa-receipt text-primary me-2"></i> 12. Fee Configuration
-                </button>
-            </h2>
-            <div id="secFees" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-12">
                             <label class="form-label small fw-semibold text-muted">Fee Plan *</label>
                             <select class="form-select" name="fee_plan" required>
-                                <option value="Regular Plan" <?php echo (($details['fee_plan'] ?? $_POST['fee_plan'] ?? '') === 'Regular Plan') ? 'selected' : ''; ?>>Regular Plan</option>
-                                <option value="Sibling Discount Plan" <?php echo (($details['fee_plan'] ?? $_POST['fee_plan'] ?? '') === 'Sibling Discount Plan') ? 'selected' : ''; ?>>Sibling Discount Plan</option>
-                                <option value="Scholarship Plan" <?php echo (($details['fee_plan'] ?? $_POST['fee_plan'] ?? '') === 'Scholarship Plan') ? 'selected' : ''; ?>>Scholarship Plan</option>
+                                <option value="Regular Plan" <?php echo (($details['fee_plan'] ?? '') === 'Regular Plan') ? 'selected' : ''; ?>>Regular Plan</option>
+                                <option value="Sibling Discount Plan" <?php echo (($details['fee_plan'] ?? '') === 'Sibling Discount Plan') ? 'selected' : ''; ?>>Sibling Discount Plan</option>
+                                <option value="Scholarship Plan" <?php echo (($details['fee_plan'] ?? '') === 'Scholarship Plan') ? 'selected' : ''; ?>>Scholarship Plan</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Admission Fee (Rs.)</label>
-                            <input type="number" class="form-control" name="fee_admission" value="<?php echo (float)($details['fee_admission'] ?? $_POST['fee_admission'] ?? 5000.00); ?>">
+                            <input type="number" class="form-control" name="fee_admission" value="<?php echo (float)($details['fee_admission'] ?? 5000.00); ?>">
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <label class="form-label small fw-semibold text-muted">Monthly Tuition Fee (Rs.)</label>
-                            <input type="number" class="form-control" name="fee_monthly" value="<?php echo (float)($details['fee_monthly'] ?? $_POST['fee_monthly'] ?? 3000.00); ?>">
+                            <input type="number" class="form-control" name="fee_monthly" value="<?php echo (float)($details['fee_monthly'] ?? 3000.00); ?>">
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Discount (Rs.)</label>
-                            <input type="number" class="form-control" name="fee_discount" value="<?php echo (float)($details['fee_discount'] ?? $_POST['fee_discount'] ?? 0.00); ?>">
+                        <div class="col-md-12">
+                            <label class="form-label small fw-semibold text-muted">Student Photograph</label>
+                            <input type="file" class="form-control" name="doc_student_photo" accept="image/*" onchange="previewImage(this, 'photoPreview')">
+                            <div class="mt-2 text-center">
+                                <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? APP_URL . '/' . $details['doc_student_photo'] : 'https://placehold.co/100x120?text=No+Photo'; ?>" class="img-thumbnail" style="max-height: 120px;">
+                            </div>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Scholarship (Rs.)</label>
-                            <input type="number" class="form-control" name="fee_scholarship" value="<?php echo (float)($details['fee_scholarship'] ?? $_POST['fee_scholarship'] ?? 0.00); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Fine Amount</label>
-                            <input type="number" class="form-control" name="fee_fine" value="<?php echo (float)($details['fee_fine'] ?? $_POST['fee_fine'] ?? 0.00); ?>">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label small fw-semibold text-muted">Security Deposit Fee (Rs.)</label>
-                            <input type="number" class="form-control" name="fee_security" value="<?php echo (float)($details['fee_security'] ?? $_POST['fee_security'] ?? 0.00); ?>">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SECTION 13: Remarks & Special Instructions -->
-        <div class="accordion-item border-0 mb-3 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <h2 class="accordion-header">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#secRemarks">
-                    <i class="fa-solid fa-notes-medical text-primary me-2"></i> 13. Remarks & Special Instructions
-                </button>
-            </h2>
-            <div id="secRemarks" class="accordion-collapse collapse" data-bs-parent="#registrationStepper">
-                <div class="accordion-body bg-white p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Remarks</label>
-                            <textarea class="form-control" name="remarks" rows="3"><?php echo sanitize($details['remarks'] ?? $_POST['remarks'] ?? ''); ?></textarea>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Special Notes / Warnings</label>
-                            <textarea class="form-control" name="special_notes" rows="3"><?php echo sanitize($details['special_notes'] ?? $_POST['special_notes'] ?? ''); ?></textarea>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold text-muted">Remarks / Special Notes</label>
+                            <textarea class="form-control" name="remarks" rows="2"><?php echo sanitize($details['remarks'] ?? ''); ?></textarea>
                         </div>
                     </div>
                 </div>
@@ -1238,69 +697,6 @@ function confirmDelete() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Academic Type toggle controls
-    const academicTypeSelect = document.getElementById("academicTypeSelect");
-    const classSelect = document.getElementById("classSelect");
-    const academyProgramSelect = document.getElementById("academyProgramSelect");
-    const academyBatchInput = document.getElementById("academyBatchInput");
-    
-    const schoolGroupFields = document.querySelectorAll(".school-group-field");
-    const academyGroupFields = document.querySelectorAll(".academy-group-field");
-    
-    function toggleAcademicFields() {
-        if (!academicTypeSelect) return;
-        const type = academicTypeSelect.value;
-        
-        if (type === "School") {
-            // Show school, hide academy
-            schoolGroupFields.forEach(f => f.style.display = "block");
-            academyGroupFields.forEach(f => f.style.display = "none");
-            
-            // Set requirements
-            if (classSelect) classSelect.required = true;
-            if (academyProgramSelect) academyProgramSelect.required = false;
-            if (academyBatchInput) academyBatchInput.required = false;
-        } else if (type === "Academy") {
-            // Show academy, hide school
-            schoolGroupFields.forEach(f => f.style.display = "none");
-            academyGroupFields.forEach(f => f.style.display = "block");
-            
-            // Set requirements
-            if (classSelect) classSelect.required = false;
-            if (academyProgramSelect) academyProgramSelect.required = true;
-            if (academyBatchInput) academyBatchInput.required = true;
-        } else if (type === "School + Academy") {
-            // Show both
-            schoolGroupFields.forEach(f => f.style.display = "block");
-            academyGroupFields.forEach(f => f.style.display = "block");
-            
-            // Set requirements
-            if (classSelect) classSelect.required = true;
-            if (academyProgramSelect) academyProgramSelect.required = true;
-            if (academyBatchInput) academyBatchInput.required = true;
-        }
-    }
-    
-    if (academicTypeSelect) {
-        academicTypeSelect.addEventListener("change", toggleAcademicFields);
-        toggleAcademicFields(); // Initial load check
-    }
-
-    // Dynamic Section populator based on Class Selection
-    const sectionInput = document.getElementById("sectionInput");
-    
-    function updateSection() {
-        if (!classSelect || !sectionInput) return;
-        const selectedOption = classSelect.options[classSelect.selectedIndex];
-        const section = selectedOption ? selectedOption.getAttribute('data-section') : '';
-        sectionInput.value = section || '';
-    }
-    
-    if (classSelect) {
-        classSelect.addEventListener("change", updateSection);
-        updateSection(); // initial check
-    }
-
     // Dynamic Age Calculator from Date of Birth
     const dobInput = document.getElementById("dobInput");
     const ageInput = document.getElementById("ageInput");
@@ -1335,17 +731,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 e.preventDefault();
                 e.stopPropagation();
                 
-                // Expand the first accordion card that has invalid fields
-                const invalidEl = form.querySelector(':invalid');
-                if (invalidEl) {
-                    const accordionItem = invalidEl.closest('.accordion-collapse');
-                    if (accordionItem) {
-                        const bsCollapse = bootstrap.Collapse.getOrCreateInstance(accordionItem);
-                        bsCollapse.show();
-                    }
-                }
-                
-                alert("Please fill in all required fields indicated in accordion cards.");
+                alert("Please fill in all required fields indicated by *.");
                 form.classList.add("was-validated");
             } else {
                 // Show loading spinner

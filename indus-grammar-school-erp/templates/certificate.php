@@ -14,7 +14,7 @@ if ($studentId <= 0) {
 
 try {
     $db = Database::getConnection();
-    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
+    $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = :sid");
     $stmt->execute(['sid' => $studentId]);
     $student = $stmt->fetch();
 } catch (Exception $e) {

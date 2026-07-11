@@ -26,7 +26,7 @@ try {
 $records = [];
 try {
     $sql = "
-        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.guardian_name, s.guardian_phone, c.class_name, c.section,
+        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.guardian_name, s.guardian_phone, s.academic_type, s.school_class, s.school_section, s.academy_program, s.academy_batch, c.class_name, c.section,
                d.father_name, d.mother_name, d.guardian_relationship, d.father_mobile, d.student_mobile, d.current_address
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
@@ -146,7 +146,7 @@ try {
                         <td class="small text-muted" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                             <?php echo sanitize($r['current_address'] ?: '-'); ?>
                         </td>
-                        <td><?php echo sanitize($r['class_name'] . ' - ' . $r['section']); ?></td>
+                        <td><?php echo sanitize(($r['class_name'] ?? $r['school_class'] ?? '-') . ' - ' . ($r['section'] ?? $r['school_section'] ?? 'A')); ?></td>
                     </tr>
                 <?php endforeach; endif; ?>
             </tbody>
