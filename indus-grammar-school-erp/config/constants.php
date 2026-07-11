@@ -12,6 +12,13 @@ define('SCHOOL_EMAIL', 'info@indus.edu.pk');
 define('SCHOOL_PHONE', '+92 300 1234567');
 define('SCHOOL_ADDRESS', 'Main Campus, Karachi, Pakistan');
 
+// Auto-generated numbers prefixes & settings
+define('PREFIX_STUDENT_ID', 'STU');
+define('PREFIX_ADMISSION_NO', 'ADM');
+define('PREFIX_REGISTRATION_NO', 'REG');
+define('PREFIX_ROLL_NO', 'ROLL');
+define('PREFIX_ENROLLMENT_NO', 'ENR');
+
 // Role Codes (must match the database `roles` table)
 define('ROLE_SUPER_ADMIN', 'super_admin');
 define('ROLE_SCHOOL_ADMIN', 'school_admin');

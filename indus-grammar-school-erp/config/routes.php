@@ -11,6 +11,18 @@ return [
     'modules/students/list.php' => 'student_view',
     'modules/students/add.php'  => 'student_create',
     'modules/students/edit.php' => 'student_edit',
+    'modules/students/registration.php'      => 'student_view',
+    'modules/students/detail_report.php'     => 'student_view',
+    'modules/students/daily_diary.php'       => 'student_view',
+    'modules/students/edit_diary.php'        => 'student_view',
+    'modules/students/diary_report.php'      => 'student_view',
+    'modules/students/complaint.php'         => 'student_view',
+    'modules/students/card_report.php'       => 'student_view',
+    'modules/students/name_cnic_report.php'  => 'student_view',
+    'modules/students/add_sponsor.php'       => 'student_view',
+    'modules/students/family_phone_list.php' => 'student_view',
+    'modules/students/profile_report.php'    => 'student_view',
+    'modules/students/summary_report.php'    => 'student_view',
     
     // Admission
     'modules/admission/applications.php' => 'admission_view',

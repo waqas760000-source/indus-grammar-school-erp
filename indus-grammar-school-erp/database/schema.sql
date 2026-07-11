@@ -458,6 +458,7 @@ CREATE TABLE IF NOT EXISTS `staff` (
   `user_id` INT NULL,
   `first_name` VARCHAR(50) NOT NULL,
   `last_name` VARCHAR(50) NOT NULL,
+  `gender` ENUM('Male', 'Female') NOT NULL DEFAULT 'Male',
   `designation` VARCHAR(100) NOT NULL,
   `department` VARCHAR(50) NOT NULL DEFAULT 'Academic',
   `phone` VARCHAR(20) NOT NULL,

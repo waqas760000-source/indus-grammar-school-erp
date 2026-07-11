@@ -1,7 +1,7 @@
 <?php
 /**
- * Indus Grammar School ERP - Dashboard Page
- * Version 2.0.0 — Live KPI Integration
+ * Indus Grammar School ERP - Dynamic Dashboard Page
+ * Version 5.0.0 — Custom Redesign Matching Reference Sections
  */
 
 $pageTitle = 'Dashboard';
@@ -11,392 +11,369 @@ include_once __DIR__ . '/includes/header.php';
 $currentUser = currentUser();
 $userRole = $currentUser['role_code'] ?? '';
 
-// ── Live KPI Data ──
-$reportService = new ReportService();
-$kpis = $reportService->getDashboardKPIs();
-
-$financeData = Report::getFinanceSummary(date('Y-m-01'), date('Y-m-d'));
-$classEnrollment = Report::getClasswiseEnrollment();
-
-// Staff count
-$staffCount = 0;
+// Check dynamic values from MySQL
 try {
     $db = Database::getConnection();
-    $staffCount = (int)$db->query("SELECT COUNT(*) FROM staff WHERE status = 'Active'")->fetchColumn();
-} catch (Exception $e) {}
+    $currentMonth = (int)date('m');
+    $currentYear = (int)date('Y');
 
-// Audit Logs
-$auditLogs = [];
-try {
-    $db = Database::getConnection();
-    $stmt = $db->query("
-        SELECT a.*, u.username, r.name as role_name
-        FROM audit_logs a 
-        LEFT JOIN users u ON a.user_id = u.id 
-        LEFT JOIN roles r ON u.role_id = r.id
-        ORDER BY a.created_at DESC 
-        LIMIT 5
-    ");
-    $auditLogs = $stmt->fetchAll();
-} catch (Exception $e) {}
+    // 1. Student Strength
+    $totalStudents = (int)$db->query("SELECT COUNT(*) FROM students WHERE status = 'Active'")->fetchColumn();
+    $totalBoys = (int)$db->query("SELECT COUNT(*) FROM students WHERE status = 'Active' AND gender = 'Male'")->fetchColumn();
+    $totalGirls = (int)$db->query("SELECT COUNT(*) FROM students WHERE status = 'Active' AND gender = 'Female'")->fetchColumn();
 
-$academicYear = CURRENT_ACADEMIC_YEAR;
+    // 2. Student Attendance Today
+    $studentsPresent = (int)$db->query("SELECT COUNT(*) FROM attendance WHERE date = CURRENT_DATE AND status = 'Present'")->fetchColumn();
+    $studentsAbsent = (int)$db->query("SELECT COUNT(*) FROM attendance WHERE date = CURRENT_DATE AND status = 'Absent'")->fetchColumn();
+    $presentBoys = (int)$db->query("SELECT COUNT(a.id) FROM attendance a JOIN students s ON a.student_id = s.id WHERE a.date = CURRENT_DATE AND a.status = 'Present' AND s.gender = 'Male'")->fetchColumn();
+    $presentGirls = (int)$db->query("SELECT COUNT(a.id) FROM attendance a JOIN students s ON a.student_id = s.id WHERE a.date = CURRENT_DATE AND a.status = 'Present' AND s.gender = 'Female'")->fetchColumn();
+    
+    $totalMarkedToday = $studentsPresent + $studentsAbsent;
+    $studentPresentPct = $totalMarkedToday > 0 ? round(($studentsPresent / $totalMarkedToday) * 100, 1) : 0;
+    $studentAbsentPct = $totalMarkedToday > 0 ? round(($studentsAbsent / $totalMarkedToday) * 100, 1) : 0;
+
+    // 3. Staff
+    $totalStaff = (int)$db->query("SELECT COUNT(*) FROM staff WHERE status = 'Active'")->fetchColumn();
+    $maleStaff = (int)$db->query("SELECT COUNT(*) FROM staff WHERE status = 'Active' AND gender = 'Male'")->fetchColumn();
+    $femaleStaff = (int)$db->query("SELECT COUNT(*) FROM staff WHERE status = 'Active' AND gender = 'Female'")->fetchColumn();
+
+    // 4. Staff Attendance Today
+    $staffPresent = (int)$db->query("SELECT COUNT(*) FROM staff_attendance WHERE date = CURRENT_DATE AND status = 'Present'")->fetchColumn();
+    $staffAbsent = (int)$db->query("SELECT COUNT(*) FROM staff_attendance WHERE date = CURRENT_DATE AND status = 'Absent'")->fetchColumn();
+    $maleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.user_id = s.user_id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Male'")->fetchColumn();
+    $femaleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.user_id = s.user_id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Female'")->fetchColumn();
+    
+    $totalStaffMarked = $staffPresent + $staffAbsent;
+    $staffPresentPct = $totalStaffMarked > 0 ? round(($staffPresent / $totalStaffMarked) * 100, 1) : 0;
+    $staffAbsentPct = $totalStaffMarked > 0 ? round(($staffAbsent / $totalStaffMarked) * 100, 1) : 0;
+
+    // 5. Families
+    $totalFamilies = (int)$db->query("SELECT COUNT(DISTINCT guardian_phone) FROM students WHERE status = 'Active'")->fetchColumn();
+    $singleChildFamilies = (int)$db->query("SELECT COUNT(*) FROM (SELECT guardian_phone FROM students WHERE status = 'Active' GROUP BY guardian_phone HAVING COUNT(*) = 1) t")->fetchColumn();
+    $multipleChildFamilies = (int)$db->query("SELECT COUNT(*) FROM (SELECT guardian_phone FROM students WHERE status = 'Active' GROUP BY guardian_phone HAVING COUNT(*) > 1) t")->fetchColumn();
+
+    // 6. Current Month Fee Status
+    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(net_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $feeReceived = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_collections WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $feeBalance = $feeReceivable - $feeReceived;
+    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(discount_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $fineCollected = (float)$db->query("SELECT COALESCE(SUM(fine_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE) AND status = 'Paid'")->fetchColumn();
+    $feeCollectionPct = $feeReceivable > 0 ? round(($feeReceived / $feeReceivable) * 100, 1) : 0;
+
+    // 7. Current Month Arrear Status
+    $arrearsReceivable = (float)$db->query("SELECT COALESCE(SUM(net_amount - amount_paid), 0) FROM fee_challans fc LEFT JOIN (SELECT challan_id, SUM(amount_paid) as amount_paid FROM fee_collections GROUP BY challan_id) col ON fc.id = col.challan_id WHERE fc.due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND fc.status IN ('Unpaid', 'Overdue')")->fetchColumn();
+    $arrearsReceived = (float)$db->query("SELECT COALESCE(SUM(fcol.amount_paid), 0) FROM fee_collections fcol JOIN fee_challans fc ON fcol.challan_id = fc.id WHERE fc.due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND MONTH(fcol.payment_date) = MONTH(CURRENT_DATE) AND YEAR(fcol.payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $arrearsBalance = $arrearsReceivable - $arrearsReceived;
+    $arrearsRecoveryPct = $arrearsReceivable > 0 ? round(($arrearsReceived / $arrearsReceivable) * 100, 1) : 0;
+
+    // 8. Cash Summary
+    $openingBalance = (float)$db->query("SELECT COALESCE(opening_balance, 0) FROM cash_register WHERE date = CURRENT_DATE LIMIT 1")->fetchColumn();
+    $todayCollection = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_collections WHERE payment_date = CURRENT_DATE")->fetchColumn();
+    $todayExpenses = (float)$db->query("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date = CURRENT_DATE")->fetchColumn();
+    $cashInHand = $openingBalance + $todayCollection - $todayExpenses;
+    $closingBalance = (float)$db->query("SELECT COALESCE(closing_balance, 0) FROM cash_register WHERE date = CURRENT_DATE AND status = 'Closed' LIMIT 1")->fetchColumn();
+
+    // 9. Notices / Announcements / Exams
+    $announcements = $db->query("SELECT * FROM audit_logs WHERE action = 'Announcement Send' ORDER BY created_at DESC LIMIT 3")->fetchAll();
+    $upcomingExams = $db->query("SELECT es.exam_date, e.exam_name, s.subject_name FROM exam_schedules es JOIN exams e ON es.exam_id = e.id JOIN subjects s ON es.subject_id = s.id WHERE es.exam_date >= CURRENT_DATE ORDER BY es.exam_date ASC LIMIT 3")->fetchAll();
+
+    // 10. Recent Activities
+    $activities = $db->query("SELECT a.*, u.username FROM audit_logs a LEFT JOIN users u ON a.user_id = u.id ORDER BY a.created_at DESC LIMIT 5")->fetchAll();
+
+} catch (Exception $e) {
+    die("Database Error loading Dashboard: " . $e->getMessage());
+}
 ?>
 
 <!-- Welcome Banner -->
-<div class="row mb-4">
+<div class="row mb-5">
     <div class="col-12">
-        <div class="card border-0 bg-primary text-white shadow-sm overflow-hidden" style="border-radius: 16px; background: linear-gradient(135deg, var(--primary-color) 0%, #6366f1 100%) !important;">
-            <div class="card-body p-4 p-md-5 position-relative">
-                <div class="row align-items-center">
-                    <div class="col-md-8 position-relative" style="z-index: 2;">
-                        <h2 class="fw-bold mb-2">Welcome Back, <?php echo sanitize(ucfirst($currentUser['username'])); ?>!</h2>
-                        <p class="mb-0 opacity-75">Here is what's happening at Indus Grammar School today. You are logged in as a <strong><?php echo sanitize($currentUser['role_name']); ?></strong>.</p>
-                    </div>
-                    <div class="col-md-4 text-end d-none d-md-block opacity-25">
-                        <i class="fa-solid fa-school" style="font-size: 8rem; margin-top: -20px;"></i>
-                    </div>
-                </div>
+        <div class="d-flex justify-content-between align-items-center bg-white p-4 shadow-sm border border-light" style="border-radius: 12px;">
+            <div>
+                <span class="text-muted small text-uppercase fw-semibold tracking-wider d-block mb-1">Welcome back,</span>
+                <h2 class="fw-bold text-dark mb-1" style="font-size: 2.2rem;"><?php echo sanitize($currentUser['username'] === 'waqas7600' ? 'Waqas Ali' : ucfirst($currentUser['username'])); ?></h2>
+                <p class="text-secondary mb-0">Indus Grammar School ERP Admin Desk.</p>
+            </div>
+            <div class="text-end d-none d-md-block">
+                <span class="badge bg-primary px-3 py-2 rounded-pill mb-2"><i class="fa-solid fa-calendar me-2"></i>Academic Session</span>
+                <h5 class="fw-semibold text-dark mb-0"><?php echo CURRENT_ACADEMIC_YEAR; ?></h5>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Dynamic KPIs Grids based on User Roles -->
-<div class="row g-4 mb-4">
+<!-- ========================================== -->
+<!-- ACADEMIC PANELS (Super Admin & School Admin) -->
+<!-- ========================================== -->
+<?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN): ?>
+<div class="row g-4 mb-5">
     
-    <!-- KPI CARD 1: Total Students -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Total Students</div>
-                        <div class="stat-card-value"><?php echo number_format($kpis['total_students']); ?></div>
-                    </div>
-                    <div class="stat-card-icon bg-primary-soft">
-                        <i class="fa-solid fa-user-graduate"></i>
-                    </div>
+    <!-- 1. Student Strength -->
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-users text-primary me-2"></i>Student Strength</h5>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small fw-semibold">Total Students</span>
+                    <span class="fw-bold fs-5 text-dark"><?php echo $totalStudents; ?></span>
                 </div>
-                <div class="small text-success">
-                    <i class="fa-solid fa-circle-check me-1"></i> Active enrollment <span class="text-secondary"><?php echo $academicYear; ?></span>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Total Boys</span>
+                    <span class="fw-bold text-primary"><?php echo $totalBoys; ?></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Total Girls</span>
+                    <span class="fw-bold text-danger"><?php echo $totalGirls; ?></span>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- KPI CARD 2: Active Staff -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Active Staff</div>
-                        <div class="stat-card-value"><?php echo $staffCount; ?></div>
-                    </div>
-                    <div class="stat-card-icon bg-info-soft">
-                        <i class="fa-solid fa-users"></i>
-                    </div>
+    <!-- 2. Student Attendance -->
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-calendar-check text-success me-2"></i>Student Attendance</h5>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small fw-semibold">Present Students</span>
+                    <span class="fw-bold text-dark"><?php echo $studentsPresent; ?></span>
                 </div>
-                <div class="small text-secondary">
-                    Academic & Administrative
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Present Boys / Girls</span>
+                    <span class="fw-semibold small text-muted"><?php echo $presentBoys; ?> M / <?php echo $presentGirls; ?> F</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Present Rate</span>
+                    <span class="badge bg-success-soft"><?php echo $studentPresentPct; ?>%</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Absent Rate</span>
+                    <span class="badge bg-danger-soft"><?php echo $studentAbsentPct; ?>%</span>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- KPI CARD 3: Fee Collection (Monthly) -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Collections (Monthly)</div>
-                        <div class="stat-card-value">Rs. <?php echo number_format($kpis['monthly_collection']); ?></div>
-                    </div>
-                    <div class="stat-card-icon bg-success-soft">
-                        <i class="fa-solid fa-hand-holding-dollar"></i>
-                    </div>
+    <!-- 3. Staff Summary -->
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-users-gear text-info me-2"></i>Staff Details</h5>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small fw-semibold">Total Staff</span>
+                    <span class="fw-bold text-dark"><?php echo $totalStaff; ?></span>
                 </div>
-                <div class="small text-success">
-                    <i class="fa-solid fa-circle-check me-1"></i> <?php echo date('F Y'); ?> <span class="text-secondary">so far</span>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Male Staff</span>
+                    <span class="fw-semibold text-dark"><?php echo $maleStaff; ?></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Female Staff</span>
+                    <span class="fw-semibold text-dark"><?php echo $femaleStaff; ?></span>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- KPI CARD 4: Outstanding Fees -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Outstanding Fees</div>
-                        <div class="stat-card-value">Rs. <?php echo number_format($financeData['outstanding']); ?></div>
-                    </div>
-                    <div class="stat-card-icon bg-danger-soft">
-                        <i class="fa-solid fa-receipt"></i>
-                    </div>
+    <!-- 4. Staff Attendance -->
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-user-clock text-warning me-2"></i>Staff Attendance</h5>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small fw-semibold">Present Staff</span>
+                    <span class="fw-bold text-dark"><?php echo $staffPresent; ?></span>
                 </div>
-                <div class="small text-<?php echo $financeData['outstanding'] > 0 ? 'danger' : 'success'; ?>">
-                    <?php if ($financeData['outstanding'] > 0): ?>
-                        <i class="fa-solid fa-circle-exclamation me-1"></i> Action required <span class="text-secondary">from Cash Desk</span>
-                    <?php else: ?>
-                        <i class="fa-solid fa-circle-check me-1"></i> All fees collected
-                    <?php endif; ?>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Male / Female Present</span>
+                    <span class="small text-muted"><?php echo $maleStaffPresent; ?> M / <?php echo $femaleStaffPresent; ?> F</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Present %</span>
+                    <span class="badge bg-success-soft"><?php echo $staffPresentPct; ?>%</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Absent %</span>
+                    <span class="badge bg-danger-soft"><?php echo $staffAbsentPct; ?>%</span>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- KPI CARD 5: Daily Attendance Rate -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Attendance Today</div>
-                        <div class="stat-card-value"><?php echo $kpis['attendance_rate']; ?>%</div>
-                    </div>
-                    <div class="stat-card-icon bg-warning-soft">
-                        <i class="fa-solid fa-calendar-check"></i>
-                    </div>
+    <!-- 5. Families -->
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-house-chimney text-primary me-2"></i>Families</h5>
+            <div class="d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small fw-semibold">Total Families</span>
+                    <span class="fw-bold text-dark"><?php echo $totalFamilies; ?></span>
                 </div>
-                <div class="small text-success">
-                    <i class="fa-solid fa-check-double me-1"></i> <?php echo date('d M Y'); ?>
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-2">
+                    <span class="text-muted small">Single Child Families</span>
+                    <span class="fw-semibold text-dark"><?php echo $singleChildFamilies; ?></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Multiple Child Families</span>
+                    <span class="fw-semibold text-dark"><?php echo $multipleChildFamilies; ?></span>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- KPI CARD 6: Monthly Expenses -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT): ?>
-        <div class="col-12 col-sm-6 col-xl-3">
-            <div class="stat-card">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <div>
-                        <div class="stat-card-label">Expenses (Monthly)</div>
-                        <div class="stat-card-value">Rs. <?php echo number_format($kpis['monthly_expense']); ?></div>
-                    </div>
-                    <div class="stat-card-icon bg-danger-soft">
-                        <i class="fa-solid fa-money-bill-transfer"></i>
-                    </div>
-                </div>
-                <div class="small text-secondary">
-                    <?php echo date('F Y'); ?>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
 </div>
+<?php endif; ?>
 
-<!-- Interactive Analytics Dashboard Charts -->
-<div class="row g-4 mb-4">
-    <!-- Chart block 1: Class-wise Enrollment -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN): ?>
-        <div class="<?php echo ($userRole === ROLE_SUPER_ADMIN) ? 'col-lg-6' : 'col-12'; ?>">
-            <div class="chart-card">
-                <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-chart-bar me-2"></i>Class-wise Enrollment</h5>
-                <div style="height: 320px; position: relative;">
-                    <canvas id="enrollmentChart"></canvas>
+<!-- ========================================== -->
+<!-- FINANCIAL PANELS (Super Admin & Accountant) -->
+<!-- ========================================== -->
+<?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT): ?>
+<div class="row g-4 mb-5">
+    
+    <!-- 6. Current Month Fee Status -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Current Month Fee Status</h5>
+            <table class="table table-sm table-borderless small mb-0">
+                <tr class="border-bottom"><td class="text-muted py-2">Receivable:</td><td class="fw-bold text-dark py-2 text-end">Rs. <?php echo number_format($feeReceivable, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-2">Received:</td><td class="fw-bold text-success py-2 text-end">Rs. <?php echo number_format($feeReceived, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-2">Balance:</td><td class="fw-bold text-danger py-2 text-end">Rs. <?php echo number_format($feeBalance, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-2">Discount Given:</td><td class="fw-bold text-warning py-2 text-end">Rs. <?php echo number_format($discountGiven, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-2">Fine Collected:</td><td class="fw-bold text-info py-2 text-end">Rs. <?php echo number_format($fineCollected, 2); ?></td></tr>
+                <tr><td class="text-muted py-2">Collection Pct:</td><td class="fw-bold text-primary py-2 text-end"><?php echo $feeCollectionPct; ?>%</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 7. Current Month Arrear Status -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-clock-rotate-left text-warning me-2"></i>Current Month Arrear Status</h5>
+            <table class="table table-sm table-borderless small mb-0">
+                <tr class="border-bottom"><td class="text-muted py-3">Arrears Receivable:</td><td class="fw-bold text-dark py-3 text-end">Rs. <?php echo number_format($arrearsReceivable, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-3">Arrears Received:</td><td class="fw-bold text-success py-3 text-end">Rs. <?php echo number_format($arrearsReceived, 2); ?></td></tr>
+                <tr class="border-bottom"><td class="text-muted py-3">Arrears Balance:</td><td class="fw-bold text-danger py-3 text-end">Rs. <?php echo number_format($arrearsBalance, 2); ?></td></tr>
+                <tr><td class="text-muted py-3">Recovery Percentage:</td><td class="fw-bold text-primary py-3 text-end"><?php echo $arrearsRecoveryPct; ?>%</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- 8. Cash Summary -->
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-white p-4" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-vault text-primary me-2"></i>Cash Summary</h5>
+            <div class="row g-3 text-center">
+                <div class="col-6 col-md-2 offset-md-1">
+                    <div class="p-2 border rounded bg-light">
+                        <span class="text-muted small d-block">Opening Balance</span>
+                        <span class="fw-bold text-dark">Rs. <?php echo number_format($openingBalance); ?></span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded bg-light">
+                        <span class="text-muted small d-block">Today's Collection</span>
+                        <span class="fw-bold text-success">Rs. <?php echo number_format($todayCollection); ?></span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded bg-light">
+                        <span class="text-muted small d-block">Today's Expenses</span>
+                        <span class="fw-bold text-danger">Rs. <?php echo number_format($todayExpenses); ?></span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-2">
+                    <div class="p-2 border rounded bg-light">
+                        <span class="text-muted small d-block">Cash in Hand</span>
+                        <span class="fw-bold text-primary">Rs. <?php echo number_format($cashInHand); ?></span>
+                    </div>
+                </div>
+                <div class="col-12 col-md-2">
+                    <div class="p-2 border rounded bg-light">
+                        <span class="text-muted small d-block">Closing Balance</span>
+                        <span class="fw-bold text-dark"><?php echo $closingBalance > 0 ? 'Rs. ' . number_format($closingBalance) : 'Not Closed'; ?></span>
+                    </div>
                 </div>
             </div>
         </div>
-    <?php endif; ?>
+    </div>
 
-    <!-- Chart block 2: Fee & Revenue Breakdown -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT): ?>
-        <div class="<?php echo ($userRole === ROLE_SUPER_ADMIN) ? 'col-lg-6' : 'col-12'; ?>">
-            <div class="chart-card">
-                <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-chart-column me-2"></i>Financial Summary (<?php echo date('F Y'); ?>)</h5>
-                <div style="height: 320px; position: relative;">
-                    <canvas id="financeChart"></canvas>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
 </div>
+<?php endif; ?>
 
-<!-- Auditing and Action Panels -->
-<div class="row g-4">
-    <!-- Recent Activity Log (Visible to Super Admin/Owner only) -->
-    <?php if ($userRole === ROLE_SUPER_ADMIN): ?>
-        <div class="col-lg-8">
-            <div class="custom-table-card">
-                <div class="p-4 border-bottom d-flex justify-content-between align-items-center">
-                    <h5 class="fw-bold mb-0 text-secondary"><i class="fa-solid fa-fingerprint me-2"></i>Security Audit Trail (Real-Time)</h5>
-                    <a href="<?php echo APP_URL; ?>/modules/administration/logs.php" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <div class="table-responsive">
-                    <table class="table custom-table table-hover">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Action</th>
-                                <th>Description</th>
-                                <th>IP Address</th>
-                                <th>Timestamp</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php if (empty($auditLogs)): ?>
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No security logs recorded yet.</td>
-                                </tr>
-                            <?php else: ?>
-                                <?php foreach ($auditLogs as $log): ?>
-                                    <tr>
-                                        <td>
-                                            <div class="fw-semibold"><?php echo sanitize($log['username'] ?? 'System / Guest'); ?></div>
-                                            <div class="text-muted small" style="font-size: 0.75rem;"><?php echo sanitize($log['role_name'] ?? 'Visitor'); ?></div>
-                                        </td>
-                                        <td>
-                                            <?php
-                                            $action = $log['action'];
-                                            $badgeClass = 'bg-secondary';
-                                            if (str_contains($action, 'Success') || str_contains($action, 'Login') || str_contains($action, 'Paid') || str_contains($action, 'Saved')) {
-                                                $badgeClass = 'badge-soft-success';
-                                            } elseif (str_contains($action, 'Failed') || str_contains($action, 'Blocked') || str_contains($action, 'Delete')) {
-                                                $badgeClass = 'badge-soft-danger';
-                                            }
-                                            ?>
-                                            <span class="badge <?php echo $badgeClass; ?>"><?php echo sanitize($action); ?></span>
-                                        </td>
-                                        <td><span class="text-muted"><?php echo sanitize(mb_substr($log['description'], 0, 60)) . (mb_strlen($log['description']) > 60 ? '…' : ''); ?></span></td>
-                                        <td><code class="text-muted"><?php echo sanitize($log['ip_address'] ?? '-'); ?></code></td>
-                                        <td>
-                                            <div class="small text-secondary"><?php echo date('M d, Y', strtotime($log['created_at'])); ?></div>
-                                            <div class="text-muted small" style="font-size: 0.75rem;"><?php echo date('h:i A', strtotime($log['created_at'])); ?></div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    <?php endif; ?>
-
-    <!-- System Context / Calendar -->
-    <div class="<?php echo ($userRole === ROLE_SUPER_ADMIN) ? 'col-lg-4' : 'col-12'; ?>">
-        <div class="stat-card">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-clock-rotate-left me-2"></i>Academic Information</h5>
+<!-- ========================================== -->
+<!-- NOTICE BOARD & EVENTS                      -->
+<!-- ========================================== -->
+<div class="row g-4 mb-5">
+    
+    <!-- 9. Notice Panel -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-bullhorn text-danger me-2"></i>Notice Board & Announcements</h5>
             
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
-                    <div>
-                        <div class="fw-semibold text-dark">Current Term</div>
-                        <div class="text-muted small">Academic session year</div>
+            <div class="d-flex flex-column gap-3">
+                <?php if (empty($announcements)): ?>
+                    <div class="alert alert-light border small mb-0">No active announcements.</div>
+                <?php else: foreach ($announcements as $ann): 
+                    preg_match('/Title: (.*?) \|/', $ann['description'], $matchesTitle);
+                    preg_match('/Message: (.*)/', $ann['description'], $matchesMsg);
+                ?>
+                    <div class="border-bottom border-light pb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark small"><?php echo sanitize($matchesTitle[1] ?? 'System Announcement'); ?></span>
+                            <span class="text-muted small" style="font-size:0.75rem;"><?php echo date('d M Y', strtotime($ann['created_at'])); ?></span>
+                        </div>
+                        <p class="text-muted small mb-0"><?php echo sanitize($matchesMsg[1] ?? $ann['description']); ?></p>
                     </div>
-                    <span class="badge bg-dark rounded-pill"><?php echo $academicYear; ?></span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
-                    <div>
-                        <div class="fw-semibold text-dark">Term Status</div>
-                        <div class="text-muted small">Mid-term examinations upcoming</div>
-                    </div>
-                    <span class="badge bg-warning text-dark rounded-pill">Active</span>
-                </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center px-0 py-3 bg-transparent">
-                    <div>
-                        <div class="fw-semibold text-dark">ERP Status</div>
-                        <div class="text-muted small">System integrity & databases</div>
-                    </div>
-                    <span class="badge bg-success rounded-pill">Operational</span>
-                </li>
-            </ul>
+                <?php endforeach; endif; ?>
+            </div>
+        </div>
+    </div>
 
-            <div class="alert bg-primary-soft text-primary border-0 mt-4 mb-0 d-flex gap-3 align-items-start" style="border-radius: 8px;">
-                <i class="fa-solid fa-lightbulb mt-1" style="font-size: 1.2rem;"></i>
-                <div class="small">
-                    <strong>Tip:</strong> You can navigate between student management, accounting cash sheets, and settings using the sidebar links panel.
-                </div>
+    <!-- 10. Upcoming Exams / Holidays -->
+    <div class="col-12 col-lg-6">
+        <div class="card border-0 shadow-sm bg-white p-4 h-100" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-calendar text-primary me-2"></i>Upcoming Exams & Events</h5>
+            <ul class="list-group list-group-flush mb-0">
+                <?php if (empty($upcomingExams)): ?>
+                    <li class="list-group-item bg-transparent px-0 py-2 small text-muted">No exams scheduled in next 30 days.</li>
+                <?php else: foreach ($upcomingExams as $exam): ?>
+                    <li class="list-group-item d-flex justify-content-between align-items-center bg-transparent px-0 py-3">
+                        <div>
+                            <div class="fw-semibold text-dark small"><?php echo sanitize($exam['exam_name']); ?></div>
+                            <div class="text-muted small" style="font-size:0.75rem;"><?php echo sanitize($exam['subject_name']); ?></div>
+                        </div>
+                        <span class="badge bg-dark rounded-pill"><?php echo date('d M', strtotime($exam['exam_date'])); ?></span>
+                    </li>
+                <?php endforeach; endif; ?>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+<!-- Recent Activities -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-white p-4" style="border-radius: 12px;">
+            <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-clock-rotate-left text-secondary me-2"></i>Recent System Activities</h5>
+            <div class="timeline d-flex flex-column gap-3">
+                <?php foreach ($activities as $log): ?>
+                    <div class="d-flex gap-3 align-items-start border-bottom pb-2">
+                        <div class="bg-light text-primary p-2 rounded-circle d-flex align-items-center justify-content-center" style="width:36px; height:36px;">
+                            <i class="fa-solid fa-circle-check fs-6 text-primary"></i>
+                        </div>
+                        <div>
+                            <div class="fw-semibold text-dark small"><?php echo sanitize($log['action']); ?></div>
+                            <div class="text-muted small mt-1"><?php echo sanitize($log['description']); ?></div>
+                            <div class="text-muted small mt-1" style="font-size:0.7rem;"><i class="fa-regular fa-clock me-1"></i><?php echo date('d M Y, h:i A', strtotime($log['created_at'])); ?> by <strong><?php echo sanitize($log['username'] ?: 'System'); ?></strong></div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>
 </div>
 
 <?php
-// ── Chart Data (Dynamic) ──
-$enrollmentLabels = array_map(fn($c) => $c['class_name'] . ' ' . $c['section'], $classEnrollment);
-$enrollmentData = array_map(fn($c) => $c['student_count'], $classEnrollment);
-
-$extraJS = '
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-';
-
-// Enrollment Chart
-if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_SCHOOL_ADMIN) {
-    $extraJS .= '
-    const ctxEnrollment = document.getElementById("enrollmentChart");
-    if (ctxEnrollment) {
-        new Chart(ctxEnrollment, {
-            type: "bar",
-            data: {
-                labels: ' . json_encode($enrollmentLabels) . ',
-                datasets: [{
-                    label: "Students",
-                    data: ' . json_encode($enrollmentData) . ',
-                    backgroundColor: "#4f46e5",
-                    borderRadius: 6
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    y: { beginAtZero: true, grid: { color: "#f1f5f9" } },
-                    x: { grid: { display: false } }
-                }
-            }
-        });
-    }
-    ';
-}
-
-// Financial Chart
-if ($userRole === ROLE_SUPER_ADMIN || $userRole === ROLE_ACCOUNTANT) {
-    $extraJS .= '
-    const ctxFinance = document.getElementById("financeChart");
-    if (ctxFinance) {
-        new Chart(ctxFinance, {
-            type: "doughnut",
-            data: {
-                labels: ["Collections", "Expenses", "Outstanding"],
-                datasets: [{
-                    data: [' . $financeData['collections'] . ', ' . $financeData['expenses'] . ', ' . $financeData['outstanding'] . '],
-                    backgroundColor: ["#16a34a", "#dc2626", "#f59e0b"],
-                    borderWidth: 0,
-                    hoverOffset: 10
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { position: "bottom" },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.label + ": Rs. " + context.parsed.toLocaleString();
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-    ';
-}
-
-$extraJS .= '
-});
-</script>
-';
-
 include_once __DIR__ . '/includes/footer.php';
 ?>

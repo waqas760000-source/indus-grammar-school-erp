@@ -1,7 +1,7 @@
 <?php
 /**
- * Indus Grammar School ERP - Students Directory
- * Version 1.0.0
+ * Indus Grammar School ERP - Students Directory (Simplified & Categorized)
+ * Version 2.0.0
  */
 
 $pageTitle = 'Student Management';
@@ -17,7 +17,9 @@ AuthMiddleware::requirePermission('student_view');
 $filters = [
     'class_id' => isset($_GET['class_id']) ? (int)$_GET['class_id'] : null,
     'status' => isset($_GET['status']) ? sanitize($_GET['status']) : null,
-    'search' => isset($_GET['search']) ? sanitize($_GET['search']) : null
+    'search' => isset($_GET['search']) ? sanitize($_GET['search']) : null,
+    'academic_type' => isset($_GET['academic_type']) ? sanitize($_GET['academic_type']) : null,
+    'academy_program' => isset($_GET['academy_program']) ? sanitize($_GET['academy_program']) : null
 ];
 
 // Pagination variables
@@ -41,7 +43,7 @@ if ($totalPages < 1) $totalPages = 1;
     </div>
     <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
         <?php if (hasPermission('student_create')): ?>
-            <a href="add.php" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-plus me-2"></i>Register Student</a>
+            <a href="registration.php" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-plus me-2"></i>Register Student</a>
         <?php endif; ?>
     </div>
 </div>
@@ -51,7 +53,7 @@ if ($totalPages < 1) $totalPages = 1;
     <div class="card-body p-4">
         <form method="GET" action="list.php" class="row g-3">
             <!-- Search field -->
-            <div class="col-12 col-md-4">
+            <div class="col-12 col-md-3">
                 <label for="search" class="form-label small fw-semibold text-muted">Search Student</label>
                 <div class="input-group">
                     <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
@@ -59,9 +61,20 @@ if ($totalPages < 1) $totalPages = 1;
                 </div>
             </div>
 
-            <!-- Class Filter -->
-            <div class="col-12 col-sm-6 col-md-3">
-                <label for="class_id" class="form-label small fw-semibold text-muted">Filter by Class</label>
+            <!-- Academic Type Filter -->
+            <div class="col-12 col-sm-6 col-md-2">
+                <label for="academic_type" class="form-label small fw-semibold text-muted">Academic Type</label>
+                <select class="form-select bg-light" id="academic_type" name="academic_type">
+                    <option value="">All Types</option>
+                    <option value="School" <?php echo ($filters['academic_type'] === 'School') ? 'selected' : ''; ?>>School</option>
+                    <option value="Academy" <?php echo ($filters['academic_type'] === 'Academy') ? 'selected' : ''; ?>>Academy</option>
+                    <option value="School + Academy" <?php echo ($filters['academic_type'] === 'School + Academy') ? 'selected' : ''; ?>>School + Academy</option>
+                </select>
+            </div>
+
+            <!-- Class Filter (For School) -->
+            <div class="col-12 col-sm-6 col-md-2">
+                <label for="class_id" class="form-label small fw-semibold text-muted">School Class</label>
                 <select class="form-select bg-light" id="class_id" name="class_id">
                     <option value="">All Classes</option>
                     <?php foreach ($classes as $c): ?>
@@ -72,8 +85,19 @@ if ($totalPages < 1) $totalPages = 1;
                 </select>
             </div>
 
+            <!-- Academy Program Filter -->
+            <div class="col-12 col-sm-6 col-md-2">
+                <label for="academy_program" class="form-label small fw-semibold text-muted">Academy Program</label>
+                <select class="form-select bg-light" id="academy_program" name="academy_program">
+                    <option value="">All Programs</option>
+                    <?php foreach(['9th Entry Test', '10th Entry Test', '1st Year Entry Test', '2nd Year Entry Test', 'MDCAT', 'ECAT', 'ICS Preparation', 'Pre-Medical', 'Pre-Engineering', 'Computer Courses', 'English Language', 'Spoken English', 'IELTS', 'Other'] as $prog): ?>
+                        <option value="<?php echo $prog; ?>" <?php echo ($filters['academy_program'] === $prog) ? 'selected' : ''; ?>><?php echo $prog; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+
             <!-- Status Filter -->
-            <div class="col-12 col-sm-6 col-md-3">
+            <div class="col-12 col-sm-6 col-md-2">
                 <label for="status" class="form-label small fw-semibold text-muted">Status</label>
                 <select class="form-select bg-light" id="status" name="status">
                     <option value="">All Statuses</option>
@@ -84,9 +108,9 @@ if ($totalPages < 1) $totalPages = 1;
             </div>
 
             <!-- Actions buttons -->
-            <div class="col-12 col-md-2 d-flex align-items-end gap-2">
+            <div class="col-12 col-md-1 d-flex align-items-end gap-2">
                 <button type="submit" class="btn btn-secondary w-100 py-2">Filter</button>
-                <?php if ($filters['class_id'] || $filters['status'] || $filters['search']): ?>
+                <?php if ($filters['class_id'] || $filters['status'] || $filters['search'] || $filters['academic_type'] || $filters['academy_program']): ?>
                     <a href="list.php" class="btn btn-outline-secondary py-2 px-3" title="Clear Filters"><i class="fa-solid fa-filter-circle-xmark"></i></a>
                 <?php endif; ?>
             </div>
@@ -97,12 +121,13 @@ if ($totalPages < 1) $totalPages = 1;
 <!-- Students Listing Card -->
 <div class="custom-table-card shadow-sm border-0 mb-4">
     <div class="table-responsive">
-        <table class="table custom-table table-hover">
+        <table class="table custom-table table-hover align-middle">
             <thead>
                 <tr>
                     <th>Admission No</th>
                     <th>Student Name</th>
-                    <th>Class / Section</th>
+                    <th>Academic Type</th>
+                    <th>Program / Class Details</th>
                     <th>Gender</th>
                     <th>Guardian Contact</th>
                     <th>Status</th>
@@ -112,11 +137,11 @@ if ($totalPages < 1) $totalPages = 1;
             <tbody>
                 <?php if (empty($students)): ?>
                     <tr>
-                        <td colspan="7" class="text-center py-5">
+                        <td colspan="8" class="text-center py-5">
                             <div class="text-muted">
                                 <i class="fa-solid fa-users-slash d-block fs-1 mb-3 text-secondary opacity-50"></i>
                                 <h5>No Students Found</h5>
-                                <p class="small mb-0">Try clearing filters or add a new student record to begin.</p>
+                                <p class="small mb-0">Try clearing filters or register a new student record to begin.</p>
                             </div>
                         </td>
                     </tr>
@@ -129,7 +154,24 @@ if ($totalPages < 1) $totalPages = 1;
                                 <div class="text-muted small" style="font-size: 0.75rem;">Born: <?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?></div>
                             </td>
                             <td>
-                                <span class="badge bg-light text-dark border px-3 py-2 rounded-pill"><?php echo sanitize($student['class_name'] . ' - ' . $student['section']); ?></span>
+                                <?php
+                                $type = $student['academic_type'] ?? 'School';
+                                $typeBadge = 'bg-primary';
+                                if ($type === 'Academy') $typeBadge = 'bg-success';
+                                elseif ($type === 'School + Academy') $typeBadge = 'bg-warning text-dark';
+                                ?>
+                                <span class="badge <?php echo $typeBadge; ?> px-2 py-1 rounded"><?php echo sanitize($type); ?></span>
+                            </td>
+                            <td>
+                                <?php if ($type === 'School'): ?>
+                                    <div class="text-dark small"><i class="fa-solid fa-school me-1 text-muted"></i><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></div>
+                                <?php elseif ($type === 'Academy'): ?>
+                                    <div class="text-dark small"><i class="fa-solid fa-graduation-cap me-1 text-muted"></i><strong><?php echo sanitize($student['academy_program'] ?? '-'); ?></strong></div>
+                                    <div class="text-muted small" style="font-size: 0.7rem;">Batch: <?php echo sanitize($student['academy_batch'] ?? '-'); ?></div>
+                                <?php else: ?>
+                                    <div class="text-dark small mb-1"><i class="fa-solid fa-school me-1 text-muted"></i><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></div>
+                                    <div class="text-dark small"><i class="fa-solid fa-graduation-cap me-1 text-muted"></i><strong><?php echo sanitize($student['academy_program'] ?? '-'); ?></strong> (<?php echo sanitize($student['academy_batch'] ?? '-'); ?>)</div>
+                                <?php endif; ?>
                             </td>
                             <td><?php echo sanitize($student['gender']); ?></td>
                             <td>
@@ -150,11 +192,11 @@ if ($totalPages < 1) $totalPages = 1;
                             </td>
                             <td class="text-end">
                                 <div class="btn-group">
-                                    <a href="profile.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-secondary btn-sm" title="View Profile">
+                                    <a href="profile_report.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-secondary btn-sm" title="View Profile">
                                         <i class="fa-regular fa-user"></i>
                                     </a>
                                     <?php if (hasPermission('student_edit')): ?>
-                                        <a href="edit.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-primary btn-sm" title="Edit Student">
+                                        <a href="registration.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-primary btn-sm" title="Edit Student">
                                             <i class="fa-regular fa-pen-to-square"></i>
                                         </a>
                                     <?php endif; ?>
@@ -178,17 +220,17 @@ if ($totalPages < 1) $totalPages = 1;
     <nav aria-label="Page navigation" class="mb-4">
         <ul class="pagination justify-content-center">
             <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
-                <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?>">Previous</a>
+                <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>">Previous</a>
             </li>
             
             <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                 <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?>"><?php echo $i; ?></a>
+                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>"><?php echo $i; ?></a>
                 </li>
             <?php endfor; ?>
             
             <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
-                <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?>">Next</a>
+                <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $filters['class_id'] ? '&class_id='.$filters['class_id'] : ''; ?><?php echo $filters['status'] ? '&status='.$filters['status'] : ''; ?><?php echo $filters['search'] ? '&search='.$filters['search'] : ''; ?><?php echo $filters['academic_type'] ? '&academic_type='.$filters['academic_type'] : ''; ?><?php echo $filters['academy_program'] ? '&academy_program='.$filters['academy_program'] : ''; ?>">Next</a>
             </li>
         </ul>
     </nav>
@@ -198,91 +240,48 @@ if ($totalPages < 1) $totalPages = 1;
 <?php if (hasPermission('student_delete')): ?>
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow" style="border-radius: 12px;">
-            <div class="modal-header border-bottom-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold text-danger" id="deleteModalLabel"><i class="fa-solid fa-circle-exclamation me-2"></i>Confirm Deletion</h5>
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger" id="deleteModalLabel"><i class="fa-solid fa-circle-exclamation me-2"></i>Delete Student Profile</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body px-4 py-3">
-                <p>Are you sure you want to delete student profile for <strong id="delete-student-name"></strong>?</p>
-                <div class="alert alert-danger mb-0 small">
-                    <i class="fa-solid fa-triangle-exclamation me-2"></i><strong>Warning:</strong> This action will permanently remove this student record from databases.
-                </div>
+            <div class="modal-body py-4">
+                <p>Are you sure you want to permanently delete the student file for <strong id="delete-student-name"></strong>?</p>
+                <p class="text-muted small mb-0"><i class="fa-solid fa-triangle-exclamation me-1 text-warning"></i>This action cannot be undone and will delete all academic, registration, fee, and documents history.</p>
             </div>
-            <div class="modal-footer border-top-0 pb-4 px-4 gap-2">
-                <button type="button" class="btn btn-outline-secondary px-3" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger px-4" id="confirm-delete-btn">Delete Record</button>
+            <div class="modal-footer border-top-0 pt-0">
+                <form method="POST" action="registration.php">
+                    <input type="hidden" name="action" value="delete">
+                    <input type="hidden" name="student_id" id="delete-student-id" value="">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger px-4">Delete Record</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
 <?php endif; ?>
 
-<?php
-// Inject delete confirmation logic via footer scripts
-$extraJS = '
 <script>
-document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", () => {
+    // Attach listener for delete buttons
     const deleteButtons = document.querySelectorAll(".btn-delete-student");
-    const confirmDeleteBtn = document.getElementById("confirm-delete-btn");
-    const deleteStudentNameSpan = document.getElementById("delete-student-name");
-    
-    let deleteId = null;
-    let deleteModalInstance = null;
+    const deleteStudentName = document.getElementById("delete-student-name");
+    const deleteStudentId = document.getElementById("delete-student-id");
+    const deleteModal = document.getElementById("deleteModal") ? new bootstrap.Modal(document.getElementById("deleteModal")) : null;
 
-    if (deleteButtons.length > 0) {
-        const deleteModal = document.getElementById("deleteModal");
-        deleteModalInstance = new bootstrap.Modal(deleteModal);
-
-        deleteButtons.forEach(btn => {
-            btn.addEventListener("click", function() {
-                deleteId = this.getAttribute("data-id");
-                deleteStudentNameSpan.textContent = this.getAttribute("data-name");
-                deleteModalInstance.show();
-            });
+    deleteButtons.forEach(btn => {
+        btn.addEventListener("click", () => {
+            if (deleteStudentName && deleteStudentId && deleteModal) {
+                deleteStudentName.textContent = btn.getAttribute("data-name");
+                deleteStudentId.value = btn.getAttribute("data-id");
+                deleteModal.show();
+            }
         });
-    }
-
-    if (confirmDeleteBtn) {
-        confirmDeleteBtn.addEventListener("click", function() {
-            if (!deleteId) return;
-
-            confirmDeleteBtn.disabled = true;
-            confirmDeleteBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span>Deleting...`;
-
-            const formData = new FormData();
-            formData.append("action", "delete");
-            formData.append("id", deleteId);
-            formData.append("csrf_token", "' . csrfToken() . '");
-
-            fetch("../../ajax/students.php", {
-                method: "POST",
-                body: formData
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    deleteModalInstance.hide();
-                    // Alert and reload
-                    window.location.reload();
-                } else {
-                    alert(data.message || "Failed to delete student record.");
-                    confirmDeleteBtn.disabled = false;
-                    confirmDeleteBtn.textContent = "Delete Record";
-                }
-            })
-            .catch(err => {
-                console.error("Error:", err);
-                alert("An unexpected network error occurred.");
-                confirmDeleteBtn.disabled = false;
-                confirmDeleteBtn.textContent = "Delete Record";
-            });
-        });
-    }
+    });
 });
 </script>
-';
 
-// Render footer
+<?php
 include_once __DIR__ . '/../../includes/footer.php';
 ?>
