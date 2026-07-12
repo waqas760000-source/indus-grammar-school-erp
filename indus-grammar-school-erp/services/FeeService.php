@@ -1,173 +1,164 @@
 <?php
 /**
- * Indus Grammar School ERP - FeeService
- * Version 1.0.0
+ * Indus Grammar School ERP - Normalized Fee Collection Business Logic Service
+ * Version 4.0.0
  */
 
 class FeeService {
 
     /**
-     * Generate a fee challan for a student based on class fee structure
-     *
-     * @param int $studentId
-     * @param string $month
-     * @param string $dueDate
-     * @return array
+     * Generate month-wise billing entry in the fee_ledger for a student.
+     * Prevents duplicate billing, auto-binds structure, and calculates annual/admission fees once.
      */
-    public function generateChallan(int $studentId, string $month, string $dueDate): array {
-        $student = Student::findById($studentId);
-        if (!$student) return ['status' => false, 'message' => 'Student not found.'];
-
-        $structures = Fee::getStructuresByClass((int)$student['class_id']);
-        if (empty($structures)) return ['status' => false, 'message' => 'No fee structure defined for this class.'];
-
-        // Check for existing unpaid challan for same month
+    public function generateMonthlyLedgerEntry($studentId, $month, $dueDate = null) {
         try {
             $db = Database::getConnection();
-            $exists = $db->prepare("SELECT id FROM fee_challans WHERE student_id = :sid AND month = :month AND academic_year = :year");
-            $exists->execute(['sid' => $studentId, 'month' => $month, 'year' => CURRENT_ACADEMIC_YEAR]);
-            if ($exists->fetch()) {
-                return ['status' => false, 'message' => "A challan already exists for $month for this student."];
-            }
-        } catch (Exception $e) {}
+            $academicYear = CURRENT_ACADEMIC_YEAR;
 
-        // Calculate totals
-        $totalAmount   = array_sum(array_column($structures, 'amount'));
-        $discounts     = Fee::getDiscountsByStudent($studentId);
-        $discountTotal = 0;
-        foreach ($discounts as $d) {
-            if ($d['percentage'] > 0) $discountTotal += ($totalAmount * $d['percentage'] / 100);
-            elseif ($d['flat_amount'] > 0) $discountTotal += $d['flat_amount'];
-        }
-        $fines     = Fee::getFinesByStudent($studentId);
-        $fineTotal = array_sum(array_column($fines, 'amount'));
-        $netAmount = $totalAmount - $discountTotal + $fineTotal;
-
-        $items = array_map(fn($s) => ['fee_type' => $s['fee_type'], 'amount' => $s['amount']], $structures);
-        $challanNo = Fee::generateChallanNumber();
-
-        $challanId = Fee::createChallan([
-            'student_id'      => $studentId,
-            'challan_no'      => $challanNo,
-            'month'           => $month,
-            'academic_year'   => CURRENT_ACADEMIC_YEAR,
-            'total_amount'    => $totalAmount,
-            'discount_amount' => $discountTotal,
-            'fine_amount'     => $fineTotal,
-            'net_amount'      => max(0, $netAmount),
-            'due_date'        => $dueDate,
-        ], $items);
-
-        if ($challanId) {
-            auditLog('Challan Generated', "Challan $challanNo generated for student ID $studentId — Month: $month");
-            return ['status' => true, 'message' => "Challan $challanNo generated successfully.", 'id' => $challanId, 'challan_no' => $challanNo];
-        }
-        return ['status' => false, 'message' => 'Failed to generate challan.'];
-    }
-
-    /**
-     * Collect a fee payment
-     *
-     * @param array $data
-     * @return array
-     */
-    public function collectPayment(array $data): array {
-        $errors = [];
-        if (empty($data['student_id']))   $errors[] = 'Student is required.';
-        if (empty($data['amount_paid']) || $data['amount_paid'] <= 0) $errors[] = 'Valid amount is required.';
-        if (empty($data['payment_date'])) $errors[] = 'Payment date is required.';
-        if (empty($data['payment_method'])) $errors[] = 'Payment method is required.';
-        if ($errors) return ['status' => false, 'message' => implode(' ', $errors)];
-
-        $data['receipt_no'] = Fee::generateReceiptNumber();
-        $id = Fee::recordPayment($data);
-        if ($id) {
-            auditLog('Fee Collected', "Receipt {$data['receipt_no']} — Amount: Rs. {$data['amount_paid']} from student ID {$data['student_id']}");
-            return ['status' => true, 'message' => "Payment recorded. Receipt No: {$data['receipt_no']}", 'receipt_no' => $data['receipt_no'], 'id' => $id];
-        }
-        return ['status' => false, 'message' => 'Failed to record payment.'];
-    }
-
-    /**
-     * Add a discount to a student
-     *
-     * @param int $studentId
-     * @param array $data
-     * @return array
-     */
-    public function addDiscount(int $studentId, array $data): array {
-        if (empty($data['discount_type'])) return ['status' => false, 'message' => 'Discount type is required.'];
-        try {
-            $db = Database::getConnection();
-            $stmt = $db->prepare("
-                INSERT INTO fee_discounts (student_id, discount_type, percentage, flat_amount, reason)
-                VALUES (:sid, :type, :pct, :flat, :reason)
+            // 1. Check if ledger record already exists for this month/year
+            $checkStmt = $db->prepare("
+                SELECT id FROM fee_ledger 
+                WHERE student_id = :sid AND month = :month AND academic_year = :year
             ");
-            $ok = $stmt->execute([
-                'sid'    => $studentId,
-                'type'   => sanitize($data['discount_type']),
-                'pct'    => (float)($data['percentage'] ?? 0),
-                'flat'   => (float)($data['flat_amount'] ?? 0),
-                'reason' => sanitize($data['reason'] ?? ''),
-            ]);
-            if ($ok) {
-                auditLog('Discount Applied', "Discount '{$data['discount_type']}' applied to student ID $studentId");
-                return ['status' => true, 'message' => 'Discount applied successfully.'];
+            $checkStmt->execute(['sid' => $studentId, 'month' => $month, 'year' => $academicYear]);
+            if ($checkStmt->fetchColumn()) {
+                return ['status' => false, 'message' => "Ledger entry already exists for $month ($academicYear)."];
             }
+
+            // 2. Ensure student has active fee structure assignment
+            Fee::ensureStudentAssignment($studentId);
+            $assignment = Fee::getStudentAssignment($studentId);
+            if (!$assignment || $assignment['status'] !== 'Active') {
+                return ['status' => false, 'message' => 'No active fee structure assignment found for this student.'];
+            }
+
+            // 3. Determine if Admission Fee should be billed (charged only once ever)
+            $prevLedgers = $db->prepare("SELECT COUNT(*) FROM fee_ledger WHERE student_id = :sid");
+            $prevLedgers->execute(['sid' => $studentId]);
+            $hasPrevBilled = ((int)$prevLedgers->fetchColumn() > 0);
+            $admissionFee = $hasPrevBilled ? 0.00 : (float)$assignment['admission_fee'];
+
+            // 4. Determine if Annual Charges should be billed (charged only once per academic year)
+            $annBilled = $db->prepare("
+                SELECT COUNT(*) FROM fee_ledger 
+                WHERE student_id = :sid AND academic_year = :year AND annual_charges > 0
+            ");
+            $annBilled->execute(['sid' => $studentId, 'year' => $academicYear]);
+            $hasAnnBilled = ((int)$annBilled->fetchColumn() > 0);
+            $annualCharges = $hasAnnBilled ? 0.00 : (float)$assignment['annual_charges'];
+
+            // 5. Calculate Discount (on Tuition Fee)
+            $tuitionFee = (float)$assignment['tuition_fee'];
+            $discountPct = (float)$assignment['discount_percentage'];
+            $discountFlat = (float)$assignment['discount_flat'];
+            
+            $discountAmount = 0.00;
+            if ($discountPct > 0) {
+                $discountAmount = ($tuitionFee * $discountPct) / 100;
+            } elseif ($discountFlat > 0) {
+                $discountAmount = $discountFlat;
+            }
+
+            // 6. Fee heads
+            $computerFee = (float)$assignment['computer_fee'];
+            $examFee = (float)$assignment['exam_fee'];
+            $transportFee = (float)$assignment['transport_fee'];
+            $securityDeposit = $hasPrevBilled ? 0.00 : (float)$assignment['security_deposit']; // security once
+            $otherCharges = (float)$assignment['other_charges'];
+
+            // Net Payable
+            $totalPayable = ($tuitionFee + $admissionFee + $computerFee + $examFee + $transportFee + $annualCharges + $securityDeposit + $otherCharges) - $discountAmount;
+            if ($totalPayable < 0) $totalPayable = 0.00;
+
+            // Default due date to 15th of current month if none supplied
+            if (empty($dueDate)) {
+                $dueDate = date('Y-m-15');
+            }
+
+            // 7. Save to Ledger
+            $insStmt = $db->prepare("
+                INSERT INTO fee_ledger 
+                (student_id, month, academic_year, admission_fee, tuition_fee, computer_fee, exam_fee, transport_fee, annual_charges, security_deposit, other_charges, fine_amount, discount_amount, total_payable, paid_amount, status, due_date)
+                VALUES 
+                (:sid, :month, :year, :adm, :tui, :comp, :exam, :trans, :ann, :sec, :oth, 0.00, :disc, :payable, 0.00, 'Pending', :due)
+            ");
+            
+            $ok = $insStmt->execute([
+                'sid'     => $studentId,
+                'month'   => $month,
+                'year'    => $academicYear,
+                'adm'     => $admissionFee,
+                'tui'     => $tuitionFee,
+                'comp'    => $computerFee,
+                'exam'    => $examFee,
+                'trans'   => $transportFee,
+                'ann'     => $annualCharges,
+                'sec'     => $securityDeposit,
+                'oth'     => $otherCharges,
+                'disc'    => $discountAmount,
+                'payable' => $totalPayable,
+                'due'     => $dueDate
+            ]);
+
+            if ($ok) {
+                return ['status' => true, 'message' => "Fee ledger entry generated successfully for $month."];
+            } else {
+                return ['status' => false, 'message' => 'Failed to save ledger record.'];
+            }
+
         } catch (Exception $e) {
-            error_log("FeeService::addDiscount error: " . $e->getMessage());
+            error_log("generateMonthlyLedgerEntry exception: " . $e->getMessage());
+            return ['status' => false, 'message' => 'System error: ' . $e->getMessage()];
         }
-        return ['status' => false, 'message' => 'Failed to apply discount.'];
     }
 
     /**
-     * Add a fine to a student
-     *
-     * @param int $studentId
-     * @param array $data
-     * @return array
+     * Dynamically calculates late fees past the due date and grace period parameters.
      */
-    public function addFine(int $studentId, array $data): array {
-        if (empty($data['fine_type']) || empty($data['amount'])) {
-            return ['status' => false, 'message' => 'Fine type and amount are required.'];
+    public function calculateLateFineForLedger($ledger) {
+        if ($ledger['status'] === 'Paid') {
+            return (float)$ledger['fine_amount'];
         }
-        try {
-            $db   = Database::getConnection();
-            $stmt = $db->prepare("INSERT INTO fee_fines (student_id, fine_type, amount, reason) VALUES (:sid, :type, :amt, :reason)");
-            $ok   = $stmt->execute([
-                'sid'    => $studentId,
-                'type'   => sanitize($data['fine_type']),
-                'amt'    => (float)$data['amount'],
-                'reason' => sanitize($data['reason'] ?? ''),
-            ]);
-            if ($ok) {
-                auditLog('Fine Added', "Fine Rs. {$data['amount']} added to student ID $studentId");
-                return ['status' => true, 'message' => 'Fine recorded successfully.'];
-            }
-        } catch (Exception $e) {
-            error_log("FeeService::addFine error: " . $e->getMessage());
+
+        $dueDate = strtotime($ledger['due_date']);
+        $today = strtotime(date('Y-m-d'));
+        if ($today <= $dueDate) {
+            return 0.00;
         }
-        return ['status' => false, 'message' => 'Failed to record fine.'];
+
+        // Get Fine parameters settings
+        $settings = Fee::getSettings();
+        $graceDays = (int)$settings['grace_days'];
+        $lateFineAmount = (float)$settings['late_fine_amount'];
+        $fineType = $settings['fine_type'];
+
+        $diffSeconds = $today - $dueDate;
+        $lateDays = ceil($diffSeconds / (60 * 60 * 24));
+
+        if ($lateDays <= $graceDays) {
+            return 0.00;
+        }
+
+        if ($fineType === 'Daily') {
+            return $lateDays * $lateFineAmount;
+        } elseif ($fineType === 'Monthly') {
+            $months = ceil($lateDays / 30);
+            return $months * $lateFineAmount;
+        } else {
+            // Fixed fine
+            return $lateFineAmount;
+        }
     }
 
     /**
-     * Add a fee structure entry for a class
-     *
-     * @param array $data
-     * @return array
+     * Interface to collect fee payments
      */
-    public function saveFeeStructure(array $data): array {
-        $errors = [];
-        if (empty($data['class_id']))  $errors[] = 'Class is required.';
-        if (empty($data['fee_type']))  $errors[] = 'Fee type is required.';
-        if (empty($data['amount']) || $data['amount'] < 0) $errors[] = 'Valid amount is required.';
-        if ($errors) return ['status' => false, 'message' => implode(' ', $errors)];
-
-        $id = Fee::createStructure($data);
-        if ($id) {
-            auditLog('Fee Structure Saved', "Fee structure saved for class ID {$data['class_id']}: {$data['fee_type']} = Rs. {$data['amount']}");
-            return ['status' => true, 'message' => 'Fee structure saved successfully.'];
+    public function collectFeePayment($data) {
+        // Validate amounts
+        if ((float)($data['amount_paid'] ?? 0) <= 0) {
+            return ['status' => false, 'message' => 'Amount received must be a positive number.'];
         }
-        return ['status' => false, 'message' => 'Failed to save fee structure.'];
+        
+        return Fee::recordPayment($data);
     }
 }

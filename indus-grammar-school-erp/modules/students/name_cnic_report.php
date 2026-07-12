@@ -1,194 +1,183 @@
 <?php
 /**
- * Indus Grammar School ERP - Student Name / CNIC Report
- * Version 2.0.0
+ * Indus Grammar School ERP - Student Name / CNIC Report Module
+ * Version 3.0.0
  */
 
-$pageTitle = 'Student Name / CNIC Report';
-$breadcrumbActive = 'Student Registration';
-include_once __DIR__ . '/../../includes/header.php';
+// 1. Bootstrap App & Authorization Check
+require_once __DIR__ . '/../../config/app.php';
+AuthMiddleware::requireLogin();
 AuthMiddleware::requirePermission('student_view');
 
 $db = Database::getConnection();
+$message = '';
+$error = '';
 
-// Filter parameters
+// Retrieve Search Filters
 $search_name = sanitize($_GET['search_name'] ?? '');
-$search_father = sanitize($_GET['search_father'] ?? '');
-$search_admission = sanitize($_GET['search_admission'] ?? '');
-$search_roll = sanitize($_GET['search_roll'] ?? '');
 $search_cnic = sanitize($_GET['search_cnic'] ?? '');
-$search_bform = sanitize($_GET['search_bform'] ?? '');
-$search_mobile = sanitize($_GET['search_mobile'] ?? '');
-$search_class = (int)($_GET['search_class'] ?? 0);
-$search_section = sanitize($_GET['search_section'] ?? '');
 
-$classes = [];
-try {
-    $classes = $db->query("SELECT * FROM classes ORDER BY class_name ASC")->fetchAll();
-} catch (Exception $e) {}
+$limit = 10;
+$page = (int)($_GET['page'] ?? 1);
+if ($page < 1) $page = 1;
+$offset = ($page - 1) * $limit;
 
-// Query matching students
-$records = [];
+$where = " WHERE 1=1";
+$params = [];
+
+if ($search_name !== '') {
+    $where .= " AND (s.first_name LIKE :name_first OR s.last_name LIKE :name_last)";
+    $params['name_first'] = '%' . $search_name . '%';
+    $params['name_last'] = '%' . $search_name . '%';
+}
+if ($search_cnic !== '') {
+    $where .= " AND d.cnic_no = :cnic";
+    $params['cnic'] = $search_cnic;
+}
+
+$students = [];
+$totalEntries = 0;
+
 try {
-    $sql = "
-        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.guardian_phone, s.academic_type, s.school_class, s.school_section, s.academy_program, s.academy_batch, c.class_name, c.section,
-               d.roll_no, d.cnic_no, d.birth_cert_no, d.father_name, d.father_cnic, d.mother_cnic, d.student_mobile
+    // Count query
+    $stmtCount = $db->prepare("
+        SELECT COUNT(*) 
+        FROM students s
+        LEFT JOIN student_registration_details d ON s.id = d.student_id
+        $where
+    ");
+    $stmtCount->execute($params);
+    $totalEntries = (int)$stmtCount->fetchColumn();
+
+    // Data query
+    $stmtData = $db->prepare("
+        SELECT s.*, c.class_name, c.section,
+               d.roll_no, d.cnic_no, d.father_name, d.father_cnic, d.father_mobile, d.mother_name, d.mother_mobile,
+               d.current_address, d.city, d.blood_group, d.religion, d.nationality, d.doc_student_photo, d.academic_session,
+               d.fee_admission, d.fee_monthly, d.fee_discount, d.remarks as reg_remarks, d.admission_date
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
         LEFT JOIN student_registration_details d ON s.id = d.student_id
-        WHERE s.status = 'Active'
-    ";
-    $params = [];
+        $where
+        ORDER BY s.admission_no ASC
+        LIMIT :limit OFFSET :offset
+    ");
 
-    if ($search_name) {
-        $sql .= " AND (s.first_name LIKE :name OR s.last_name LIKE :name)";
-        $params['name'] = '%' . $search_name . '%';
+    foreach ($params as $k => $v) {
+        $stmtData->bindValue($k, $v);
     }
-    if ($search_father) {
-        $sql .= " AND d.father_name LIKE :father";
-        $params['father'] = '%' . $search_father . '%';
-    }
-    if ($search_admission) {
-        $sql .= " AND s.admission_no = :admission";
-        $params['admission'] = $search_admission;
-    }
-    if ($search_roll) {
-        $sql .= " AND d.roll_no = :roll";
-        $params['roll'] = $search_roll;
-    }
-    if ($search_cnic) {
-        $sql .= " AND d.cnic_no = :cnic";
-        $params['cnic'] = $search_cnic;
-    }
-    if ($search_bform) {
-        $sql .= " AND d.birth_cert_no = :bform";
-        $params['bform'] = $search_bform;
-    }
-    if ($search_mobile) {
-        $sql .= " AND (d.student_mobile = :mobile OR s.guardian_phone = :mobile)";
-        $params['mobile'] = $search_mobile;
-    }
-    if ($search_class > 0) {
-        $sql .= " AND s.class_id = :class_id";
-        $params['class_id'] = $search_class;
-    }
-    if ($search_section) {
-        $sql .= " AND c.section = :section";
-        $params['section'] = $search_section;
-    }
+    $stmtData->bindValue('limit', $limit, PDO::PARAM_INT);
+    $stmtData->bindValue('offset', $offset, PDO::PARAM_INT);
+    $stmtData->execute();
 
-    $sql .= " ORDER BY s.admission_no DESC";
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
-    $records = $stmt->fetchAll();
+    $students = $stmtData->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {
-    error_log("CNIC Report query error: " . $e->getMessage());
+    $error = "Error querying Student Registry: " . $e->getMessage();
 }
+
+$totalPages = ceil($totalEntries / $limit);
+if ($totalPages < 1) $totalPages = 1;
+
+$pageTitle = 'Name / CNIC Report';
+$breadcrumbActive = 'Student Registration';
+include_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Title Header -->
+<!-- Title Banner -->
 <div class="row mb-4 align-items-center d-print-none">
     <div class="col-sm-6">
-        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-passport me-2 text-primary"></i>Student Name / CNIC Report</h3>
+        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-address-book me-2 text-primary"></i>Student Name & CNIC Directory</h3>
     </div>
 </div>
 
-<!-- Filters Panel -->
+<!-- Alerts -->
+<?php if ($error): ?>
+    <div class="alert alert-danger border-0 shadow-sm mb-4" style="border-radius: 12px;">
+        <i class="fa-solid fa-circle-xmark me-2"></i><?php echo htmlspecialchars($error); ?>
+    </div>
+<?php endif; ?>
+
+<!-- Search Card Panel -->
 <div class="card border border-light shadow-sm bg-white p-4 mb-4 d-print-none" style="border-radius:12px;">
-    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Registry</h6>
-    <form method="GET" action="name_cnic_report.php" class="row g-3 align-items-end">
-        <div class="col-md-3">
+    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-magnifying-glass me-2"></i>Locate Student File</h6>
+    <form method="GET" action="name_cnic_report.php" id="searchForm" class="row g-3">
+        <div class="col-md-5">
             <label class="form-label small fw-semibold text-muted">Student Name</label>
-            <input type="text" class="form-control form-control-sm" name="search_name" value="<?php echo $search_name; ?>" placeholder="Name...">
+            <div class="input-group">
+                <span class="input-group-text bg-light text-secondary"><i class="fa-solid fa-user"></i></span>
+                <input type="text" class="form-control" name="search_name" value="<?php echo htmlspecialchars($search_name); ?>" placeholder="Enter Student Name">
+            </div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold text-muted">Father Name</label>
-            <input type="text" class="form-control form-control-sm" name="search_father" value="<?php echo $search_father; ?>" placeholder="Father Name...">
+        <div class="col-md-5">
+            <label class="form-label small fw-semibold text-muted">Student B-Form / CNIC Number</label>
+            <div class="input-group">
+                <span class="input-group-text bg-light text-secondary"><i class="fa-solid fa-passport"></i></span>
+                <input type="text" class="form-control" name="search_cnic" value="<?php echo htmlspecialchars($search_cnic); ?>" placeholder="e.g. 35201-1234567-1">
+            </div>
         </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold text-muted">Admission No</label>
-            <input type="text" class="form-control form-control-sm" name="search_admission" value="<?php echo $search_admission; ?>" placeholder="IGS-AD-XXXX-XXXX">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold text-muted">Roll No</label>
-            <input type="text" class="form-control form-control-sm" name="search_roll" value="<?php echo $search_roll; ?>" placeholder="IGS-ROLL-XXXX-XXXX">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold text-muted">B-Form / CNIC</label>
-            <input type="text" class="form-control form-control-sm" name="search_cnic" value="<?php echo $search_cnic; ?>" placeholder="35201-XXXXXXX-X">
-        </div>
-        <div class="col-md-3">
-            <label class="form-label small fw-semibold text-muted">Birth Cert. No</label>
-            <input type="text" class="form-control form-control-sm" name="search_bform" value="<?php echo $search_bform; ?>">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold text-muted">Mobile</label>
-            <input type="tel" class="form-control form-control-sm" name="search_mobile" value="<?php echo $search_mobile; ?>">
-        </div>
-        <div class="col-md-2">
-            <label class="form-label small fw-semibold text-muted">Class</label>
-            <select class="form-select form-select-sm" name="search_class">
-                <option value="">All</option>
-                <?php foreach ($classes as $c): ?>
-                    <option value="<?php echo $c['id']; ?>" <?php echo ($search_class == $c['id']) ? 'selected' : ''; ?>>
-                        <?php echo sanitize($c['class_name'] . ' - ' . $c['section']); ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="col-md-1">
-            <label class="form-label small fw-semibold text-muted">Sec.</label>
-            <input type="text" class="form-control form-control-sm" name="search_section" value="<?php echo $search_section; ?>">
-        </div>
-        <div class="col-12 text-end">
-            <button type="submit" class="btn btn-sm btn-primary px-4"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</button>
-            <a href="name_cnic_report.php" class="btn btn-sm btn-outline-secondary">Clear Filters</a>
+        <div class="col-md-2 align-self-end text-end mt-4">
+            <button type="submit" id="searchBtn" class="btn btn-primary btn-sm w-100 mb-1 px-4"><i class="fa-solid fa-magnifying-glass me-1"></i>Search</button>
+            <a href="name_cnic_report.php" class="btn btn-outline-secondary btn-sm w-100">Reset</a>
         </div>
     </form>
 </div>
 
-<!-- Report Table Card -->
-<div class="card border border-light shadow-sm bg-white p-4" style="border-radius:12px;">
-    <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4 d-print-none">
-        <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-passport text-primary me-2"></i>CNIC Registry Report</h5>
-        <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-secondary px-3" onclick="window.print()"><i class="fa-solid fa-print me-2"></i>Print Report</button>
-            <button class="btn btn-sm btn-outline-success px-3" onclick="exportExcel()"><i class="fa-solid fa-file-excel me-2"></i>Export Excel</button>
-        </div>
-    </div>
-
+<!-- Search Results Table -->
+<div class="card border-0 shadow-sm bg-white d-print-none" style="border-radius:12px; overflow:hidden;">
     <div class="table-responsive">
-        <table class="table custom-table table-hover align-middle" id="cnicTable">
+        <table class="table custom-table table-hover align-middle mb-0">
             <thead>
                 <tr>
-                    <th>Adm. No</th>
-                    <th>Roll No</th>
+                    <th>Photo</th>
+                    <th>Admission Number</th>
                     <th>Student Name</th>
                     <th>Father Name</th>
-                    <th>Student CNIC / B-Form</th>
-                    <th>Father CNIC</th>
-                    <th>Mother CNIC</th>
-                    <th>Contact Phone</th>
+                    <th>Student B-Form / CNIC</th>
+                    <th>Academic Type</th>
                     <th>Class</th>
-                    <th class="text-end d-print-none">Actions</th>
+                    <th>Section</th>
+                    <th>Status</th>
+                    <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (empty($records)): ?>
-                    <tr><td colspan="10" class="text-center py-4 text-muted">No student profiles registered with CNIC info match.</td></tr>
-                <?php else: foreach ($records as $r): ?>
+                <?php if (empty($students)): ?>
                     <tr>
-                        <td class="fw-bold text-dark"><?php echo sanitize($r['admission_no']); ?></td>
-                        <td><?php echo sanitize($r['roll_no'] ?: '-'); ?></td>
-                        <td class="fw-bold"><?php echo sanitize($r['first_name'] . ' ' . $r['last_name']); ?></td>
-                        <td><?php echo sanitize($r['father_name'] ?: '-'); ?></td>
-                        <td><?php echo sanitize($r['cnic_no'] ?: '-'); ?></td>
-                        <td><?php echo sanitize($r['father_cnic'] ?: '-'); ?></td>
-                        <td><?php echo sanitize($r['mother_cnic'] ?: '-'); ?></td>
-                        <td><?php echo sanitize($r['student_mobile'] ?: $r['guardian_phone']); ?></td>
-                        <td><?php echo sanitize(($r['class_name'] ?? $r['school_class'] ?? '-') . ' - ' . ($r['section'] ?? $r['school_section'] ?? 'A')); ?></td>
-                        <td class="text-end d-print-none">
-                            <a href="detail_report.php?view_id=<?php echo $r['id']; ?>" class="btn btn-sm btn-outline-primary" title="View Profile"><i class="fa-solid fa-eye"></i></a>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            <i class="fa-solid fa-user-slash d-block fs-3 mb-2 opacity-50"></i>
+                            No student found.
+                        </td>
+                    </tr>
+                <?php else: foreach ($students as $row): ?>
+                    <tr>
+                        <td>
+                            <div class="avatar-small border rounded-circle d-flex align-items-center justify-content-center bg-light" style="width: 38px; height: 38px; overflow:hidden;">
+                                <?php if (!empty($row['doc_student_photo'])): ?>
+                                    <img src="<?php echo APP_URL . '/' . $row['doc_student_photo']; ?>" style="width:100%; height:100%; object-fit:cover;">
+                                <?php else: ?>
+                                    <i class="fa-solid fa-user text-muted small"></i>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                        <td><strong class="text-primary"><?php echo sanitize($row['admission_no']); ?></strong></td>
+                        <td class="fw-bold"><?php echo sanitize($row['first_name'] . ' ' . $row['last_name']); ?></td>
+                        <td><?php echo displayValue($row['father_name'] ?? $row['guardian_name']); ?></td>
+                        <td class="font-monospace"><?php echo displayValue($row['cnic_no']); ?></td>
+                        <td><span class="badge bg-secondary"><?php echo sanitize($row['academic_type']); ?></span></td>
+                        <td><?php echo displayValue($row['class_name'] ?? $row['school_class']); ?></td>
+                        <td><?php echo displayValue($row['section'] ?? $row['school_section']); ?></td>
+                        <td>
+                            <span class="badge badge-soft-success"><?php echo sanitize($row['status']); ?></span>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="viewStudentDetails(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="View Details">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="printStudentDossier(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="Print Dossier">
+                                    <i class="fa-solid fa-print"></i>
+                                </button>
+                            </div>
                         </td>
                     </tr>
                 <?php endforeach; endif; ?>
@@ -197,32 +186,185 @@ try {
     </div>
 </div>
 
-<script>
-// CSV exporter trigger
-function exportExcel() {
-    let csv = "Admission No,Roll No,Student Name,Father Name,Student CNIC,Father CNIC,Mother CNIC,Contact Phone,Class\n";
-    const rows = document.querySelectorAll("#cnicTable tbody tr");
-    
-    rows.forEach(tr => {
-        const cols = tr.querySelectorAll("td");
-        if(cols.length === 10) {
-            let rowData = [];
-            // Omit the actions cell (index 9)
-            for(let i=0; i<9; i++) {
-                let text = cols[i].textContent.replace(/"/g, '""').replace(/,/g, ' ').trim();
-                rowData.push('"' + text + '"');
-            }
-            csv += rowData.join(",") + "\n";
-        }
-    });
+<!-- Pagination (Hidden in print) -->
+<?php if ($totalPages > 1): ?>
+    <nav aria-label="Page navigation" class="mt-4 mb-4 d-print-none">
+        <ul class="pagination justify-content-center">
+            <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
+                <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $search_name ? '&search_name='.$search_name : ''; ?><?php echo $search_cnic ? '&search_cnic='.$search_cnic : ''; ?>">Previous</a>
+            </li>
+            <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
+                    <a class="page-link" href="?page=<?php echo $i; ?><?php echo $search_name ? '&search_name='.$search_name : ''; ?><?php echo $search_cnic ? '&search_cnic='.$search_cnic : ''; ?>"><?php echo $i; ?></a>
+                </li>
+            <?php endfor; ?>
+            <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
+                <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $search_name ? '&search_name='.$search_name : ''; ?><?php echo $search_cnic ? '&search_cnic='.$search_cnic : ''; ?>">Next</a>
+            </li>
+        </ul>
+    </nav>
+<?php endif; ?>
 
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "student_cnic_audit_report.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+<!-- View Details Modal Panel -->
+<div class="modal fade" id="detailsModal" tabindex="-1" aria-labelledby="detailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
+            <div class="modal-header bg-light border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark" id="detailsModalLabel"><i class="fa-solid fa-address-card text-primary me-2"></i>Student Registration Profile Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-4" id="printableDossierArea">
+                <!-- PRINT HEADER (ONLY visible during print output) -->
+                <div class="d-none d-print-block text-center border-bottom pb-3 mb-4">
+                    <h2 class="fw-bold text-dark mb-1">INDUS GRAMMAR SCHOOL & ACADEMY</h2>
+                    <h5 class="text-secondary mb-2">Student Registration Profile Dossier</h5>
+                    <span class="small text-muted">Print Date: <strong><?php echo date('M d, Y h:i A'); ?></strong></span>
+                </div>
+
+                <div class="row g-3">
+                    <!-- Photo & Core placement -->
+                    <div class="col-md-3 text-center border-end">
+                        <div class="avatar-large border rounded mx-auto mb-3 bg-light d-flex align-items-center justify-content-center" style="width: 120px; height: 120px; overflow: hidden;">
+                            <img id="v-photo" src="" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                            <i id="v-photo-placeholder" class="fa-solid fa-user fs-1 text-secondary opacity-50"></i>
+                        </div>
+                        <h6 class="fw-bold text-primary mb-1" id="v-name"></h6>
+                        <span class="badge bg-secondary mb-2" id="v-type"></span>
+                    </div>
+                    
+                    <!-- Details rows -->
+                    <div class="col-md-9">
+                        <div class="row g-2">
+                            <!-- Admission info header -->
+                            <div class="col-12 border-bottom pb-1 mb-2"><h6 class="fw-bold text-secondary mb-0">Admission Information</h6></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Admission Number</span><strong class="text-dark" id="v-admission"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Admission Date</span><strong class="text-dark" id="v-admission-date"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Academic Session</span><strong class="text-dark" id="v-session"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Class</span><strong class="text-dark" id="v-class"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Section</span><strong class="text-dark" id="v-section"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Status</span><span class="badge bg-success" id="v-status"></span></div>
+
+                            <!-- Student Info -->
+                            <div class="col-12 border-bottom pb-1 mb-2 mt-3"><h6 class="fw-bold text-secondary mb-0">Student Information</h6></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Gender</span><strong class="text-dark" id="v-gender"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Date of Birth</span><strong class="text-dark" id="v-dob"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Blood Group</span><strong class="text-dark" id="v-blood"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Religion</span><strong class="text-dark" id="v-religion"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Nationality</span><strong class="text-dark" id="v-nationality"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Student B-Form / CNIC</span><strong class="text-dark font-monospace" id="v-cnic"></strong></div>
+
+                            <!-- Parent Info -->
+                            <div class="col-12 border-bottom pb-1 mb-2 mt-3"><h6 class="fw-bold text-secondary mb-0">Parent Information</h6></div>
+                            <div class="col-md-6"><span class="text-muted small d-block">Father Name</span><strong class="text-dark" id="v-father-name"></strong></div>
+                            <div class="col-md-6"><span class="text-muted small d-block">Father CNIC</span><strong class="text-dark font-monospace" id="v-father-cnic"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Father Mobile</span><strong class="text-dark" id="v-father-mobile"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Mother Name</span><strong class="text-dark" id="v-mother-name"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Mother Mobile</span><strong class="text-dark" id="v-mother-mobile"></strong></div>
+
+                            <!-- Address Info -->
+                            <div class="col-12 border-bottom pb-1 mb-2 mt-3"><h6 class="fw-bold text-secondary mb-0">Address Information</h6></div>
+                            <div class="col-md-8"><span class="text-muted small d-block">Current Address</span><strong class="text-dark" id="v-address"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">City</span><strong class="text-dark" id="v-city"></strong></div>
+
+                            <!-- Fee Info -->
+                            <div class="col-12 border-bottom pb-1 mb-2 mt-3"><h6 class="fw-bold text-secondary mb-0">Fee Structure Details</h6></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Admission Fee</span><strong class="text-dark" id="v-fee-admission"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Monthly Fee</span><strong class="text-dark" id="v-fee-monthly"></strong></div>
+                            <div class="col-md-4"><span class="text-muted small d-block">Discount</span><strong class="text-dark" id="v-fee-discount"></strong></div>
+
+                            <!-- Remarks -->
+                            <div class="col-12 border-bottom pb-1 mb-2 mt-3"><h6 class="fw-bold text-secondary mb-0">Remarks / Special Notes</h6></div>
+                            <div class="col-12"><strong class="text-dark" id="v-remarks"></strong></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PRINT FOOTER (ONLY visible during print output) -->
+                <div class="d-none d-print-block text-center mt-5 pt-3 border-top">
+                    <span class="small text-muted">IGS Registry Profile © <?php echo date('Y'); ?></span>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-outline-secondary" onclick="printDossierModal()"><i class="fa-solid fa-print me-2"></i>Print Dossier</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Search loading spinner activation
+document.getElementById('searchForm').addEventListener('submit', function() {
+    const btn = document.getElementById('searchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Searching...';
+});
+
+const dModal = new bootstrap.Modal(document.getElementById("detailsModal"));
+function viewStudentDetails(student) {
+    document.getElementById("v-name").textContent = student.first_name + ' ' + student.last_name;
+    document.getElementById("v-type").textContent = student.academic_type;
+    document.getElementById("v-admission").textContent = student.admission_no;
+    document.getElementById("v-admission-date").textContent = student.admission_date ? student.admission_date : '—';
+    document.getElementById("v-session").textContent = student.academic_session ? student.academic_session : '—';
+    document.getElementById("v-class").textContent = student.class_name ? student.class_name : (student.school_class ? student.school_class : '—');
+    document.getElementById("v-section").textContent = student.section ? student.section : (student.school_section ? student.school_section : '—');
+    document.getElementById("v-status").textContent = student.status;
+    document.getElementById("v-gender").textContent = student.gender;
+    document.getElementById("v-dob").textContent = student.date_of_birth;
+    document.getElementById("v-blood").textContent = student.blood_group ? student.blood_group : '—';
+    document.getElementById("v-religion").textContent = student.religion ? student.religion : '—';
+    document.getElementById("v-nationality").textContent = student.nationality ? student.nationality : '—';
+    document.getElementById("v-cnic").textContent = student.cnic_no ? student.cnic_no : '—';
+    document.getElementById("v-father-name").textContent = student.father_name ? student.father_name : '—';
+    document.getElementById("v-father-cnic").textContent = student.father_cnic ? student.father_cnic : '—';
+    document.getElementById("v-father-mobile").textContent = student.father_mobile ? student.father_mobile : '—';
+    document.getElementById("v-mother-name").textContent = student.mother_name ? student.mother_name : '—';
+    document.getElementById("v-mother-mobile").textContent = student.mother_mobile ? student.mother_mobile : '—';
+    document.getElementById("v-address").textContent = student.current_address ? student.current_address : (student.address ? student.address : '—');
+    document.getElementById("v-city").textContent = student.city ? student.city : '—';
+    
+    // Fee structures
+    document.getElementById("v-fee-admission").textContent = student.fee_admission ? 'Rs. ' + parseFloat(student.fee_admission).toLocaleString() : 'Rs. 0';
+    document.getElementById("v-fee-monthly").textContent = student.fee_monthly ? 'Rs. ' + parseFloat(student.fee_monthly).toLocaleString() : 'Rs. 0';
+    document.getElementById("v-fee-discount").textContent = student.fee_discount ? 'Rs. ' + parseFloat(student.fee_discount).toLocaleString() : 'Rs. 0';
+    document.getElementById("v-remarks").textContent = student.reg_remarks ? student.reg_remarks : 'No special notes logged.';
+
+    // Avatar setup
+    const photoEl = document.getElementById("v-photo");
+    const photoPlaceholderEl = document.getElementById("v-photo-placeholder");
+    if (student.doc_student_photo) {
+        photoEl.src = "<?php echo APP_URL; ?>/" + student.doc_student_photo;
+        photoEl.style.display = "block";
+        photoPlaceholderEl.style.display = "none";
+    } else {
+        photoEl.style.display = "none";
+        photoPlaceholderEl.style.display = "block";
+    }
+
+    dModal.show();
+}
+
+// Print single student dossier
+function printDossierModal() {
+    const printContent = document.getElementById("printableDossierArea").innerHTML;
+    const originalContent = document.body.innerHTML;
+    
+    document.body.innerHTML = `
+        <div style="padding:40px; font-family: sans-serif; background-color: #fff;">
+            ${printContent}
+        </div>
+    `;
+    
+    window.print();
+    document.body.innerHTML = originalContent;
+    window.location.reload();
+}
+
+// Direct action row print handler
+function printStudentDossier(student) {
+    viewStudentDetails(student);
+    setTimeout(printDossierModal, 300);
 }
 </script>
 

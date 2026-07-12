@@ -55,7 +55,12 @@
                     <i class="fa-solid fa-chevron-right arrow-icon"></i>
                 </a>
                 <ul class="collapse list-unstyled submenu <?php echo (str_contains($_SERVER['PHP_SELF'], '/modules/attendance/') && !str_contains($_SERVER['PHP_SELF'], '/staff')) ? 'show' : ''; ?>" id="attendanceSubmenu" data-bs-parent="#sidebarMenu">
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/student.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/student.php">Attendance Sheets</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/student.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/student.php">Mark Attendance</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/daily.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/daily.php">Daily Report</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/monthly.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/monthly.php">Monthly Report</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/reports.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/reports.php">Attendance Register</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/leave.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/leave.php">Leave Management</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/settings.php">Attendance Settings</a></li>
                 </ul>
             </li>
             <?php endif; ?>
@@ -71,7 +76,14 @@
                     <i class="fa-solid fa-chevron-right arrow-icon"></i>
                 </a>
                 <ul class="collapse list-unstyled submenu <?php echo (str_contains($_SERVER['PHP_SELF'], '/modules/fees/') && !str_contains($_SERVER['PHP_SELF'], '/expenses')) ? 'show' : ''; ?>" id="feeSubmenu" data-bs-parent="#sidebarMenu">
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/collection.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/collection.php">Fee Ledger</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/structure.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/structure.php">Fee Structure</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/collection.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/collection.php">Collect Fee</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/challan.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/challan.php">Fee Challan</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/dues.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/dues.php">Pending Dues</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/discounts.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/discounts.php">Discounts</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/fines.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/fines.php">Fine Management</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/receipts.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/receipts.php">Fee Receipts</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/reports.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/reports.php">Fee Reports</a></li>
                 </ul>
             </li>
             <?php endif; ?>

@@ -1,128 +1,421 @@
 <?php
 /**
- * Indus Grammar School ERP - Fee & Accounts AJAX Handler
- * Version 1.0.0
+ * Indus Grammar School ERP - Fee Controller AJAX Handler (Ledger system)
+ * Version 4.0.0
  */
 
-require_once __DIR__ . '/../config/app.php';
+require_once 'e:/Xampo/htdocs/indus-grammar-school-erp/indus-grammar-school-erp/config/app.php';
 
-if (!isLoggedIn()) jsonResponse(['success' => false, 'message' => 'Unauthorized.'], 401);
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonResponse(['success' => false, 'message' => 'Invalid request method.'], 405);
-if (!validateCsrf($_POST['csrf_token'] ?? '')) jsonResponse(['success' => false, 'message' => 'Security token expired.'], 403);
+if (!isLoggedIn()) {
+    jsonResponse(['success' => false, 'message' => 'Unauthorized.'], 401);
+}
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    jsonResponse(['success' => false, 'message' => 'Invalid request method.'], 405);
+}
+if (!validateCsrf($_POST['csrf_token'] ?? '')) {
+    jsonResponse(['success' => false, 'message' => 'Security token expired.'], 403);
+}
 
 $action     = $_POST['action'] ?? '';
 $feeService = new FeeService();
 
 switch ($action) {
 
-    // ── Save fee structure ──
+    // ── Save Class Fee Structure ──
     case 'save_structure':
         AuthMiddleware::requirePermission('fee_manage');
-        $result = $feeService->saveFeeStructure([
-            'class_id'  => (int)($_POST['class_id'] ?? 0),
-            'fee_type'  => sanitize($_POST['fee_type'] ?? ''),
-            'amount'    => (float)($_POST['amount'] ?? 0),
-            'academic_year' => sanitize($_POST['academic_year'] ?? CURRENT_ACADEMIC_YEAR),
+        $result = Fee::createStructure([
+            'academic_type'    => sanitize($_POST['academic_type'] ?? 'School'),
+            'class_id'         => (int)($_POST['class_id'] ?? 0),
+            'admission_fee'    => (float)($_POST['admission_fee'] ?? 0),
+            'tuition_fee'      => (float)($_POST['tuition_fee'] ?? 0),
+            'computer_fee'     => (float)($_POST['computer_fee'] ?? 0),
+            'exam_fee'         => (float)($_POST['exam_fee'] ?? 0),
+            'transport_fee'    => (float)($_POST['transport_fee'] ?? 0),
+            'annual_charges'   => (float)($_POST['annual_charges'] ?? 0),
+            'security_deposit' => (float)($_POST['security_deposit'] ?? 0),
+            'other_charges'    => (float)($_POST['other_charges'] ?? 0),
+            'status'           => sanitize($_POST['status'] ?? 'Active'),
+            'academic_year'    => sanitize($_POST['academic_year'] ?? CURRENT_ACADEMIC_YEAR),
         ]);
-        jsonResponse(['success' => $result['status'], 'message' => $result['message']]);
+        jsonResponse(['success' => $result, 'message' => $result ? 'Fee structure saved successfully.' : 'Failed to save fee structure.']);
         break;
 
-    // ── Delete fee structure ──
+    // ── Delete Structure ──
     case 'delete_structure':
         AuthMiddleware::requirePermission('fee_manage');
         $id = (int)($_POST['id'] ?? 0);
-        if ($id <= 0) jsonResponse(['success' => false, 'message' => 'Invalid ID.']);
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid structure ID.']);
+        }
         $ok = Fee::deleteStructure($id);
-        if ($ok) auditLog('Fee Structure Deleted', "Fee structure ID $id deleted.");
-        jsonResponse(['success' => $ok, 'message' => $ok ? 'Deleted successfully.' : 'Delete failed.']);
+        if ($ok) {
+            auditLog('Fee Structure Deleted', "Structure ID $id deleted.");
+        }
+        jsonResponse(['success' => $ok, 'message' => $ok ? 'Deleted successfully.' : 'Failed to delete structure.']);
         break;
 
-    // ── Get fee structures for a class ──
-    case 'get_structures_by_class':
-        AuthMiddleware::requirePermission('fee_view');
-        $classId = (int)($_POST['class_id'] ?? 0);
-        $structures = Fee::getStructuresByClass($classId);
-        $total = array_sum(array_column($structures, 'amount'));
-        jsonResponse(['success' => true, 'structures' => $structures, 'total' => $total]);
+    // ── Apply Student Discount (Assignment mapping) ──
+    case 'apply_discount':
+        AuthMiddleware::requirePermission('fee_manage');
+        $studentId = (int)($_POST['student_id'] ?? 0);
+        
+        // Ensure assignment exists
+        Fee::ensureStudentAssignment($studentId);
+        $assignment = Fee::getStudentAssignment($studentId);
+        if (!$assignment) {
+            jsonResponse(['success' => false, 'message' => 'No active fee configuration assigned to this student.']);
+        }
+        
+        $ok = Fee::assignFeeToStudent([
+            'student_id'          => $studentId,
+            'fee_structure_id'    => (int)$assignment['fee_structure_id'],
+            'discount_percentage' => (float)($_POST['percentage'] ?? 0),
+            'discount_flat'       => (float)($_POST['flat_amount'] ?? 0),
+            'discount_reason'     => sanitize($_POST['reason'] ?? ''),
+            'status'              => 'Active'
+        ]);
+        jsonResponse(['success' => $ok, 'message' => $ok ? 'Discount settings saved.' : 'Failed to save discount.']);
         break;
 
-    // ── Generate challan for a student ──
-    case 'generate_challan':
+    // ── Delete Discount ──
+    case 'delete_discount':
+        AuthMiddleware::requirePermission('fee_manage');
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid assignment ID.']);
+        }
+        try {
+            $db = Database::getConnection();
+            $ok = $db->prepare("
+                UPDATE student_fee_assignments 
+                SET discount_percentage = 0.00, discount_flat = 0.00, discount_reason = '' 
+                WHERE id = :id
+            ")->execute(['id' => $id]);
+            if ($ok) {
+                auditLog('Discount Deleted', "Discount cleared on assignment $id");
+            }
+            jsonResponse(['success' => $ok, 'message' => $ok ? 'Discount cleared successfully.' : 'Clear failed.']);
+        } catch (Exception $ex) {
+            jsonResponse(['success' => false, 'message' => $ex->getMessage()]);
+        }
+        break;
+
+    // ── Generate Single Month Student Ledger Entry ──
+    case 'generate_ledger_entry':
         AuthMiddleware::requirePermission('fee_manage');
         $studentId = (int)($_POST['student_id'] ?? 0);
         $month     = sanitize($_POST['month'] ?? '');
         $dueDate   = sanitize($_POST['due_date'] ?? '');
-        if ($studentId <= 0) jsonResponse(['success' => false, 'message' => 'Invalid student.']);
-        $result = $feeService->generateChallan($studentId, $month, $dueDate);
-        jsonResponse(['success' => $result['status'], 'message' => $result['message'], 'challan_no' => $result['challan_no'] ?? '']);
+        if ($studentId <= 0 || empty($month)) {
+            jsonResponse(['success' => false, 'message' => 'Invalid parameters.']);
+        }
+        $res = $feeService->generateMonthlyLedgerEntry($studentId, $month, $dueDate);
+        jsonResponse(['success' => $res['status'], 'message' => $res['message']]);
         break;
 
-    // ── Collect a fee payment ──
-    case 'collect_payment':
-        AuthMiddleware::requirePermission('fee_collect');
-        $result = $feeService->collectPayment([
-            'challan_id'     => !empty($_POST['challan_id']) ? (int)$_POST['challan_id'] : null,
-            'student_id'     => (int)($_POST['student_id'] ?? 0),
-            'amount_paid'    => (float)($_POST['amount_paid'] ?? 0),
-            'payment_date'   => sanitize($_POST['payment_date'] ?? date('Y-m-d')),
-            'payment_method' => sanitize($_POST['payment_method'] ?? 'Cash'),
-            'remarks'        => sanitize($_POST['remarks'] ?? ''),
-        ]);
-        jsonResponse(['success' => $result['status'], 'message' => $result['message'], 'receipt_no' => $result['receipt_no'] ?? '']);
-        break;
-
-    // ── Apply discount ──
-    case 'apply_discount':
+    // ── Generate Class Batch Ledger ──
+    case 'generate_class_ledger':
         AuthMiddleware::requirePermission('fee_manage');
-        $studentId = (int)($_POST['student_id'] ?? 0);
-        $result = $feeService->addDiscount($studentId, [
-            'discount_type' => sanitize($_POST['discount_type'] ?? ''),
-            'percentage'    => (float)($_POST['percentage'] ?? 0),
-            'flat_amount'   => (float)($_POST['flat_amount'] ?? 0),
-            'reason'        => sanitize($_POST['reason'] ?? ''),
-        ]);
-        jsonResponse(['success' => $result['status'], 'message' => $result['message']]);
-        break;
-
-    // ── Apply fine ──
-    case 'apply_fine':
-        AuthMiddleware::requirePermission('fee_manage');
-        $studentId = (int)($_POST['student_id'] ?? 0);
-        $result = $feeService->addFine($studentId, [
-            'fine_type' => sanitize($_POST['fine_type'] ?? 'Late Payment'),
-            'amount'    => (float)($_POST['amount'] ?? 0),
-            'reason'    => sanitize($_POST['reason'] ?? ''),
-        ]);
-        jsonResponse(['success' => $result['status'], 'message' => $result['message']]);
-        break;
-
-    // ── Search student for fee collection ──
-    case 'search_student':
-        AuthMiddleware::requirePermission('fee_view');
-        $q = sanitize($_POST['q'] ?? '');
-        if (strlen($q) < 2) jsonResponse(['success' => false, 'message' => 'Enter at least 2 characters.']);
+        $classId      = (int)($_POST['class_id'] ?? 0);
+        $academicType = sanitize($_POST['academic_type'] ?? 'School');
+        $month        = sanitize($_POST['month'] ?? '');
+        $dueDate      = sanitize($_POST['due_date'] ?? '');
+        if ($classId <= 0 || empty($month)) {
+            jsonResponse(['success' => false, 'message' => 'Invalid parameters.']);
+        }
         try {
-            $db   = Database::getConnection();
-            $stmt = $db->prepare("
-                SELECT s.id, s.first_name, s.last_name, s.admission_no, c.class_name, c.section,
-                       (SELECT COALESCE(SUM(net_amount), 0) FROM fee_challans WHERE student_id = s.id AND status IN ('Unpaid','Overdue')) as dues
-                FROM students s JOIN classes c ON s.class_id = c.id
-                WHERE (s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q)
-                  AND s.status = 'Active' LIMIT 10
-            ");
-            $stmt->execute(['q' => '%'.$q.'%']);
-            jsonResponse(['success' => true, 'students' => $stmt->fetchAll()]);
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT id FROM students WHERE class_id = :cid AND academic_type = :type AND status = 'Active'");
+            $stmt->execute(['cid' => $classId, 'type' => $academicType]);
+            $students = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            if (empty($students)) {
+                jsonResponse(['success' => false, 'message' => 'No active students found in this class.']);
+            }
+            
+            $successCount = 0;
+            $failCount = 0;
+            foreach ($students as $sid) {
+                $res = $feeService->generateMonthlyLedgerEntry($sid, $month, $dueDate);
+                if ($res['status']) {
+                    $successCount++;
+                } else {
+                    $failCount++;
+                }
+            }
+            jsonResponse(['success' => true, 'message' => "Batch generated. Success: $successCount, Skipped/Failed: $failCount."]);
         } catch (Exception $e) {
-            jsonResponse(['success' => false, 'message' => 'Search failed.']);
+            jsonResponse(['success' => false, 'message' => 'Batch generation failed: ' . $e->getMessage()]);
         }
         break;
 
-    // ── Get student challans ──
-    case 'get_student_challans':
+    // ── Collect Fee Payment ──
+    case 'collect_payment':
+        AuthMiddleware::requirePermission('fee_collect');
+        $result = $feeService->collectFeePayment([
+            'ledger_id'        => (int)($_POST['challan_id'] ?? 0), // maps to select dropdown value
+            'amount_paid'      => (float)($_POST['amount_paid'] ?? 0),
+            'payment_date'     => sanitize($_POST['payment_date'] ?? date('Y-m-d')),
+            'payment_method'   => sanitize($_POST['payment_method'] ?? 'Cash'),
+            'reference_number' => sanitize($_POST['reference_number'] ?? ''),
+            'remarks'          => sanitize($_POST['remarks'] ?? ''),
+        ]);
+        jsonResponse(['success' => $result['status'], 'message' => $result['message'] ?? 'Payment recorded.', 'receipt_no' => $result['receipt_no'] ?? '']);
+        break;
+
+    // ── Load Student Details, Ledger Summaries, and Histories ──
+    case 'load_student_details':
         AuthMiddleware::requirePermission('fee_view');
         $sid = (int)($_POST['student_id'] ?? 0);
-        $challans = Fee::allChallans(['student_id' => $sid]);
-        jsonResponse(['success' => true, 'challans' => $challans]);
+        
+        try {
+            $db = Database::getConnection();
+            
+            // 1. Fetch student info
+            $stmt = $db->prepare("
+                SELECT s.*, c.class_name, c.section, d.father_name, d.roll_no, d.doc_student_photo
+                FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
+                WHERE s.id = :sid
+            ");
+            $stmt->execute(['sid' => $sid]);
+            $student = $stmt->fetch();
+            
+            if (!$student) {
+                jsonResponse(['success' => false, 'message' => 'Student not found.']);
+            }
+
+            // Ensure assignment exist
+            Fee::ensureStudentAssignment($sid);
+
+            // 2. Fetch student ledger entries
+            $ledgStmt = $db->prepare("
+                SELECT * FROM fee_ledger 
+                WHERE student_id = :sid 
+                ORDER BY due_date ASC
+            ");
+            $ledgStmt->execute(['sid' => $sid]);
+            $allLedgers = $ledgStmt->fetchAll();
+
+            $pendingFees = [];
+            $prevBalance = 0.00;
+            
+            $admissionFee = 0.00;
+            $tuitionFee = 0.00;
+            $annualCharges = 0.00;
+            $fineAmount = 0.00;
+            $discountAmount = 0.00;
+            
+            $totalPayable = 0.00;
+            $paidAmount = 0.00;
+            
+            $currentMonthStr = date('F Y');
+            
+            foreach ($allLedgers as $row) {
+                // Dynamic late fine calculation
+                $lateFine = $feeService->calculateLateFineForLedger($row);
+                $netPayable = (float)$row['total_payable'] + $lateFine;
+                $remaining = max(0.00, $netPayable - (float)$row['paid_amount']);
+                
+                if ($row['status'] === 'Paid') {
+                    $remaining = 0.00;
+                }
+
+                if ($row['status'] !== 'Paid' || $remaining > 0) {
+                    $pendingFees[] = [
+                        'id'                => $row['id'],
+                        'month'             => $row['month'],
+                        'monthly_fee'       => (float)$row['tuition_fee'] + (float)$row['computer_fee'] + (float)$row['exam_fee'] + (float)$row['transport_fee'] + (float)$row['security_deposit'] + (float)$row['other_charges'],
+                        'fine'              => (float)$row['fine_amount'] + $lateFine,
+                        'discount'          => (float)$row['discount_amount'],
+                        'paid_amount'       => (float)$row['paid_amount'],
+                        'remaining_balance' => $remaining,
+                        'status'            => $row['status'],
+                        'due_date'          => $row['due_date']
+                    ];
+
+                    if (strcasecmp($row['month'], $currentMonthStr) === 0) {
+                        $admissionFee   += (float)$row['admission_fee'];
+                        $tuitionFee     += ((float)$row['tuition_fee'] + (float)$row['computer_fee'] + (float)$row['exam_fee'] + (float)$row['transport_fee'] + (float)$row['security_deposit'] + (float)$row['other_charges']);
+                        $annualCharges  += (float)$row['annual_charges'];
+                        $fineAmount     += ((float)$row['fine_amount'] + $lateFine);
+                        $discountAmount += (float)$row['discount_amount'];
+                    } else {
+                        $prevBalance    += $remaining;
+                    }
+
+                    $totalPayable += $remaining;
+                }
+                
+                $paidAmount += (float)$row['paid_amount'];
+            }
+            
+            $remainingBalance = $totalPayable;
+
+            // 3. Fetch transaction payment history
+            $histStmt = $db->prepare("
+                SELECT fp.*, fl.month, fr.receipt_no
+                FROM fee_payments fp
+                JOIN fee_receipts fr ON fr.payment_id = fp.id
+                JOIN fee_ledger fl ON fp.ledger_id = fl.id
+                WHERE fp.student_id = :sid
+                ORDER BY fp.created_at DESC
+            ");
+            $histStmt->execute(['sid' => $sid]);
+            $history = $histStmt->fetchAll();
+
+            jsonResponse([
+                'success' => true,
+                'student' => $student,
+                'summary' => [
+                    'admission_fee'     => $admissionFee,
+                    'tuition_fee'       => $tuitionFee,
+                    'annual_charges'    => $annualCharges,
+                    'previous_balance'  => $prevBalance,
+                    'fine'              => $fineAmount,
+                    'discount'          => $discountAmount,
+                    'total_payable'     => $totalPayable,
+                    'paid_amount'       => $paidAmount,
+                    'remaining_balance' => $remainingBalance
+                ],
+                'pending_fees'    => $pendingFees,
+                'payment_history' => $history
+            ]);
+
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ── Get Cashier Dashboard Counters ──
+    case 'get_cashier_dashboard':
+        AuthMiddleware::requirePermission('fee_view');
+        jsonResponse([
+            'success'   => true,
+            'dashboard' => Fee::getCashierDashboard()
+        ]);
+        break;
+
+    // ── Add Custom Fine to Ledger row ──
+    case 'ledger_add_fine':
+        AuthMiddleware::requirePermission('fee_manage');
+        $id  = (int)($_POST['id'] ?? 0);
+        $amt = (float)($_POST['amount'] ?? 0);
+        if ($id <= 0 || $amt <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid parameters.']);
+        }
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT status FROM fee_ledger WHERE id = :id");
+            $stmt->execute(['id' => $id]);
+            $status = $stmt->fetchColumn();
+            if ($status === 'Paid') {
+                jsonResponse(['success' => false, 'message' => 'Cannot add fine to a fully paid month.']);
+            }
+            
+            $ok = $db->prepare("
+                UPDATE fee_ledger 
+                SET fine_amount = fine_amount + :amt, total_payable = total_payable + :amt 
+                WHERE id = :id
+            ")->execute(['amt' => $amt, 'id' => $id]);
+            if ($ok) {
+                auditLog('Ledger Fine Added', "Rs. $amt fine added to ledger entry ID $id.");
+            }
+            jsonResponse(['success' => $ok, 'message' => $ok ? 'Fine added successfully.' : 'Operation failed.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => $e->getMessage()]);
+        }
+        break;
+
+    // ── Waive Fine from Ledger row ──
+    case 'ledger_waive_fine':
+        AuthMiddleware::requirePermission('fee_manage');
+        $id = (int)($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid entry ID.']);
+        }
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT fine_amount, status FROM fee_ledger WHERE id = :id");
+            $stmt->execute(['id' => $id]);
+            $ledger = $stmt->fetch();
+            if (!$ledger) {
+                jsonResponse(['success' => false, 'message' => 'Ledger record not found.']);
+            }
+            if ($ledger['status'] === 'Paid') {
+                jsonResponse(['success' => false, 'message' => 'Cannot waive fine on a fully paid month.']);
+            }
+            
+            $fine = (float)$ledger['fine_amount'];
+            $ok = $db->prepare("
+                UPDATE fee_ledger 
+                SET total_payable = total_payable - :fine, fine_amount = 0.00 
+                WHERE id = :id
+            ")->execute(['fine' => $fine, 'id' => $id]);
+            
+            if ($ok) {
+                auditLog('Ledger Fine Waived', "Fine of Rs. $fine waived from ledger entry ID $id.");
+            }
+            jsonResponse(['success' => $ok, 'message' => $ok ? 'Fine waived successfully.' : 'Operation failed.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => $e->getMessage()]);
+        }
+        break;
+
+    // ── Update Late Fine Settings ──
+    case 'update_fine_settings':
+        AuthMiddleware::requirePermission('fee_manage');
+        $ok = Fee::updateSettings([
+            'late_fine_amount' => (float)($_POST['late_fine_amount'] ?? 0.00),
+            'grace_days'       => (int)($_POST['grace_days'] ?? 0),
+            'fine_type'        => sanitize($_POST['fine_type'] ?? 'Fixed')
+        ]);
+        if ($ok) {
+            auditLog('Fine Settings Updated', 'Late fine properties modified.');
+        }
+        jsonResponse(['success' => $ok, 'message' => $ok ? 'Settings updated successfully.' : 'Failed to update settings.']);
+        break;
+
+    // ── Student Autocomplete Lookup ──
+    case 'search_student':
+        AuthMiddleware::requirePermission('fee_view');
+        $q = sanitize($_POST['q'] ?? '');
+        if (strlen($q) < 2) {
+            jsonResponse(['success' => false, 'message' => 'Enter at least 2 characters.']);
+        }
+        try {
+            $db   = Database::getConnection();
+            $stmt = $db->prepare("
+                SELECT s.id, s.first_name, s.last_name, s.admission_no, s.academic_type,
+                       c.class_name, c.section, d.father_name, d.roll_no, d.doc_student_photo
+                FROM students s 
+                LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
+                WHERE (s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q OR d.roll_no LIKE :q)
+                  AND s.status = 'Active' LIMIT 15
+            ");
+            $stmt->execute(['q' => '%'.$q.'%']);
+            $students = $stmt->fetchAll();
+            
+            // Calculate pending dues from ledger
+            foreach ($students as &$st) {
+                $lStmt = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = :sid AND status IN ('Pending', 'Partial')");
+                $lStmt->execute(['sid' => $st['id']]);
+                $ledgers = $lStmt->fetchAll();
+                $dues = 0.00;
+                foreach ($ledgers as $ledger) {
+                    $lateFine = $feeService->calculateLateFineForLedger($ledger);
+                    $dues += ((float)$ledger['total_payable'] + $lateFine - (float)$ledger['paid_amount']);
+                }
+                $st['dues'] = $dues;
+            }
+            
+            jsonResponse(['success' => true, 'students' => $students]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Search failed: ' . $e->getMessage()]);
+        }
         break;
 
     default:
