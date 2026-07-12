@@ -17,6 +17,10 @@ class Cash {
         }
     }
 
+    public static function getActiveRegister(): array|bool {
+        return self::getOpenRegister();
+    }
+
     public static function getByDate(string $date): array|bool {
         try {
             $db   = Database::getConnection();
@@ -65,7 +69,7 @@ class Cash {
     public static function recalculate(string $date): bool {
         try {
             $db = Database::getConnection();
-            $colStmt = $db->prepare("SELECT COALESCE(SUM(amount_paid),0) FROM fee_collections WHERE payment_date = :dt");
+            $colStmt = $db->prepare("SELECT COALESCE(SUM(amount_paid),0) FROM fee_payments WHERE payment_date = :dt");
             $colStmt->execute(['dt' => $date]);
             $totalCol = (float)$colStmt->fetchColumn();
 
@@ -80,6 +84,22 @@ class Cash {
             return $upStmt->execute(['col' => $totalCol, 'exp' => $totalExp, 'dt' => $date]);
         } catch (PDOException $e) {
             error_log("Cash::recalculate error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function recalculateRegister(int $registerId): bool {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT date FROM cash_register WHERE id = :id");
+            $stmt->execute(['id' => $registerId]);
+            $date = $stmt->fetchColumn();
+            if ($date) {
+                return self::recalculate($date);
+            }
+            return false;
+        } catch (PDOException $e) {
+            error_log("Cash::recalculateRegister error: " . $e->getMessage());
             return false;
         }
     }

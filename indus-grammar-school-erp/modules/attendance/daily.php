@@ -18,6 +18,16 @@ $filter_class = sanitize($_GET['class'] ?? '');
 $filter_section = sanitize($_GET['section'] ?? '');
 $filter_status = sanitize($_GET['status'] ?? '');
 
+$classesList = [];
+try {
+    $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    error_log("Error fetching classes in daily.php: " . $e->getMessage());
+}
+if (empty($classesList)) {
+    $classesList = ['Playgroup', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10'];
+}
+
 $limit = 15;
 $page = (int)($_GET['page'] ?? 1);
 if ($page < 1) $page = 1;
@@ -216,7 +226,7 @@ include_once __DIR__ . '/../../includes/header.php';
             <label class="form-label small fw-semibold text-muted">Class</label>
             <select class="form-select form-select-sm" name="class">
                 <option value="">All Classes</option>
-                <?php foreach (['Play Group', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'] as $cls): ?>
+                <?php foreach ($classesList as $cls): ?>
                     <option value="<?php echo $cls; ?>" <?php echo ($filter_class === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                 <?php endforeach; ?>
             </select>

@@ -13,10 +13,10 @@ $defaulters = [];
 try {
     $db = Database::getConnection();
     $defaulters = $db->query("
-        SELECT s.first_name, s.last_name, s.guardian_phone, SUM(fc.net_amount) as total_due
+        SELECT s.first_name, s.last_name, s.guardian_phone, SUM(fl.total_payable - fl.paid_amount) as total_due
         FROM students s
-        JOIN fee_challans fc ON s.id = fc.student_id
-        WHERE fc.status IN ('Unpaid', 'Overdue')
+        JOIN fee_ledger fl ON s.id = fl.student_id
+        WHERE fl.status IN ('Pending', 'Partial')
         GROUP BY s.id
         HAVING total_due > 0
         LIMIT 20

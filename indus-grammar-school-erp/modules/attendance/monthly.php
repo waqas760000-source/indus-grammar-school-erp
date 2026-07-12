@@ -18,6 +18,16 @@ $academic_type = sanitize($_GET['academic_type'] ?? 'School');
 $class_name = sanitize($_GET['class'] ?? '');
 $section_name = sanitize($_GET['section'] ?? '');
 
+$classesList = [];
+try {
+    $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+} catch (Exception $e) {
+    error_log("Error fetching classes in monthly.php: " . $e->getMessage());
+}
+if (empty($classesList)) {
+    $classesList = ['Playgroup', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10'];
+}
+
 $daysInMonth = cal_days_in_month(CAL_GREGORIAN, $selectedMonth, $selectedYear);
 $students = [];
 $attendanceMap = []; // [student_id][day] => status
@@ -121,7 +131,7 @@ include_once __DIR__ . '/../../includes/header.php';
             <label class="form-label small fw-semibold text-muted">Class</label>
             <select class="form-select form-select-sm" name="class" required>
                 <option value="">— Select Class —</option>
-                <?php foreach (['Play Group', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'] as $cls): ?>
+                <?php foreach ($classesList as $cls): ?>
                     <option value="<?php echo $cls; ?>" <?php echo ($class_name === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                 <?php endforeach; ?>
             </select>

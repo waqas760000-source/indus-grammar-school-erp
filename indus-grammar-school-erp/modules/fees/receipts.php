@@ -107,7 +107,7 @@ $totalInView = array_sum(array_column($collections, 'amount_paid'));
                         <td><?php echo date('d M Y', strtotime($c['payment_date'])); ?></td>
                         <td class="fw-bold text-dark"><?php echo sanitize($c['first_name'] . ' ' . $c['last_name']); ?></td>
                         <td><code><?php echo sanitize($c['admission_no']); ?></code></td>
-                        <td><span class="text-muted small"><?php echo sanitize($c['challan_no'] ?: 'Direct Payment'); ?></span></td>
+                        <td><span class="text-muted small"><?php echo sanitize($c['month'] ?: 'Direct Payment'); ?></span></td>
                         <td>
                             <span class="badge bg-light text-dark border">
                                 <i class="fa-solid <?php 

@@ -53,22 +53,22 @@ try {
     $multipleChildFamilies = (int)$db->query("SELECT COUNT(*) FROM (SELECT guardian_phone FROM students WHERE status = 'Active' GROUP BY guardian_phone HAVING COUNT(*) > 1) t")->fetchColumn();
 
     // 6. Current Month Fee Status
-    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(net_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
-    $feeReceived = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_collections WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(total_payable), 0) FROM fee_ledger WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $feeReceived = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
     $feeBalance = $feeReceivable - $feeReceived;
-    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(discount_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
-    $fineCollected = (float)$db->query("SELECT COALESCE(SUM(fine_amount), 0) FROM fee_challans WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE) AND status = 'Paid'")->fetchColumn();
+    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(discount_amount), 0) FROM fee_ledger WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $fineCollected = (float)$db->query("SELECT COALESCE(SUM(fine_amount), 0) FROM fee_ledger WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE) AND status = 'Paid'")->fetchColumn();
     $feeCollectionPct = $feeReceivable > 0 ? round(($feeReceived / $feeReceivable) * 100, 1) : 0;
 
     // 7. Current Month Arrear Status
-    $arrearsReceivable = (float)$db->query("SELECT COALESCE(SUM(net_amount - amount_paid), 0) FROM fee_challans fc LEFT JOIN (SELECT challan_id, SUM(amount_paid) as amount_paid FROM fee_collections GROUP BY challan_id) col ON fc.id = col.challan_id WHERE fc.due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND fc.status IN ('Unpaid', 'Overdue')")->fetchColumn();
-    $arrearsReceived = (float)$db->query("SELECT COALESCE(SUM(fcol.amount_paid), 0) FROM fee_collections fcol JOIN fee_challans fc ON fcol.challan_id = fc.id WHERE fc.due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND MONTH(fcol.payment_date) = MONTH(CURRENT_DATE) AND YEAR(fcol.payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    $arrearsReceivable = (float)$db->query("SELECT COALESCE(SUM(total_payable - paid_amount), 0) FROM fee_ledger WHERE due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND status IN ('Pending', 'Partial')")->fetchColumn();
+    $arrearsReceived = (float)$db->query("SELECT COALESCE(SUM(fp.amount_paid), 0) FROM fee_payments fp JOIN fee_ledger fl ON fp.ledger_id = fl.id WHERE fl.due_date < DATE_FORMAT(CURRENT_DATE ,'%Y-%m-01') AND MONTH(fp.payment_date) = MONTH(CURRENT_DATE) AND YEAR(fp.payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
     $arrearsBalance = $arrearsReceivable - $arrearsReceived;
     $arrearsRecoveryPct = $arrearsReceivable > 0 ? round(($arrearsReceived / $arrearsReceivable) * 100, 1) : 0;
 
     // 8. Cash Summary
     $openingBalance = (float)$db->query("SELECT COALESCE(opening_balance, 0) FROM cash_register WHERE date = CURRENT_DATE LIMIT 1")->fetchColumn();
-    $todayCollection = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_collections WHERE payment_date = CURRENT_DATE")->fetchColumn();
+    $todayCollection = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE payment_date = CURRENT_DATE")->fetchColumn();
     $todayExpenses = (float)$db->query("SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE expense_date = CURRENT_DATE")->fetchColumn();
     $cashInHand = $openingBalance + $todayCollection - $todayExpenses;
     $closingBalance = (float)$db->query("SELECT COALESCE(closing_balance, 0) FROM cash_register WHERE date = CURRENT_DATE AND status = 'Closed' LIMIT 1")->fetchColumn();

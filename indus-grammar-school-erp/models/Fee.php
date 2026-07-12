@@ -367,7 +367,15 @@ class Fee {
                 if ($activeReg) {
                     $cashRegId = $activeReg['id'];
                 } else {
-                    $cashRegId = Cash::openRegister(0.00, 'System Auto-Init');
+                    $newId = Cash::openRegister(0.00, 'System Auto-Init');
+                    if ($newId > 0) {
+                        $cashRegId = $newId;
+                    } else {
+                        $activeReg = Cash::getActiveRegister();
+                        if ($activeReg) {
+                            $cashRegId = $activeReg['id'];
+                        }
+                    }
                 }
             }
 

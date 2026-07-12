@@ -64,7 +64,7 @@ class Report {
         try {
             $db = Database::getConnection();
             // Total collections
-            $stmt1 = $db->prepare("SELECT SUM(amount_paid) as total FROM fee_collections WHERE payment_date BETWEEN :from AND :to");
+            $stmt1 = $db->prepare("SELECT SUM(amount_paid) as total FROM fee_payments WHERE payment_date BETWEEN :from AND :to");
             $stmt1->execute(['from' => $from, 'to' => $to]);
             $col = $stmt1->fetch();
 
@@ -74,7 +74,7 @@ class Report {
             $exp = $stmt2->fetch();
 
             // Total unpaid challans
-            $stmt3 = $db->prepare("SELECT SUM(net_amount) as total FROM fee_challans WHERE status IN ('Unpaid', 'Overdue')");
+            $stmt3 = $db->prepare("SELECT SUM(total_payable - paid_amount) as total FROM fee_ledger WHERE status IN ('Pending', 'Partial')");
             $stmt3->execute();
             $unpaid = $stmt3->fetch();
 
@@ -140,11 +140,11 @@ class Report {
             }
 
             // Financial Summaries
-            $incomeMonth = (float)$db->query("SELECT SUM(amount_paid) FROM fee_collections WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+            $incomeMonth = (float)$db->query("SELECT SUM(amount_paid) FROM fee_payments WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
             $expensesMonth = (float)$db->query("SELECT SUM(amount) FROM expenses WHERE MONTH(expense_date) = MONTH(CURRENT_DATE) AND YEAR(expense_date) = YEAR(CURRENT_DATE)")->fetchColumn();
             
             // Outstanding unpaid challans
-            $pendingFees = (float)$db->query("SELECT SUM(net_amount - amount_paid) FROM fee_challans fc LEFT JOIN (SELECT challan_id, SUM(amount_paid) as amount_paid FROM fee_collections GROUP BY challan_id) col ON fc.id = col.challan_id WHERE fc.status IN ('Unpaid', 'Overdue')")->fetchColumn();
+            $pendingFees = (float)$db->query("SELECT SUM(total_payable - paid_amount) FROM fee_ledger WHERE status IN ('Pending', 'Partial')")->fetchColumn();
 
             // Admissions this month
             $admissionsThisMonth = (int)$db->query("SELECT COUNT(*) FROM admissions WHERE MONTH(application_date) = MONTH(CURRENT_DATE) AND YEAR(application_date) = YEAR(CURRENT_DATE)")->fetchColumn();

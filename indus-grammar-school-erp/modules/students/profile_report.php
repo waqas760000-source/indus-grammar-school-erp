@@ -52,11 +52,11 @@ if ($selectedId > 0) {
             }
 
             // 2. Related Fees
-            $stmtFee = $db->prepare("SELECT * FROM fee_challans WHERE student_id = ? ORDER BY due_date DESC");
+            $stmtFee = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = ? ORDER BY due_date DESC");
             $stmtFee->execute([$selectedId]);
             $feeChallans = $stmtFee->fetchAll();
 
-            $stmtColl = $db->prepare("SELECT * FROM fee_collections WHERE student_id = ? ORDER BY payment_date DESC");
+            $stmtColl = $db->prepare("SELECT fp.*, fr.receipt_no FROM fee_payments fp LEFT JOIN fee_receipts fr ON fp.id = fr.payment_id WHERE fp.student_id = ? ORDER BY fp.payment_date DESC");
             $stmtColl->execute([$selectedId]);
             $feeCollections = $stmtColl->fetchAll();
 
@@ -265,12 +265,12 @@ if ($selectedId > 0) {
                     <thead><tr><th>Challan No</th><th>Month</th><th>Amount</th><th>Status</th><th>Due Date</th></tr></thead>
                     <tbody>
                         <?php if (empty($feeChallans)): ?>
-                            <tr><td colspan="5" class="text-center text-muted">No unpaid/paid fee challans generated.</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted">No monthly fee ledger sheets generated.</td></tr>
                         <?php else: foreach ($feeChallans as $challan): ?>
                             <tr>
-                                <td><?php echo sanitize($challan['challan_no']); ?></td>
+                                <td>#<?php echo str_pad($challan['id'], 5, '0', STR_PAD_LEFT); ?></td>
                                 <td><?php echo sanitize($challan['month']); ?></td>
-                                <td>Rs. <?php echo number_format($challan['net_amount'], 2); ?></td>
+                                <td>Rs. <?php echo number_format($challan['total_payable'], 2); ?></td>
                                 <td><span class="badge bg-<?php echo ($challan['status'] === 'Paid') ? 'success' : 'danger'; ?>-soft"><?php echo sanitize($challan['status']); ?></span></td>
                                 <td><?php echo sanitize($challan['due_date']); ?></td>
                             </tr>
