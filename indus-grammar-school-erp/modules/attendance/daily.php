@@ -20,7 +20,7 @@ $filter_status = sanitize($_GET['status'] ?? '');
 
 $classesList = [];
 try {
-    $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $classesList = $db->query("SELECT class_name FROM classes GROUP BY class_name ORDER BY MIN(id) ASC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
     error_log("Error fetching classes in daily.php: " . $e->getMessage());
 }
@@ -46,12 +46,14 @@ if ($filter_academic_type !== '') {
     $params['academic_type'] = $filter_academic_type;
 }
 if ($filter_class !== '') {
-    $where .= " AND (c.class_name = :class OR s.school_class = :class)";
-    $params['class'] = $filter_class;
+    $where .= " AND (c.class_name = :class1 OR s.school_class = :class2)";
+    $params['class1'] = $filter_class;
+    $params['class2'] = $filter_class;
 }
 if ($filter_section !== '') {
-    $where .= " AND (c.section = :section OR s.school_section = :section)";
-    $params['section'] = $filter_section;
+    $where .= " AND (c.section = :section1 OR s.school_section = :section2)";
+    $params['section1'] = $filter_section;
+    $params['section2'] = $filter_section;
 }
 if ($filter_status !== '') {
     $where .= " AND a.status = :status";

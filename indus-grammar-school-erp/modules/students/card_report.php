@@ -1,7 +1,7 @@
 <?php
 /**
- * Indus Grammar School ERP - Student Card Report & PVC Generator
- * Version 3.0.0
+ * Indus Grammar School ERP - Student ID Card Module
+ * Version 5.1.0
  */
 
 // 1. Bootstrap App & Authorization Check
@@ -9,11 +9,20 @@ require_once __DIR__ . '/../../config/app.php';
 AuthMiddleware::requireLogin();
 AuthMiddleware::requirePermission('student_view');
 
+// Role-Based Access Control: Only Super Admin, School Admin, and Receptionist can access/print ID cards
+$userRole = $_SESSION['role_code'] ?? '';
+$allowedRoles = [ROLE_SUPER_ADMIN, ROLE_SCHOOL_ADMIN, 'receptionist'];
+if (!in_array($userRole, $allowedRoles)) {
+    $_SESSION['flash_error'] = "You do not have permission to access the Student ID Card Module.";
+    header("Location: " . APP_URL . "/dashboard.php");
+    exit;
+}
+
 $db = Database::getConnection();
 $message = '';
 $error = '';
 
-// Load lookups
+// Load class and section lists for batch printing filters
 $classesList = [];
 try {
     $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY class_name ASC")->fetchAll(PDO::FETCH_COLUMN);
@@ -29,60 +38,72 @@ try {
     }
 } catch (Exception $e) {}
 
-// Retrieve search filters
-$search_academic_type = sanitize($_GET['search_academic_type'] ?? '');
-$search_class = sanitize($_GET['search_class'] ?? '');
-$search_section = sanitize($_GET['search_section'] ?? '');
-$search_admission = sanitize($_GET['search_admission'] ?? '');
+// Retrieve search query and batch filters
+$singleSearchQuery = sanitize($_GET['single_search'] ?? '');
+$batchAcademicType = sanitize($_GET['batch_academic_type'] ?? '');
+$batchClass = sanitize($_GET['batch_class'] ?? '');
+$batchSection = sanitize($_GET['batch_section'] ?? '');
 
 $where = " WHERE s.status = 'Active'";
 $params = [];
 
-if ($search_academic_type !== '') {
-    $where .= " AND s.academic_type = :academic_type";
-    $params['academic_type'] = $search_academic_type;
-}
-if ($search_class !== '') {
-    $where .= " AND (c.class_name = :class OR s.school_class = :class)";
-    $params['class'] = $search_class;
-}
-if ($search_section !== '') {
-    $where .= " AND (c.section = :section OR s.school_section = :section)";
-    $params['section'] = $search_section;
-}
-if ($search_admission !== '') {
-    $where .= " AND s.admission_no = :admission";
-    $params['admission'] = $search_admission;
+// Apply single search query
+if ($singleSearchQuery !== '') {
+    $cleanQuery = str_replace('-', '', $singleSearchQuery);
+    $where .= " AND (s.admission_no = :query OR d.cnic_no = :query OR REPLACE(d.cnic_no, '-', '') = :cleanQuery)";
+    $params['query'] = $singleSearchQuery;
+    $params['cleanQuery'] = $cleanQuery;
 }
 
+// Apply batch filters
+if ($batchAcademicType !== '') {
+    $where .= " AND s.academic_type = :academic_type";
+    $params['academic_type'] = $batchAcademicType;
+}
+if ($batchClass !== '') {
+    $where .= " AND (c.class_name = :class1 OR s.school_class = :class2)";
+    $params['class1'] = $batchClass;
+    $params['class2'] = $batchClass;
+}
+if ($batchSection !== '') {
+    $where .= " AND (c.section = :section1 OR s.school_section = :section2)";
+    $params['section1'] = $batchSection;
+    $params['section2'] = $batchSection;
+}
+
+// Query students
 $students = [];
 try {
     $sql = "
         SELECT s.*, c.class_name, c.section,
                d.roll_no, d.blood_group, d.emergency_contact, d.academic_session, d.doc_student_photo,
-               d.father_name, d.father_mobile, d.current_address
+               d.father_name, d.father_mobile, d.current_address,
+               d.admission_date, d.cnic_no
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
         LEFT JOIN student_registration_details d ON s.id = d.student_id
         $where
         ORDER BY s.admission_no ASC
     ";
-    
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (empty($students) && $singleSearchQuery !== '') {
+        $error = "No student found.";
+    }
 } catch (Exception $e) {
-    $error = "Error fetching students for ID Cards: " . $e->getMessage();
+    $error = "Database error: " . $e->getMessage();
 }
 
-$pageTitle = 'Student Card Report';
-$breadcrumbActive = 'Student Registration';
+$pageTitle = 'Student ID Card Generator';
+$breadcrumbActive = 'ID Cards';
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Premium PVC ID Card Stylesheets -->
+<!-- Premium Vertical PVC ID Card Stylesheets -->
 <style>
-/* PVC Card Dimension specifications: CR80 standard (~86mm x 54mm) -> vertical layout approx 250px x 400px */
+/* PVC Card Dimension specifications: CR80 standard (~86mm x 54mm) -> vertical layout approx 260px x 410px */
 .id-card-wrap {
     display: inline-block;
     margin: 15px;
@@ -212,16 +233,21 @@ include_once __DIR__ . '/../../includes/header.php';
     font-weight: 600;
 }
 
-.pvc-card-front .footer-strip .sign-box img.sign-img {
-    height: 15px;
-    object-fit: contain;
+.pvc-card-front .footer-strip .sign-box .sign-line {
+    border-bottom: 0.5px solid #6b7280;
+    width: 50px;
+    height: 10px;
     margin-bottom: 2px;
-    display: block;
 }
 
-.pvc-card-front .footer-strip img.qr-img {
-    width: 32px;
-    height: 32px;
+.pvc-card-front .status-badge {
+    background-color: #dcfce7;
+    color: #15803d;
+    font-size: 0.55rem;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 50px;
+    border: 0.5px solid #bbf7d0;
 }
 
 /* Back Side Styling */
@@ -250,6 +276,20 @@ include_once __DIR__ . '/../../includes/header.php';
 
 .pvc-card-back .back-info strong {
     color: #111827;
+}
+
+.pvc-card-back .qr-frame-box {
+    text-align: center;
+    margin-top: 5px;
+    margin-bottom: 8px;
+}
+
+.pvc-card-back .qr-frame-box img {
+    width: 60px;
+    height: 60px;
+    border: 1px solid #e2e8f0;
+    padding: 2px;
+    background-color: #ffffff;
 }
 
 .pvc-card-back .rules-box {
@@ -290,18 +330,21 @@ include_once __DIR__ . '/../../includes/header.php';
 
 /* Printing styles */
 @media print {
-    .left-sidebar, .header-navbar, .d-print-none, .breadcrumb-card, .footer-container {
+    body > *:not(#printSection) {
         display: none !important;
     }
-    body, .main-content-container, .card, .card-body {
-        margin: 0 !important;
-        padding: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
+    #printSection, #printSection * {
+        display: block !important;
     }
-    #printZone {
-        text-align: center !important;
+    #printSection {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        text-align: center;
         background: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
     }
     .id-card-wrap {
         border: none !important;
@@ -310,212 +353,231 @@ include_once __DIR__ . '/../../includes/header.php';
         page-break-inside: avoid !important;
     }
     .pvc-card-side {
-        border: 1px solid #94a3b8 !important;
+        width: 53.98mm !important;
+        height: 85.60mm !important;
+        border: 1px solid #cbd5e1 !important;
         box-shadow: none !important;
-        margin: 5px !important;
     }
 }
 </style>
 
-<!-- Header toolbar (Hidden in Print) -->
 <div class="row mb-4 align-items-center d-print-none">
     <div class="col-sm-6">
-        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-id-card me-2 text-primary"></i>Student Card Report</h3>
+        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-id-card me-2 text-primary"></i>Student ID Card Generator</h3>
     </div>
     <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
-        <button class="btn btn-primary px-3 rounded-pill shadow-sm" onclick="printSelectedCards()"><i class="fa-solid fa-print me-2"></i>Print Selected</button>
-        <button class="btn btn-outline-primary px-3 rounded-pill shadow-sm ms-1" onclick="printAllCards()"><i class="fa-solid fa-print me-2"></i>Print All</button>
-        <button class="btn btn-outline-danger px-3 rounded-pill shadow-sm ms-1" onclick="downloadPDF()"><i class="fa-solid fa-file-pdf me-2"></i>Download PDF</button>
+        <span class="badge bg-light text-dark border p-2"><i class="fa-solid fa-user-shield me-1 text-primary"></i>Role: <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $userRole))); ?></span>
     </div>
 </div>
 
-<!-- Search Panel (Hidden in Print) -->
+<?php if ($message): ?>
+    <div class="alert alert-success border-0 shadow-sm mb-4 alert-dismissible fade show d-print-none" role="alert" style="border-radius:10px;">
+        <i class="fa-solid fa-circle-check me-2"></i><?php echo htmlspecialchars($message); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="this.parentElement.remove()"></button>
+    </div>
+<?php endif; ?>
+
+<?php if ($error): ?>
+    <div class="alert alert-danger border-0 shadow-sm mb-4 alert-dismissible fade show d-print-none" role="alert" style="border-radius:10px;">
+        <i class="fa-solid fa-circle-exclamation me-2"></i><?php echo htmlspecialchars($error); ?>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" onclick="this.parentElement.remove()"></button>
+    </div>
+<?php endif; ?>
+
+<!-- Search and Batch Filter Panel (Unified, Hidden in Print) -->
 <div class="card border border-light shadow-sm bg-white p-4 mb-4 d-print-none" style="border-radius:12px;">
-    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-magnifying-glass me-2"></i>Filter Cards</h6>
-    <form method="GET" action="card_report.php" id="searchForm" class="row g-3">
+    <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-magnifying-glass me-2"></i>Search & Filter ID Cards</h6>
+    <form method="GET" action="card_report.php" id="filterForm" class="row g-3">
         <div class="col-md-3">
             <label class="form-label small fw-semibold text-muted">Academic Type</label>
-            <select class="form-select form-select-sm" name="search_academic_type">
+            <select class="form-select form-select-sm" name="batch_academic_type">
                 <option value="">All Types</option>
-                <option value="School" <?php echo ($search_academic_type === 'School') ? 'selected' : ''; ?>>School</option>
-                <option value="Academy" <?php echo ($search_academic_type === 'Academy') ? 'selected' : ''; ?>>Academy</option>
+                <option value="School" <?php echo ($batchAcademicType === 'School') ? 'selected' : ''; ?>>School</option>
+                <option value="Academy" <?php echo ($batchAcademicType === 'Academy') ? 'selected' : ''; ?>>Academy</option>
             </select>
         </div>
         <div class="col-md-3">
             <label class="form-label small fw-semibold text-muted">Class</label>
-            <select class="form-select form-select-sm" name="search_class">
+            <select class="form-select form-select-sm" name="batch_class">
                 <option value="">All Classes</option>
                 <?php foreach ($classesList as $cls): ?>
-                    <option value="<?php echo $cls; ?>" <?php echo ($search_class === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
+                    <option value="<?php echo $cls; ?>" <?php echo ($batchClass === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="col-md-2">
             <label class="form-label small fw-semibold text-muted">Section</label>
-            <select class="form-select form-select-sm" name="search_section">
-                <option value="">All</option>
+            <select class="form-select form-select-sm" name="batch_section">
+                <option value="">All Sections</option>
                 <?php foreach ($sectionsList as $sec): ?>
-                    <option value="<?php echo $sec; ?>" <?php echo ($search_section === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                    <option value="<?php echo $sec; ?>" <?php echo ($batchSection === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
         <div class="col-md-2">
-            <label class="form-label small fw-semibold text-muted">Admission No.</label>
-            <input type="text" class="form-control form-control-sm" name="search_admission" value="<?php echo htmlspecialchars($search_admission); ?>" placeholder="ADM-2026-0001">
+            <label class="form-label small fw-semibold text-muted">Search Student ID / CNIC</label>
+            <input type="text" class="form-control form-control-sm" name="single_search" value="<?php echo htmlspecialchars($singleSearchQuery); ?>" placeholder="e.g. IGS-2026-0001">
         </div>
-        <div class="col-md-2 text-end align-self-end mt-4">
+        <div class="col-md-2 text-end align-self-end">
             <button type="submit" id="searchBtn" class="btn btn-sm btn-primary w-100 mb-1"><i class="fa-solid fa-search me-1"></i>Search</button>
             <a href="card_report.php" class="btn btn-sm btn-outline-secondary w-100">Reset</a>
         </div>
     </form>
 </div>
 
-<!-- Student selection table (Hidden in Print) -->
-<div class="card border border-light shadow-sm bg-white p-4 mb-4 d-print-none" style="border-radius:12px;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-list me-2"></i>Select Students for PVC printing (<?php echo count($students); ?> found)</h6>
-        <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="selectAll" checked onchange="toggleAllCheckboxes(this)">
-            <label class="form-check-label small fw-bold text-muted" for="selectAll">Select All</label>
+<?php if (!empty($students)): ?>
+    
+    <!-- Student selection table (Hidden in Print) -->
+    <div class="card border border-light shadow-sm bg-white p-4 mb-4 d-print-none" style="border-radius:12px;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-list me-2"></i>Select Students for PVC printing (<?php echo count($students); ?> found)</h6>
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="selectAll" checked onchange="toggleAllCheckboxes(this)">
+                <label class="form-check-label small fw-bold text-muted" for="selectAll">Select All</label>
+            </div>
+        </div>
+        
+        <div class="table-responsive">
+            <table class="table custom-table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th width="50">Select</th>
+                        <th>Photo</th>
+                        <th>Admission No</th>
+                        <th>Student Name</th>
+                        <th>Class</th>
+                        <th>Section</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($students as $row): ?>
+                        <tr>
+                            <td>
+                                <input class="form-check-input student-chk" type="checkbox" value="<?php echo $row['id']; ?>" id="chk_<?php echo $row['id']; ?>" checked onchange="toggleCardPreview(<?php echo $row['id']; ?>, this.checked)">
+                            </td>
+                            <td>
+                                <div class="avatar-small border rounded-circle d-flex align-items-center justify-content-center bg-light" style="width: 36px; height: 36px; overflow:hidden;">
+                                    <?php if (!empty($row['doc_student_photo'])): ?>
+                                        <img src="<?php echo APP_URL . '/' . $row['doc_student_photo']; ?>" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.png';">
+                                    <?php else: ?>
+                                        <img src="<?php echo APP_URL; ?>/assets/images/default_student.png" style="width:100%; height:100%; object-fit:cover;" onerror="this.onerror=null; this.src='https://placehold.co/100x100?text=No+Photo';">
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                            <td><strong class="text-primary"><?php echo sanitize($row['admission_no']); ?></strong></td>
+                            <td class="fw-bold"><?php echo sanitize($row['first_name'] . ' ' . $row['last_name']); ?></td>
+                            <td><?php echo sanitize($row['class_name'] ?? $row['school_class'] ?? '—'); ?></td>
+                            <td><?php echo sanitize($row['section'] ?? $row['school_section'] ?? '—'); ?></td>
+                            <td><span class="badge bg-secondary"><?php echo sanitize($row['academic_type']); ?></span></td>
+                            <td><span class="badge bg-success">Active</span></td>
+                            <td class="text-end">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="previewSingleCard(<?php echo htmlspecialchars(json_encode($row)); ?>)"><i class="fa-solid fa-eye me-1"></i>Preview Card</button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="border-top pt-3 mt-4 text-end">
+            <button class="btn btn-primary px-4 rounded-pill shadow-sm me-2" onclick="printSelectedCards()"><i class="fa-solid fa-print me-2"></i>Print Selected Cards</button>
+            <button class="btn btn-outline-danger px-4 rounded-pill shadow-sm" onclick="downloadSelectedPDF()"><i class="fa-solid fa-file-pdf me-2"></i>Download Selected PDF</button>
         </div>
     </div>
-    
-    <div class="table-responsive">
-        <table class="table custom-table table-hover align-middle mb-0">
-            <thead>
-                <tr>
-                    <th width="50">Select</th>
-                    <th>Student Photo</th>
-                    <th>Admission No.</th>
-                    <th>Student Name</th>
-                    <th>Class</th>
-                    <th>Section</th>
-                    <th>Academic Type</th>
-                    <th>Status</th>
-                    <th class="text-end">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($students)): ?>
-                    <tr>
-                        <td colspan="9" class="text-center py-4 text-muted">No students found.</td>
-                    </tr>
-                <?php else: foreach ($students as $row): ?>
-                    <tr>
-                        <td>
-                            <input class="form-check-input student-chk" type="checkbox" value="<?php echo $row['id']; ?>" id="chk_<?php echo $row['id']; ?>" checked onchange="toggleCardPreview(<?php echo $row['id']; ?>, this.checked)">
-                        </td>
-                        <td>
-                            <div class="avatar-small border rounded-circle d-flex align-items-center justify-content-center bg-light" style="width: 38px; height: 38px; overflow:hidden;">
-                                <?php if (!empty($row['doc_student_photo'])): ?>
-                                    <img src="<?php echo APP_URL . '/' . $row['doc_student_photo']; ?>" style="width:100%; height:100%; object-fit:cover;">
-                                <?php else: ?>
-                                    <i class="fa-solid fa-user text-muted small"></i>
-                                <?php endif; ?>
-                            </div>
-                        </td>
-                        <td><strong class="text-primary"><?php echo sanitize($row['admission_no']); ?></strong></td>
-                        <td class="fw-bold"><?php echo sanitize($row['first_name'] . ' ' . $row['last_name']); ?></td>
-                        <td><?php echo displayValue($row['class_name'] ?? $row['school_class']); ?></td>
-                        <td><?php echo displayValue($row['section'] ?? $row['school_section']); ?></td>
-                        <td><span class="badge bg-secondary"><?php echo sanitize($row['academic_type']); ?></span></td>
-                        <td>
-                            <span class="badge badge-soft-success"><?php echo sanitize($row['status']); ?></span>
-                        </td>
-                        <td class="text-end">
-                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="previewSingleCard(<?php echo htmlspecialchars(json_encode($row)); ?>)"><i class="fa-solid fa-eye me-1"></i>Preview Card</button>
-                        </td>
-                    </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
 
-<!-- PVC ID Cards Print rendering area -->
-<div class="bg-light border p-4 shadow-inner text-center" style="border-radius: 12px; min-height: 200px;">
-    <h5 class="fw-bold text-secondary mb-4 d-print-none"><i class="fa-solid fa-print me-2"></i>Identity Cards Print Queue Preview</h5>
-    <div id="printZone">
-        <?php if (empty($students)): ?>
-            <div class="text-center py-5 text-muted d-print-none">
-                <i class="fa-solid fa-id-card fs-1 opacity-25 mb-2 d-block"></i>
-                No cards in render queue.
-            </div>
-        <?php else: foreach ($students as $row): 
-            $qrData = urlencode(APP_URL . "/modules/students/profile_report.php?id=" . $row['id']);
-            $qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=" . $qrData;
-        ?>
-            <!-- ID CARD WRAPPER FRAME (Front and Back side) -->
-            <div class="id-card-wrap" id="card_wrapper_<?php echo $row['id']; ?>">
-                
-                <!-- Front Side -->
-                <div class="pvc-card-side pvc-card-front me-2">
-                    <div class="header-band">
-                        <i class="fa-solid fa-graduation-cap text-warning fs-5"></i>
-                        <h6>INDUS GRAMMAR SCHOOL</h6>
-                        <p class="subtitle">Student Identity Card</p>
-                    </div>
-                    <div class="pvc-card-front-body">
+    <!-- PVC ID Cards Print rendering queue area -->
+    <div class="bg-light border p-4 shadow-inner text-center d-print-none" style="border-radius: 12px; min-height: 200px;">
+        <h5 class="fw-bold text-secondary mb-4"><i class="fa-solid fa-print me-2"></i>Identity Cards Print Queue Preview</h5>
+        <div id="queueZone">
+            <?php foreach ($students as $row): 
+                $qrRawData = "Student ID: " . $row['admission_no'] . "\n" .
+                             "Name: " . $row['first_name'] . " " . $row['last_name'] . "\n" .
+                             "Class: " . ($row['class_name'] ?? $row['school_class'] ?? '—') . "\n" .
+                             "Section: " . ($row['section'] ?? $row['school_section'] ?? '—') . "\n" .
+                             "Academic Type: " . $row['academic_type'];
+                $qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . urlencode($qrRawData);
+            ?>
+                <!-- ID CARD WRAPPER FRAME (Front and Back side) -->
+                <div class="id-card-wrap" id="card_wrapper_<?php echo $row['id']; ?>" data-student='<?php echo htmlspecialchars(json_encode($row)); ?>'>
+                    
+                    <!-- Front Side -->
+                    <div class="pvc-card-side pvc-card-front me-3" id="front_<?php echo $row['id']; ?>">
+                        <div class="header-band">
+                            <img src="<?php echo APP_URL; ?>/assets/images/logo.png" class="school-logo" onerror="this.onerror=null; this.src='https://placehold.co/100x100?text=IGS'">
+                            <h6>INDUS GRAMMAR SCHOOL</h6>
+                            <p class="subtitle">Student ID Card</p>
+                        </div>
+                        
                         <div class="avatar-box">
                             <?php if (!empty($row['doc_student_photo'])): ?>
-                                <img src="<?php echo APP_URL . '/' . $row['doc_student_photo']; ?>">
+                                <img src="<?php echo APP_URL . '/' . $row['doc_student_photo']; ?>" alt="Photo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.png';">
                             <?php else: ?>
-                                <i class="fa-solid fa-user fs-1 text-secondary opacity-50"></i>
+                                <img src="<?php echo APP_URL; ?>/assets/images/default_student.png" alt="Avatar" onerror="this.onerror=null; this.src='https://placehold.co/150x200?text=No+Photo';">
                             <?php endif; ?>
                         </div>
-                        <div class="student-name-title"><?php echo sanitize($row['first_name'] . ' ' . $row['last_name']); ?></div>
+                        
+                        <div class="student-name-title"><?php echo htmlspecialchars($row['first_name'] . ' ' . $row['last_name']); ?></div>
                         
                         <table class="info-table">
-                            <tr><td class="lbl">Admission No:</td><td class="val"><?php echo sanitize($row['admission_no']); ?></td></tr>
-                            <tr><td class="lbl">Class & Section:</td><td class="val"><?php echo sanitize(($row['class_name'] ?? $row['school_class'] ?? '-') . ' - ' . ($row['section'] ?? $row['school_section'] ?? 'A')); ?></td></tr>
-                            <tr><td class="lbl">Academic Session:</td><td class="val"><?php echo sanitize($row['academic_session'] ?: '-'); ?></td></tr>
-                            <tr><td class="lbl">Blood Group:</td><td class="val"><?php echo sanitize($row['blood_group'] ?: '-'); ?></td></tr>
-                            <tr><td class="lbl">Emergency:</td><td class="val"><?php echo sanitize($row['emergency_contact'] ?: '-'); ?></td></tr>
+                            <tr><td class="lbl">Student ID:</td><td class="val font-monospace"><?php echo htmlspecialchars($row['admission_no']); ?></td></tr>
+                            <tr><td class="lbl">Roll Number:</td><td class="val"><?php echo htmlspecialchars($row['roll_no'] ?: '—'); ?></td></tr>
+                            <tr><td class="lbl">Class & Section:</td><td class="val"><?php echo htmlspecialchars(($row['class_name'] ?? $row['school_class'] ?? '—') . ' - ' . ($row['section'] ?? $row['school_section'] ?? 'A')); ?></td></tr>
+                            <tr><td class="lbl">Academic Type:</td><td class="val"><?php echo htmlspecialchars($row['academic_type']); ?></td></tr>
+                            <tr><td class="lbl">Session:</td><td class="val"><?php echo htmlspecialchars($row['academic_session'] ?: '—'); ?></td></tr>
+                            <tr><td class="lbl">Issue Date:</td><td class="val"><?php echo htmlspecialchars(date('d-M-Y', strtotime($row['admission_date'] ?: 'now'))); ?></td></tr>
                         </table>
                         
                         <div class="footer-strip">
+                            <span class="status-badge"><?php echo htmlspecialchars($row['status']); ?></span>
                             <div class="sign-box">
-                                <span class="d-block border-bottom font-monospace" style="font-size:0.55rem; color:#111;">Principal</span>
-                                <span class="small text-muted" style="font-size:0.45rem;">Authorized Sign</span>
+                                <div class="sign-line"></div>
+                                <span class="small text-muted" style="font-size:0.45rem;">Principal Sign</span>
                             </div>
-                            <img src="<?php echo $qrCodeUrl; ?>" class="qr-img" alt="QR Link">
                         </div>
                     </div>
-                </div>
-                
-                <!-- Back Side -->
-                <div class="pvc-card-side pvc-card-back">
-                    <h6 class="back-title">STUDENT REGISTRY INFO</h6>
-                    <div class="back-info">
-                        <p>Father Name: <strong><?php echo displayValue($row['father_name'] ?? $row['guardian_name']); ?></strong></p>
-                        <p>Parent Contact: <strong><?php echo displayValue($row['father_mobile'] ?? $row['guardian_phone']); ?></strong></p>
-                        <p class="text-wrap" style="line-height:1.2;">Address: <strong><?php echo displayValue($row['current_address'] ?? $row['address']); ?></strong></p>
-                        <p>Issue Date: <strong><?php echo date('M d, Y'); ?></strong></p>
-                    </div>
-                    
-                    <h6 class="back-title" style="border-top:1px solid #e2e8f0; padding-top:6px; margin-top:10px;">CAMPUS RULES</h6>
-                    <div class="rules-box">
-                        <ol>
-                            <li>Card must be worn prominently inside campus.</li>
-                            <li>Loss of card must be reported immediately.</li>
-                            <li>Card is non-transferable and belongs to IGS.</li>
-                        </ol>
-                    </div>
-                    
-                    <div class="school-address-box">
-                        <p class="fw-bold">Indus Grammar School & Academy</p>
-                        <p>Main Campus, Lahore | Ph: +92 42 111-222-333</p>
-                    </div>
-                </div>
 
-            </div>
-        <?php endforeach; endif; ?>
+                    <!-- Back Side -->
+                    <div class="pvc-card-side pvc-card-back" id="back_<?php echo $row['id']; ?>">
+                        <h6 class="back-title">STUDENT REGISTRY INFO</h6>
+                        <div class="back-info">
+                            <p>Father / Guardian Name: <strong><?php echo htmlspecialchars($row['father_name'] ?: $row['guardian_name'] ?: '—'); ?></strong></p>
+                            <p>Guardian Contact: <strong><?php echo htmlspecialchars($row['father_mobile'] ?: $row['guardian_phone'] ?: '—'); ?></strong></p>
+                            <p>Emergency Contact: <strong><?php echo htmlspecialchars($row['emergency_contact'] ?: $row['father_mobile'] ?: $row['guardian_phone'] ?: '—'); ?></strong></p>
+                        </div>
+                        <div class="qr-frame-box">
+                            <img src="<?php echo $qrCodeUrl; ?>" alt="QR Code" onerror="this.onerror=null; this.src='https://placehold.co/150x150?text=QR+Code';">
+                        </div>
+                        <div class="rules-box">
+                            <ol>
+                                <li>Always display this card while on campus premises.</li>
+                                <li>Loss must be reported immediately to school admin.</li>
+                                <li>Card is property of Indus Grammar School & Academy.</li>
+                            </ol>
+                        </div>
+                        <div class="school-address-box">
+                            <p class="fw-bold">Indus Grammar School & Academy</p>
+                            <p><?php echo SCHOOL_ADDRESS; ?> | Ph: <?php echo SCHOOL_PHONE; ?></p>
+                            <p>Email: <?php echo SCHOOL_EMAIL; ?> | Web: www.indus.edu.pk</p>
+                        </div>
+                    </div>
+
+                </div>
+            <?php endforeach; ?>
+        </div>
     </div>
-</div>
+
+<?php endif; ?>
+
+<!-- Print Zone Area (Always empty on screen, dynamically populated for clean print output) -->
+<div id="printSection"></div>
 
 <!-- Modal Card Preview -->
 <div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-lg" style="max-width:650px;">
         <div class="modal-content border-0 shadow-lg" style="border-radius:12px;">
             <div class="modal-header bg-light border-bottom-0 pb-0">
                 <h5 class="modal-title fw-bold text-dark" id="previewModalLabel"><i class="fa-solid fa-address-card text-primary me-2"></i>ID Card Preview</h5>
@@ -523,91 +585,158 @@ include_once __DIR__ . '/../../includes/header.php';
             </div>
             <div class="modal-body py-4 text-center bg-light">
                 <div id="modalCardPreviewZone">
-                    <!-- Loaded dynamically via JavaScript cloning -->
+                    <!-- Cloned dynamic content -->
                 </div>
             </div>
             <div class="modal-footer border-top-0 pt-0">
-                <button type="button" class="btn btn-outline-secondary" onclick="printSingleCardModal()"><i class="fa-solid fa-print me-2"></i>Print Card</button>
+                <button type="button" class="btn btn-primary" id="modalPrintBtn"><i class="fa-solid fa-print me-2"></i>Print Card</button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- html2canvas and jsPDF libraries CDNs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script>
-// Search loading spinner activation
-document.getElementById('searchForm').addEventListener('submit', function() {
-    const btn = document.getElementById('searchBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>...';
-});
-
-// Toggle all student check indicators
-function toggleAllCheckboxes(master) {
-    document.querySelectorAll(".student-chk").forEach(chk => {
-        chk.checked = master.checked;
-        toggleCardPreview(chk.value, master.checked);
-    });
-}
-
-function toggleCardPreview(id, visible) {
-    const wrapper = document.getElementById("card_wrapper_" + id);
-    if (wrapper) {
-        wrapper.style.display = visible ? "inline-block" : "none";
+    // Search loaders
+    const fForm = document.getElementById('filterForm');
+    if (fForm) {
+        fForm.addEventListener('submit', () => {
+            const btn = document.getElementById('searchBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>...';
+        });
     }
-}
 
-// Single card preview modal loader
-const pModal = new bootstrap.Modal(document.getElementById("previewModal"));
-let activePreviewCardId = 0;
-
-function previewSingleCard(student) {
-    activePreviewCardId = student.id;
-    const originalWrapper = document.getElementById("card_wrapper_" + student.id);
-    if (originalWrapper) {
-        const previewZone = document.getElementById("modalCardPreviewZone");
-        previewZone.innerHTML = originalWrapper.innerHTML;
-        pModal.show();
+    // Toggle Checkboxes
+    function toggleAllCheckboxes(master) {
+        document.querySelectorAll(".student-chk").forEach(chk => {
+            chk.checked = master.checked;
+            toggleCardPreview(chk.value, master.checked);
+        });
     }
-}
 
-// Print single card
-function printSingleCardModal() {
-    if (activePreviewCardId > 0) {
-        const originalContent = document.body.innerHTML;
-        const targetCardHtml = document.getElementById("card_wrapper_" + activePreviewCardId).innerHTML;
+    function toggleCardPreview(id, visible) {
+        const wrap = document.getElementById("card_wrapper_" + id);
+        if (wrap) {
+            wrap.style.display = visible ? "inline-block" : "none";
+        }
+    }
+
+    // Modal Card Preview triggers
+    const pModal = new bootstrap.Modal(document.getElementById("previewModal"));
+    let activePreviewStudentId = 0;
+
+    function previewSingleCard(student) {
+        activePreviewStudentId = student.id;
+        const front = document.getElementById("front_" + student.id).outerHTML;
+        const back = document.getElementById("back_" + student.id).outerHTML;
         
-        document.body.innerHTML = `
-            <div style="padding:20px; text-align:center;">
-                ${targetCardHtml}
+        document.getElementById("modalCardPreviewZone").innerHTML = `
+            <div class="d-flex justify-content-center gap-3">
+                ${front} ${back}
             </div>
         `;
-        window.print();
-        document.body.innerHTML = originalContent;
-        window.location.reload();
+        pModal.show();
     }
-}
 
-function printSelectedCards() {
-    window.print();
-}
-
-function printAllCards() {
-    // Select all checkboxes and trigger print
-    document.querySelectorAll(".student-chk").forEach(chk => {
-        chk.checked = true;
-        toggleCardPreview(chk.value, true);
+    document.getElementById("modalPrintBtn").addEventListener("click", () => {
+        if (activePreviewStudentId > 0) {
+            const front = document.getElementById("front_" + activePreviewStudentId).outerHTML;
+            const back = document.getElementById("back_" + activePreviewStudentId).outerHTML;
+            
+            const printSec = document.getElementById("printSection");
+            printSec.innerHTML = `
+                <div class="id-card-wrap">${front}</div>
+                <div class="id-card-wrap">${back}</div>
+            `;
+            window.print();
+            printSec.innerHTML = "";
+        }
     });
-    document.getElementById("selectAll").checked = true;
-    setTimeout(() => {
-        window.print();
-    }, 200);
-}
 
-function downloadPDF() {
-    alert("PVC ID Card templates are optimized for PDF print layouts. Please select PDF printer in print dialogue.");
-    window.print();
-}
+    // Print Selected Cards
+    function printSelectedCards() {
+        const printSec = document.getElementById("printSection");
+        let html = '';
+        
+        document.querySelectorAll(".student-chk:checked").forEach(chk => {
+            const id = chk.value;
+            const front = document.getElementById("front_" + id).outerHTML;
+            const back = document.getElementById("back_" + id).outerHTML;
+            html += `
+                <div class="id-card-wrap">${front}</div>
+                <div class="id-card-wrap">${back}</div>
+            `;
+        });
+        
+        if (html === '') {
+            alert("Please select at least one card to print.");
+            return;
+        }
+        
+        printSec.innerHTML = html;
+        window.print();
+        printSec.innerHTML = "";
+    }
+
+    // Download Selected PDF
+    function downloadSelectedPDF() {
+        const { jsPDF } = window.jspdf;
+        const checked = document.querySelectorAll(".student-chk:checked");
+        
+        if (checked.length === 0) {
+            alert("Please select at least one student.");
+            return;
+        }
+
+        const btn = document.querySelector('button[onclick="downloadSelectedPDF()"]');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Generating PDF...';
+
+        // Render target canvases
+        const promises = [];
+        checked.forEach(chk => {
+            const id = chk.value;
+            const front = document.getElementById("front_" + id);
+            const back = document.getElementById("back_" + id);
+            
+            promises.push(
+                html2canvas(front, { scale: 3, useCORS: true, allowTaint: true }),
+                html2canvas(back, { scale: 3, useCORS: true, allowTaint: true })
+            );
+        });
+
+        Promise.all(promises).then(canvases => {
+            // Portrait CR80 Size in mm: 53.98 x 85.60
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: [53.98, 85.60]
+            });
+
+            canvases.forEach((canvas, index) => {
+                if (index > 0) {
+                    pdf.addPage([53.98, 85.60], 'portrait');
+                }
+                const imgData = canvas.toDataURL('image/jpeg', 1.0);
+                pdf.addImage(imgData, 'JPEG', 0, 0, 53.98, 85.60);
+            });
+
+            pdf.save(`Student_ID_Cards_${Date.now()}.pdf`);
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }).catch(err => {
+            console.error("PDF generation failed:", err);
+            alert("Unable to generate PDF document.");
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        });
+    }
 </script>
 
 <?php

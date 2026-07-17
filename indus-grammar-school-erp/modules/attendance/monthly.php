@@ -20,7 +20,7 @@ $section_name = sanitize($_GET['section'] ?? '');
 
 $classesList = [];
 try {
-    $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $classesList = $db->query("SELECT class_name FROM classes GROUP BY class_name ORDER BY MIN(id) ASC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
     error_log("Error fetching classes in monthly.php: " . $e->getMessage());
 }
@@ -46,16 +46,18 @@ if (!empty($class_name) && !empty($section_name)) {
             LEFT JOIN classes c ON s.class_id = c.id
             WHERE s.status = 'Active' 
               AND s.academic_type = :academic_type 
-              AND (c.class_name = :class OR s.school_class = :class)
-              AND (c.section = :section OR s.school_section = :section)
+              AND (c.class_name = :class1 OR s.school_class = :class2)
+              AND (c.section = :section1 OR s.school_section = :section2)
             ORDER BY s.first_name ASC
         ";
         
         $stmt = $db->prepare($qSql);
         $stmt->execute([
             'academic_type' => $academic_type,
-            'class' => $class_name,
-            'section' => $section_name
+            'class1' => $class_name,
+            'class2' => $class_name,
+            'section1' => $section_name,
+            'section2' => $section_name
         ]);
         $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

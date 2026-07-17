@@ -33,7 +33,7 @@ $section_name = sanitize($_GET['section'] ?? '');
 $classesList = [];
 $sectionsList = [];
 try {
-    $classesList = $db->query("SELECT DISTINCT class_name FROM classes ORDER BY id ASC")->fetchAll(PDO::FETCH_COLUMN);
+    $classesList = $db->query("SELECT class_name FROM classes GROUP BY class_name ORDER BY MIN(id) ASC")->fetchAll(PDO::FETCH_COLUMN);
     $sectionsList = $db->query("SELECT DISTINCT section FROM classes ORDER BY section ASC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
     error_log("Error fetching classes/sections in student.php: " . $e->getMessage());
@@ -139,8 +139,8 @@ if (!empty($class_name) && !empty($section_name)) {
             LEFT JOIN attendance a ON a.student_id = s.id AND a.date = :date
             WHERE s.status = 'Active' 
               AND s.academic_type = :academic_type 
-              AND (c.class_name = :class OR s.school_class = :class)
-              AND (c.section = :section OR s.school_section = :section)
+              AND (c.class_name = :class1 OR s.school_class = :class2)
+              AND (c.section = :section1 OR s.school_section = :section2)
             ORDER BY s.admission_no ASC
         ";
         
@@ -148,8 +148,10 @@ if (!empty($class_name) && !empty($section_name)) {
         $stmt->execute([
             'date' => $selectedDate,
             'academic_type' => $academic_type,
-            'class' => $class_name,
-            'section' => $section_name
+            'class1' => $class_name,
+            'class2' => $class_name,
+            'section1' => $section_name,
+            'section2' => $section_name
         ]);
         $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

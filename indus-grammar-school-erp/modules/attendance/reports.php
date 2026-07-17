@@ -90,12 +90,14 @@ if ($view_student_id > 0) {
         $params['academic_type'] = $search_academic_type;
     }
     if ($search_class !== '') {
-        $where .= " AND (c.class_name = :class OR s.school_class = :class)";
-        $params['class'] = $search_class;
+        $where .= " AND (c.class_name = :class1 OR s.school_class = :class2)";
+        $params['class1'] = $search_class;
+        $params['class2'] = $search_class;
     }
     if ($search_section !== '') {
-        $where .= " AND (c.section = :section OR s.school_section = :section)";
-        $params['section'] = $search_section;
+        $where .= " AND (c.section = :section1 OR s.school_section = :section2)";
+        $params['section1'] = $search_section;
+        $params['section2'] = $search_section;
     }
 }
 
