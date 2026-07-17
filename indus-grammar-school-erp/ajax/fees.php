@@ -317,9 +317,9 @@ switch ($action) {
             
             $ok = $db->prepare("
                 UPDATE fee_ledger 
-                SET fine_amount = fine_amount + :amt, total_payable = total_payable + :amt 
+                SET fine_amount = fine_amount + :amt1, total_payable = total_payable + :amt2 
                 WHERE id = :id
-            ")->execute(['amt' => $amt, 'id' => $id]);
+            ")->execute(['amt1' => $amt, 'amt2' => $amt, 'id' => $id]);
             if ($ok) {
                 auditLog('Ledger Fine Added', "Rs. $amt fine added to ledger entry ID $id.");
             }

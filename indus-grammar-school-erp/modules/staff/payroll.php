@@ -1,272 +1,336 @@
 <?php
 /**
- * Indus Grammar School ERP - Payroll Management
- * Version 1.0.0
+ * Indus Grammar School ERP - Payroll Central Dashboard
+ * Version 4.0.0
  */
 
-$pageTitle = 'Payroll Management';
+$pageTitle = 'Payroll Dashboard';
 $breadcrumbActive = 'HR & Staff';
 include_once __DIR__ . '/../../includes/header.php';
-AuthMiddleware::requirePermission('hr_view');
 
-$selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
-$selectedYear  = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
-$selectedStatus = $_GET['status'] ?? '';
-
-$filters = [
-    'month' => $selectedMonth,
-    'year'  => $selectedYear
-];
-if ($selectedStatus) $filters['status'] = sanitize($selectedStatus);
-
-$salaries = Payroll::all($filters, 500);
-
-$totalGross = array_sum(array_column($salaries, 'basic_salary')) + array_sum(array_column($salaries, 'allowances'));
-$totalDeductions = array_sum(array_column($salaries, 'deductions'));
-$totalNet = array_sum(array_column($salaries, 'net_salary'));
-?>
-
-<div class="row mb-4 align-items-center">
-    <div class="col-sm-6">
-        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-money-check-dollar me-2 text-primary"></i>Payroll Management</h3>
-    </div>
-    <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
-        <?php if (hasPermission('hr_manage')): ?>
-        <button class="btn btn-primary px-4" id="btnGenPayroll">
-            <i class="fa-solid fa-gears me-2"></i>Generate Payroll
-        </button>
-        <?php endif; ?>
-    </div>
-</div>
-
-<div class="card border-0 shadow-sm mb-4" style="border-radius:12px;">
-    <div class="card-body p-4">
-        <form method="GET" class="row g-3 align-items-end" id="filterForm">
-            <div class="col-md-3">
-                <label class="form-label small fw-semibold text-muted">Month</label>
-                <select class="form-select" name="month" onchange="document.getElementById('filterForm').submit()">
-                    <?php for($m=1; $m<=12; $m++): ?>
-                        <option value="<?php echo $m; ?>" <?php echo $selectedMonth == $m ? 'selected' : ''; ?>><?php echo date('F', mktime(0,0,0,$m,1)); ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-semibold text-muted">Year</label>
-                <select class="form-select" name="year" onchange="document.getElementById('filterForm').submit()">
-                    <?php for($y = date('Y'); $y >= 2020; $y--): ?>
-                        <option value="<?php echo $y; ?>" <?php echo $selectedYear == $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label small fw-semibold text-muted">Payment Status</label>
-                <select class="form-select" name="status" onchange="document.getElementById('filterForm').submit()">
-                    <option value="">All Statuses</option>
-                    <option value="Pending" <?php echo $selectedStatus === 'Pending' ? 'selected' : ''; ?>>Pending</option>
-                    <option value="Paid" <?php echo $selectedStatus === 'Paid' ? 'selected' : ''; ?>>Paid</option>
-                </select>
-            </div>
-        </form>
-    </div>
-</div>
-
-<div class="row g-4 mb-4">
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #f8f9fa);">
-            <div class="card-body p-4 text-center">
-                <div class="small text-muted fw-semibold mb-1">Total Gross Salary</div>
-                <h3 class="fw-bold text-dark mb-0">Rs. <?php echo number_format($totalGross, 2); ?></h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #fef5f5);">
-            <div class="card-body p-4 text-center">
-                <div class="small text-muted fw-semibold mb-1">Total Deductions</div>
-                <h3 class="fw-bold text-danger mb-0">Rs. <?php echo number_format($totalDeductions, 2); ?></h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-12 col-md-4">
-        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #f0fdf4);">
-            <div class="card-body p-4 text-center">
-                <div class="small text-muted fw-semibold mb-1">Total Net Payable</div>
-                <h3 class="fw-bold text-success mb-0">Rs. <?php echo number_format($totalNet, 2); ?></h3>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="custom-table-card shadow-sm border-0">
-    <div class="table-responsive">
-        <table class="table custom-table table-hover">
-            <thead>
-                <tr>
-                    <th>Staff Name</th>
-                    <th>Designation</th>
-                    <th class="text-end">Basic Salary</th>
-                    <th class="text-end text-success">+ Allow.</th>
-                    <th class="text-end text-danger">- Deduct.</th>
-                    <th class="text-end fw-bold">Net Salary</th>
-                    <th class="text-center">Status</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php if (empty($salaries)): ?>
-                    <tr><td colspan="8" class="text-center py-5 text-muted">No payroll data found for <?php echo date('F Y', mktime(0,0,0,$selectedMonth,1,$selectedYear)); ?>. Click "Generate Payroll" to create records.</td></tr>
-                <?php else: foreach ($salaries as $s): ?>
-                    <tr>
-                        <td class="fw-semibold text-dark">
-                            <?php echo sanitize($s['first_name'] . ' ' . $s['last_name']); ?>
-                            <br><small class="text-muted"><?php echo sanitize($s['employee_no']); ?></small>
-                        </td>
-                        <td><?php echo sanitize($s['designation']); ?></td>
-                        <td class="text-end">Rs. <?php echo number_format($s['basic_salary'], 2); ?></td>
-                        <td class="text-end text-success">Rs. <?php echo number_format($s['allowances'], 2); ?></td>
-                        <td class="text-end text-danger">Rs. <?php echo number_format($s['deductions'], 2); ?></td>
-                        <td class="text-end fw-bold fs-6">Rs. <?php echo number_format($s['net_salary'], 2); ?></td>
-                        <td class="text-center">
-                            <span class="badge bg-<?php echo $s['payment_status'] === 'Paid' ? 'success' : 'warning text-dark'; ?>-soft px-3 py-2 rounded-pill">
-                                <?php echo sanitize($s['payment_status']); ?>
-                            </span>
-                            <?php if ($s['payment_status'] === 'Paid'): ?>
-                                <br><small class="text-muted" style="font-size:0.7rem;"><?php echo date('d M Y', strtotime($s['payment_date'])); ?></small>
-                            <?php endif; ?>
-                        </td>
-                        <td class="text-end">
-                            <a href="salary_slip.php?id=<?php echo $s['id']; ?>" class="btn btn-sm btn-outline-secondary" target="_blank" title="Print Slip">
-                                <i class="fa-solid fa-print"></i>
-                            </a>
-                            <?php if ($s['payment_status'] === 'Pending' && hasPermission('hr_manage')): ?>
-                            <button class="btn btn-sm btn-success ms-1 btn-pay" data-id="<?php echo $s['id']; ?>" title="Mark as Paid">
-                                <i class="fa-solid fa-check"></i>
-                            </button>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; endif; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Pay Salary Modal -->
-<?php if (hasPermission('hr_manage')): ?>
-<div class="modal fade" id="payModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow" style="border-radius:12px;">
-            <div class="modal-header border-0 pt-4 px-4">
-                <h5 class="modal-title fw-bold"><i class="fa-solid fa-money-check-dollar me-2 text-success"></i>Process Payment</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body px-4">
-                <form id="payForm">
-                    <input type="hidden" name="csrf_token" value="<?php echo csrfToken(); ?>">
-                    <input type="hidden" name="action" value="pay_salary">
-                    <input type="hidden" name="salary_id" id="paySalaryId">
-                    
-                    <div class="alert alert-info border-0 shadow-sm small py-2 mb-4">
-                        <i class="fa-solid fa-info-circle me-2"></i>If paid via Cash, this will automatically record an expense in the active cash register.
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Payment Date</label>
-                        <input type="date" class="form-control" name="payment_date" value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold">Payment Method</label>
-                        <select class="form-select" name="payment_method" required>
-                            <option value="Bank">Bank Transfer</option>
-                            <option value="Cash">Cash</option>
-                            <option value="Cheque">Cheque</option>
-                        </select>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer border-0 pb-4 px-4">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" form="payForm" class="btn btn-success px-4" id="btnConfirmPay">Confirm Payment</button>
-            </div>
-        </div>
-    </div>
-</div>
-<?php endif; ?>
-
-<!-- Toast -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
-    <div id="prToast" class="toast align-items-center text-white border-0" role="alert">
-        <div class="d-flex">
-            <div class="toast-body fw-semibold" id="prToastMsg"></div>
-            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-        </div>
-    </div>
-</div>
-
-<?php $extraJS = '<script>
-function showToast(msg, ok) {
-    const t = document.getElementById("prToast");
-    const m = document.getElementById("prToastMsg");
-    t.classList.remove("bg-success","bg-danger");
-    t.classList.add(ok ? "bg-success" : "bg-danger");
-    m.textContent = msg;
-    new bootstrap.Toast(t).show();
+// Restricted to Super Admin, School Admin, and Accountant
+AuthMiddleware::requireLogin();
+$userRole = $_SESSION['role_code'] ?? '';
+if (!in_array($userRole, [ROLE_SUPER_ADMIN, ROLE_SCHOOL_ADMIN, 'accountant'])) {
+    $_SESSION['flash_error'] = 'Access denied. You do not have permissions to access the payroll module.';
+    redirect(APP_URL . '/dashboard.php');
 }
 
-document.addEventListener("DOMContentLoaded", function() {
+$db = Database::getConnection();
+
+$currentMonth = (int)date('m');
+$currentYear  = (int)date('Y');
+$monthText = date('F Y');
+
+// ── 1. Calculate Metrics ──
+// Total active employees
+$totalEmployees = (int)$db->query("SELECT COUNT(*) FROM staff WHERE status = 'Active'")->fetchColumn();
+
+// Fetch processing entry ID for current month
+$procId = $db->query("SELECT id FROM salary_processing WHERE month = $currentMonth AND year = $currentYear")->fetchColumn();
+$procId = $procId ? (int)$procId : 0;
+
+// Processed, Pending, Paid counts/sums
+$processedCount = 0;
+$pendingCount = $totalEmployees;
+$totalPaid = 0.00;
+$totalAllowances = 0.00;
+$totalDeductions = 0.00;
+$currentMonthSum = 0.00;
+
+if ($procId > 0) {
+    $processedCount = (int)$db->query("SELECT COUNT(*) FROM salary_details WHERE processing_id = $procId")->fetchColumn();
+    $pendingCount   = max(0, $totalEmployees - $processedCount);
     
-    // Generate Payroll
-    const btnGen = document.getElementById("btnGenPayroll");
-    if (btnGen) {
-        btnGen.addEventListener("click", function() {
-            if(!confirm("Are you sure you want to generate payroll for ' . date('F Y', mktime(0,0,0,$selectedMonth,1,$selectedYear)) . '?\\nThis will create salary records for all active staff.")) return;
-            
-            btnGen.disabled = true;
-            btnGen.innerHTML = \'<span class="spinner-border spinner-border-sm me-2"></span>Generating...\';
-            
-            const fd = new FormData();
-            fd.append("action", "generate_payroll");
-            fd.append("csrf_token", "' . csrfToken() . '");
-            fd.append("month", "' . $selectedMonth . '");
-            fd.append("year", "' . $selectedYear . '");
-            
-            fetch("../../ajax/staff.php", { method: "POST", body: fd })
-                .then(r => r.json())
-                .then(data => {
-                    showToast(data.message, data.success);
-                    if(data.success) setTimeout(() => location.reload(), 1500);
-                    else { btnGen.disabled = false; btnGen.innerHTML = \'<i class="fa-solid fa-gears me-2"></i>Generate Payroll\'; }
-                });
-        });
-    }
+    $totalPaid       = (float)$db->query("SELECT COALESCE(SUM(net_salary),0) FROM salary_details WHERE processing_id = $procId AND payment_status = 'Paid'")->fetchColumn();
+    $totalAllowances = (float)$db->query("SELECT COALESCE(SUM(allowances),0) FROM salary_details WHERE processing_id = $procId")->fetchColumn();
+    $totalDeductions = (float)$db->query("SELECT COALESCE(SUM(deductions + advance_salary_deduction),0) FROM salary_details WHERE processing_id = $procId")->fetchColumn();
+    $currentMonthSum = (float)$db->query("SELECT COALESCE(SUM(net_salary),0) FROM salary_details WHERE processing_id = $procId")->fetchColumn();
+}
 
-    // Process Payment Modal
-    let payModal;
-    document.querySelectorAll(".btn-pay").forEach(btn => {
-        btn.addEventListener("click", function() {
-            document.getElementById("paySalaryId").value = this.dataset.id;
-            payModal = new bootstrap.Modal(document.getElementById("payModal"));
-            payModal.show();
-        });
-    });
+// Outstanding advance salary
+$outstandingAdvance = (float)$db->query("SELECT COALESCE(SUM(remaining_balance),0) FROM advance_salary WHERE status = 'Pending'")->fetchColumn();
 
-    const form = document.getElementById("payForm");
-    if (form) {
-        form.addEventListener("submit", function(e) {
-            e.preventDefault();
-            const btn = document.getElementById("btnConfirmPay");
-            btn.disabled = true; btn.innerHTML = "Processing...";
-            
-            fetch("../../ajax/staff.php", { method: "POST", body: new FormData(form) })
-                .then(r => r.json())
-                .then(data => {
-                    showToast(data.message, data.success);
-                    if(data.success) setTimeout(() => location.reload(), 1000);
-                    else { btn.disabled = false; btn.innerHTML = "Confirm Payment"; }
-                });
-        });
-    }
-});
-</script>';
-include_once __DIR__ . '/../../includes/footer.php'; ?>
+// Fetch payroll processing runs list
+$runs = $db->query("
+    SELECT p.*, 
+           (SELECT COUNT(*) FROM salary_details WHERE processing_id = p.id) as total_staff,
+           (SELECT SUM(net_salary) FROM salary_details WHERE processing_id = p.id) as total_net,
+           (SELECT COUNT(*) FROM salary_details WHERE processing_id = p.id AND payment_status = 'Paid') as paid_count
+    FROM salary_processing p
+    ORDER BY p.year DESC, p.month DESC
+    LIMIT 12
+")->fetchAll(PDO::FETCH_ASSOC);
+?>
+
+<!-- Title & Header -->
+<div class="row mb-4 align-items-center">
+    <div class="col-sm-6">
+        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-money-check-dollar me-2 text-primary"></i>School Payroll Dashboard</h3>
+        <p class="text-muted small mb-0">Consolidated overview of active employee salaries, shift attendance deductions, cash postings, and payment structures.</p>
+    </div>
+</div>
+
+<!-- Grid of 8 Metrics Cards -->
+<div class="row g-3 mb-4">
+    <!-- Total Staff -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #f8f9fa);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary-soft text-primary p-2 fs-6 rounded-pill"><i class="fa-solid fa-users"></i></span>
+                    <span class="small text-muted fw-semibold">Total Employees</span>
+                </div>
+                <h4 class="fw-bold text-dark mb-0"><?php echo $totalEmployees; ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Payroll Processed -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #f0fdf4);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-success-soft text-success p-2 fs-6 rounded-pill"><i class="fa-solid fa-circle-check"></i></span>
+                    <span class="small text-muted fw-semibold">Runs Processed</span>
+                </div>
+                <h4 class="fw-bold text-success mb-0"><?php echo $processedCount; ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Payroll Pending -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #fffbeb);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-warning-soft text-warning p-2 fs-6 rounded-pill"><i class="fa-solid fa-clock-rotate-left"></i></span>
+                    <span class="small text-muted fw-semibold">Runs Pending</span>
+                </div>
+                <h4 class="fw-bold text-warning mb-0"><?php echo $pendingCount; ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Total Salary Paid -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #fdf2f8);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-danger-soft text-danger p-2 fs-6 rounded-pill"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                    <span class="small text-muted fw-semibold">Total Paid</span>
+                </div>
+                <h4 class="fw-bold text-danger mb-0" style="font-size: 1.15rem;">Rs. <?php echo number_format($totalPaid, 2); ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Total Allowances -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #ecfdf5);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-success-soft text-success p-2 fs-6 rounded-pill"><i class="fa-solid fa-plus"></i></span>
+                    <span class="small text-muted fw-semibold">Total Allowances</span>
+                </div>
+                <h4 class="fw-bold text-success mb-0" style="font-size: 1.15rem;">Rs. <?php echo number_format($totalAllowances, 2); ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Total Deductions -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #fff5f5);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-danger-soft text-danger p-2 fs-6 rounded-pill"><i class="fa-solid fa-minus"></i></span>
+                    <span class="small text-muted fw-semibold">Total Deductions</span>
+                </div>
+                <h4 class="fw-bold text-danger mb-0" style="font-size: 1.15rem;">Rs. <?php echo number_format($totalDeductions, 2); ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Advance Outstanding -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #f5f3ff);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-purple-soft text-purple p-2 fs-6 rounded-pill"><i class="fa-solid fa-comments-dollar"></i></span>
+                    <span class="small text-muted fw-semibold">Advances Balance</span>
+                </div>
+                <h4 class="fw-bold text-purple mb-0" style="font-size: 1.15rem;">Rs. <?php echo number_format($outstandingAdvance, 2); ?></h4>
+            </div>
+        </div>
+    </div>
+    <!-- Current Month Net -->
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="border-radius:12px; background: linear-gradient(135deg, #fff, #eff6ff);">
+            <div class="card-body p-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-primary-soft text-primary p-2 fs-6 rounded-pill"><i class="fa-solid fa-file-invoice-dollar"></i></span>
+                    <span class="small text-muted fw-semibold"><?php echo $monthText; ?> Net</span>
+                </div>
+                <h4 class="fw-bold text-primary mb-0" style="font-size: 1.15rem;">Rs. <?php echo number_format($currentMonthSum, 2); ?></h4>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Consolidated Submodule Gateways (Navigation Roster) -->
+<h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-cubes me-2 text-primary"></i>Payroll Submodules</h5>
+<div class="row g-3 mb-5">
+    <!-- 1. Salary Setup -->
+    <div class="col-md-3">
+        <a href="payroll_setup.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-primary bg-primary-soft rounded p-3"><i class="fa-solid fa-user-gear fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Salary Setup</h6>
+                    <small class="text-muted text-xs">Assign structures & details</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 2. Salary Processing -->
+    <div class="col-md-3">
+        <a href="payroll_process.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-success bg-success-soft rounded p-3"><i class="fa-solid fa-gears fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Salary Processing</h6>
+                    <small class="text-muted text-xs">Run bulk monthly payrolls</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 3. Allowances -->
+    <div class="col-md-3">
+        <a href="payroll_allowances.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-success bg-success-soft rounded p-3"><i class="fa-solid fa-plus fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Allowances</h6>
+                    <small class="text-muted text-xs">Manage structural bonuses</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 4. Deductions -->
+    <div class="col-md-3">
+        <a href="payroll_deductions.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-danger bg-danger-soft rounded p-3"><i class="fa-solid fa-minus fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Deductions</h6>
+                    <small class="text-muted text-xs">Configure tax, provident funds</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 5. Advance Salary -->
+    <div class="col-md-3">
+        <a href="payroll_advance.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-purple bg-purple-soft rounded p-3"><i class="fa-solid fa-comments-dollar fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Advance Salary</h6>
+                    <small class="text-muted text-xs">Log loans & auto-installments</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 6. Bonus & Incentives -->
+    <div class="col-md-3">
+        <a href="payroll_bonuses.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-warning bg-warning-soft rounded p-3"><i class="fa-solid fa-gift fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Bonuses & Gifts</h6>
+                    <small class="text-muted text-xs">Eid, performance incentives</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 7. Payroll Reports -->
+    <div class="col-md-3">
+        <a href="payroll_reports.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-primary bg-primary-soft rounded p-3"><i class="fa-solid fa-file-invoice-dollar fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Payroll Reports</h6>
+                    <small class="text-muted text-xs">Summaries & exports PDF/CSV</small>
+                </div>
+            </div>
+        </a>
+    </div>
+    <!-- 8. Payroll Settings -->
+    <div class="col-md-3">
+        <a href="payroll_settings.php" class="card border-0 shadow-sm text-decoration-none h-100 gateway-card" style="border-radius:12px;">
+            <div class="card-body p-3 d-flex align-items-center gap-3">
+                <div class="gateway-icon text-secondary bg-secondary-soft rounded p-3"><i class="fa-solid fa-sliders fs-4"></i></div>
+                <div>
+                    <h6 class="fw-bold text-dark mb-1">Payroll Settings</h6>
+                    <small class="text-muted text-xs">Time values & lock criteria</small>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- Monthly Runs Roster -->
+<div class="card border-0 shadow-sm" style="border-radius:12px;">
+    <div class="card-header bg-white border-0 pt-4 px-4 d-flex align-items-center justify-content-between">
+        <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-receipt me-2 text-primary"></i>Recent Payroll Runs</h5>
+        <a href="payroll_process.php" class="btn btn-primary btn-sm px-3 rounded-pill"><i class="fa-solid fa-gears me-1"></i>New Processing Run</a>
+    </div>
+    <div class="card-body p-4">
+        <div class="table-responsive">
+            <table class="table custom-table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Billing Cycle</th>
+                        <th class="text-center">Staff Count</th>
+                        <th class="text-end">Total Salary Disbursed</th>
+                        <th class="text-center">Status</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($runs)): ?>
+                        <tr><td colspan="5" class="text-center py-4 text-muted">No processing runs exist. Click "New Processing Run" to get started.</td></tr>
+                    <?php else: foreach ($runs as $r): ?>
+                        <tr>
+                            <td class="fw-bold text-dark"><?php echo date('F Y', mktime(0,0,0,$r['month'],1,$r['year'])); ?></td>
+                            <td class="text-center fw-semibold"><?php echo $r['total_staff']; ?> Employees</td>
+                            <td class="text-end fw-bold text-dark">Rs. <?php echo number_format((float)$r['total_net'], 2); ?></td>
+                            <td class="text-center">
+                                <?php 
+                                $status = $r['status'];
+                                if ($r['total_staff'] > 0 && $r['paid_count'] === $r['total_staff']) $status = 'Paid';
+                                else if ($r['paid_count'] > 0) $status = 'Processed'; // partially paid
+
+                                $badge = 'warning text-dark';
+                                if ($status === 'Paid') $badge = 'success';
+                                else if ($status === 'Processed') $badge = 'info';
+                                ?>
+                                <span class="badge bg-<?php echo $badge; ?>-soft px-3 py-2 rounded-pill"><?php echo $status; ?></span>
+                            </td>
+                            <td class="text-end">
+                                <a href="payroll_process.php?month=<?php echo $r['month']; ?>&year=<?php echo $r['year']; ?>" class="btn btn-sm btn-outline-primary px-3 rounded-pill">
+                                    <i class="fa-solid fa-eye me-1"></i>Manage Run
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.gateway-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.gateway-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 .5rem 1.5rem rgba(0,0,0,.08)!important;
+}
+</style>
+
+<?php include_once __DIR__ . '/../../includes/footer.php'; ?>

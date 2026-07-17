@@ -358,12 +358,12 @@ include_once __DIR__ . '/../../includes/header.php';
                         <td><span class="small text-muted"><?php echo date('M d, Y', strtotime($row['created_at'])); ?></span></td>
                         <td class="text-end d-print-none">
                             <div class="btn-group">
-                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="viewDiaryDetails(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="View Details">
+                                <a href="view_diary.php?id=<?php echo $row['id']; ?>" class="btn btn-outline-secondary btn-sm" title="View Details">
                                     <i class="fa-regular fa-eye"></i>
-                                </button>
-                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="printSingleDiary(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="Print Entry">
+                                </a>
+                                <a href="print_diary.php?id=<?php echo $row['id']; ?>" target="_blank" class="btn btn-outline-primary btn-sm" title="Print Entry">
                                     <i class="fa-solid fa-print"></i>
-                                </button>
+                                </a>
                             </div>
                         </td>
                     </tr>

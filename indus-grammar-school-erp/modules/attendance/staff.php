@@ -13,13 +13,13 @@ $selectedDate = isset($_GET['date']) ? sanitize($_GET['date']) : date('Y-m-d');
 
 try {
     $db = Database::getConnection();
-    // Fetch all users with their today's attendance
     $stmt = $db->prepare("
         SELECT u.id, u.username, u.email, r.name as role_name,
                sa.status as current_status, sa.check_in_time, sa.check_out_time, sa.remarks
         FROM users u
         JOIN roles r ON u.role_id = r.id
-        LEFT JOIN staff_attendance sa ON sa.user_id = u.id AND sa.date = :date
+        LEFT JOIN staff s ON s.user_id = u.id
+        LEFT JOIN staff_attendance sa ON sa.staff_id = s.id AND sa.date = :date
         WHERE u.is_active = 1
         ORDER BY r.id ASC, u.username ASC
     ");

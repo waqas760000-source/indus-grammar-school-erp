@@ -155,8 +155,13 @@ class Fee {
             $fid = $fsStmt->fetchColumn();
             
             if (!$fid) {
-                // Return false if no structures are defined for this class
-                return false;
+                // Automatically initialize a default zero-rate structure for this class/type/year
+                $insFs = $db->prepare("
+                    INSERT INTO fee_structure (academic_type, class_id, academic_year, admission_fee, tuition_fee, computer_fee, exam_fee, transport_fee, annual_charges, security_deposit, other_charges, status)
+                    VALUES (:type, :cid, :year, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Active')
+                ");
+                $insFs->execute(['type' => $st['academic_type'], 'cid' => $st['class_id'], 'year' => CURRENT_ACADEMIC_YEAR]);
+                $fid = (int)$db->lastInsertId();
             }
             
             $ins = $db->prepare("
@@ -410,9 +415,26 @@ class Fee {
                 'pid' => $paymentId
             ]);
             
+            
             if ($cashRegId && class_exists('Cash') && $data['payment_method'] === 'Cash') {
                 Cash::recalculateRegister($cashRegId);
             }
+
+            // Auto-post to income table
+            $incStmt = $db->prepare("
+                INSERT INTO income (income_date, source, reference_no, student_id, description, amount, payment_method, received_by, remarks)
+                VALUES (:idate, 'Student Fee Collection', :ref, :sid, :desc, :amt, :method, :by, :remarks)
+            ");
+            $incStmt->execute([
+                'idate'   => $data['payment_date'],
+                'ref'     => $receiptNo,
+                'sid'     => $ledger['student_id'],
+                'desc'    => "Fee collection for month: " . $ledger['month'] . " (" . $ledger['academic_year'] . ")",
+                'amt'     => $data['amount_paid'],
+                'method'  => $data['payment_method'],
+                'by'      => $_SESSION['user_id'] ?? null,
+                'remarks' => $data['remarks'] ?? null
+            ]);
             
             $db->commit();
             return [

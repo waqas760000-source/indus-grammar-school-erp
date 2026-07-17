@@ -10,6 +10,39 @@ AuthMiddleware::requireLogin();
 AuthMiddleware::requirePermission('student_view');
 
 $db = Database::getConnection();
+
+// AJAX Student Search Handler
+if (isset($_GET['ajax_search_student'])) {
+    header('Content-Type: application/json');
+    $query = sanitize($_GET['query'] ?? '');
+    try {
+        $cleanQuery = str_replace('-', '', $query);
+        $stmtSearch = $db->prepare("
+            SELECT s.id, s.admission_no, s.first_name, s.last_name, s.academic_type,
+                   c.class_name, c.section, d.father_name, d.cnic_no, s.guardian_phone,
+                   s.guardian_name, s.enrollment_date, s.status, d.doc_student_photo,
+                   s.school_class, s.school_section
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            LEFT JOIN student_registration_details d ON s.id = d.student_id
+            WHERE s.admission_no = :query 
+               OR d.cnic_no = :query 
+               OR REPLACE(d.cnic_no, '-', '') = :cleanQuery
+            LIMIT 1
+        ");
+        $stmtSearch->execute(['query' => $query, 'cleanQuery' => $cleanQuery]);
+        $st = $stmtSearch->fetch(PDO::FETCH_ASSOC);
+        if ($st) {
+            echo json_encode(['status' => 'success', 'student' => $st]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'No student found with the provided Student ID or CNIC.']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+    exit;
+}
+
 $message = '';
 $error = '';
 
@@ -23,23 +56,12 @@ if (!empty($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
-// 2. Load Lookups (Active students with registration details)
-$studentsList = [];
-try {
-    $studentsList = $db->query("
-        SELECT s.id, s.admission_no, s.first_name, s.last_name, s.academic_type, s.school_class, s.school_section,
-               c.class_name, c.section, d.father_name
-        FROM students s
-        LEFT JOIN classes c ON s.class_id = c.id
-        LEFT JOIN student_registration_details d ON s.id = d.student_id
-        WHERE s.status = 'Active'
-        ORDER BY s.admission_no ASC
-    ")->fetchAll(PDO::FETCH_ASSOC);
-} catch (Exception $e) {}
+
 
 // Check if a specific complaint ID is loaded for editing
 $complaintId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $complaint = null;
+$editStudent = null;
 
 if ($complaintId > 0) {
     try {
@@ -49,6 +71,19 @@ if ($complaintId > 0) {
         if (!$complaint) {
             $error = "Complaint record not found.";
             $complaintId = 0;
+        } else {
+            // Load specific student details
+            $stmtStudent = $db->prepare("
+                SELECT s.id, s.admission_no, s.first_name, s.last_name, s.academic_type,
+                       c.class_name, c.section, d.father_name, d.cnic_no, s.guardian_phone,
+                       s.guardian_name, s.enrollment_date, s.status, d.doc_student_photo
+                FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
+                WHERE s.id = ?
+            ");
+            $stmtStudent->execute([$complaint['student_id']]);
+            $editStudent = $stmtStudent->fetch(PDO::FETCH_ASSOC);
         }
     } catch (Exception $e) {
         $error = "Error loading complaint: " . $e->getMessage();
@@ -62,9 +97,9 @@ if ($complaintId === 0) {
     $year = date('Y');
     try {
         $maxId = (int)$db->query("SELECT MAX(id) FROM student_complaints")->fetchColumn();
-        $nextComplaintNo = sprintf("COM-%s-%04d", $year, $maxId + 1);
+        $nextComplaintNo = sprintf("IGS-COM-%s-%04d", $year, $maxId + 1);
     } catch (Exception $e) {
-        $nextComplaintNo = "COM-" . $year . "-" . rand(1000, 9999);
+        $nextComplaintNo = "IGS-COM-" . $year . "-" . sprintf("%04d", rand(1000, 9999));
     }
 }
 
@@ -101,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($stmtCheck->fetchColumn() > 0) {
                     // Regenerate
                     $maxId = (int)$db->query("SELECT MAX(id) FROM student_complaints")->fetchColumn();
-                    $nextComplaintNo = sprintf("COM-%s-%04d", date('Y'), $maxId + 1);
+                    $nextComplaintNo = sprintf("IGS-COM-%s-%04d", date('Y'), $maxId + 1);
                 }
 
                 $stmt = $db->prepare("
@@ -134,26 +169,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $db->prepare("
                     UPDATE student_complaints SET 
-                        student_id = :student_id, class_id = :class_id, complaint_date = :complaint_date,
-                        category = :category, title = :title, description = :description,
-                        action_taken = :action_taken, status = :status, remarks = :remarks,
+                        action_taken = :action_taken, 
+                        status = :status, 
+                        remarks = :remarks,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = :id
                 ");
                 $stmt->execute([
-                    'student_id' => $student_id,
-                    'class_id' => $class_id ?: null,
-                    'complaint_date' => $complaint_date,
-                    'category' => $category,
-                    'title' => $title,
-                    'description' => $description,
                     'action_taken' => $action_taken,
                     'status' => $status,
                     'remarks' => $remarks,
                     'id' => $targetId
                 ]);
 
-                $logDesc = "Updated Complaint ID $targetId | Category: $category";
+                $logDesc = "Updated Complaint ID $targetId (Status: $status)";
                 $logAction = "Complaint Updated";
             }
 
@@ -161,7 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtLog = $db->prepare("INSERT INTO audit_logs (user_id, action, description, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)");
             $stmtLog->execute([$created_by, $logAction, $logDesc, $_SERVER['REMOTE_ADDR'] ?? '', $_SERVER['HTTP_USER_AGENT'] ?? '']);
 
-            $_SESSION['flash_success'] = ($action === 'save') ? "Complaint file generated successfully!" : "Complaint records updated successfully.";
+            $_SESSION['flash_success'] = "Complaint saved successfully.";
             if (isset($_POST['save_and_new'])) {
                 header("Location: complaint.php#create-tab");
             } else {
@@ -203,13 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // 4. Retrieve list filters
-$search_number = sanitize($_GET['search_number'] ?? '');
-$search_admission = sanitize($_GET['search_admission'] ?? '');
-$search_date = sanitize($_GET['search_date'] ?? '');
-$search_class = sanitize($_GET['search_class'] ?? '');
-$search_section = sanitize($_GET['search_section'] ?? '');
-$search_category = sanitize($_GET['search_category'] ?? '');
-$search_status = sanitize($_GET['search_status'] ?? '');
+$search_roll_no = sanitize($_GET['search_roll_no'] ?? '');
 
 $limit = 10;
 $page = (int)($_GET['page'] ?? 1);
@@ -219,33 +242,9 @@ $offset = ($page - 1) * $limit;
 $where = " WHERE 1=1";
 $params = [];
 
-if ($search_number !== '') {
-    $where .= " AND c.complaint_number LIKE :search_number";
-    $params['search_number'] = '%' . $search_number . '%';
-}
-if ($search_admission !== '') {
-    $where .= " AND s.admission_no = :search_admission";
-    $params['search_admission'] = $search_admission;
-}
-if ($search_date !== '') {
-    $where .= " AND c.complaint_date = :search_date";
-    $params['search_date'] = $search_date;
-}
-if ($search_class !== '') {
-    $where .= " AND (cls.class_name = :search_class OR s.school_class = :search_class)";
-    $params['search_class'] = $search_class;
-}
-if ($search_section !== '') {
-    $where .= " AND (cls.section = :search_section OR s.school_section = :search_section)";
-    $params['search_section'] = $search_section;
-}
-if ($search_category !== '') {
-    $where .= " AND c.category = :search_category";
-    $params['search_category'] = $search_category;
-}
-if ($search_status !== '') {
-    $where .= " AND c.status = :search_status";
-    $params['search_status'] = $search_status;
+if ($search_roll_no !== '') {
+    $where .= " AND d.roll_no = :search_roll_no";
+    $params['search_roll_no'] = $search_roll_no;
 }
 
 $complaints = [];
@@ -263,6 +262,7 @@ try {
         FROM student_complaints c 
         LEFT JOIN students s ON c.student_id = s.id 
         LEFT JOIN classes cls ON c.class_id = cls.id 
+        LEFT JOIN student_registration_details d ON s.id = d.student_id
         $where
     ");
     $stmtCount->execute($params);
@@ -273,6 +273,7 @@ try {
         FROM student_complaints c 
         LEFT JOIN students s ON c.student_id = s.id 
         LEFT JOIN classes cls ON c.class_id = cls.id 
+        LEFT JOIN student_registration_details d ON s.id = d.student_id
         $where AND c.status = 'Pending'
     ");
     $stmtPend->execute($params);
@@ -283,6 +284,7 @@ try {
         FROM student_complaints c 
         LEFT JOIN students s ON c.student_id = s.id 
         LEFT JOIN classes cls ON c.class_id = cls.id 
+        LEFT JOIN student_registration_details d ON s.id = d.student_id
         $where AND c.status = 'In Progress'
     ");
     $stmtProg->execute($params);
@@ -293,6 +295,7 @@ try {
         FROM student_complaints c 
         LEFT JOIN students s ON c.student_id = s.id 
         LEFT JOIN classes cls ON c.class_id = cls.id 
+        LEFT JOIN student_registration_details d ON s.id = d.student_id
         $where AND c.status = 'Resolved'
     ");
     $stmtRes->execute($params);
@@ -380,62 +383,81 @@ include_once __DIR__ . '/../../includes/header.php';
                     <input type="text" class="form-control bg-light" name="complaint_number" value="<?php echo htmlspecialchars($complaint['complaint_number']); ?>" readonly>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label small fw-semibold text-muted">Complaint Date *</label>
-                    <input type="date" class="form-control" name="complaint_date" value="<?php echo $complaint['complaint_date']; ?>" required>
+                    <label class="form-label small fw-semibold text-muted">Complaint Date</label>
+                    <input type="date" class="form-control bg-light" name="complaint_date" value="<?php echo $complaint['complaint_date']; ?>" readonly>
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label small fw-semibold text-muted">Select Student (Admission No) *</label>
-                    <select class="form-select" name="student_id" id="studentSelect" onchange="autoFillStudentDetails(this)" required>
-                        <option value="" data-name="" data-father="" data-type="" data-class="" data-section="">— Select Student —</option>
-                        <?php foreach ($studentsList as $st): ?>
-                            <option value="<?php echo $st['id']; ?>"
-                                    data-admission="<?php echo htmlspecialchars($st['admission_no']); ?>"
-                                    data-name="<?php echo htmlspecialchars($st['first_name'] . ' ' . $st['last_name']); ?>"
-                                    data-father="<?php echo htmlspecialchars($st['father_name'] ?? '—'); ?>"
-                                    data-type="<?php echo htmlspecialchars($st['academic_type'] ?? 'School'); ?>"
-                                    data-class="<?php echo htmlspecialchars($st['class_name'] ?? $st['school_class'] ?? '—'); ?>"
-                                    data-section="<?php echo htmlspecialchars($st['section'] ?? $st['school_section'] ?? 'A'); ?>"
-                                    <?php echo ($complaint['student_id'] == $st['id']) ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($st['admission_no'] . ' - ' . $st['first_name'] . ' ' . $st['last_name']); ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
+                    <label class="form-label small fw-semibold text-muted">Linked Student ID</label>
+                    <input type="text" class="form-control bg-light" value="<?php echo htmlspecialchars($editStudent['admission_no'] ?? '—'); ?>" readonly>
+                    <input type="hidden" name="student_id" value="<?php echo $complaint['student_id']; ?>">
                 </div>
-                
-                <!-- Auto-filled readonly student information -->
-                <div class="col-md-4">
-                    <label class="form-label small fw-semibold text-muted">Student Name</label>
-                    <input type="text" class="form-control bg-light" id="studentNameInput" readonly value="—">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-semibold text-muted">Father Name</label>
-                    <input type="text" class="form-control bg-light" id="fatherNameInput" readonly value="—">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label small fw-semibold text-muted">Academic Type</label>
-                    <input type="text" class="form-control bg-light" id="academicTypeInput" readonly value="—">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small fw-semibold text-muted">Class</label>
-                    <input type="text" class="form-control bg-light" id="classInput" readonly value="—">
-                </div>
-                <div class="col-md-6">
-                    <label class="form-label small fw-semibold text-muted">Section</label>
-                    <input type="text" class="form-control bg-light" id="sectionInput" readonly value="—">
+
+                <!-- Student details panel card -->
+                <div class="col-12">
+                    <div class="card border border-light bg-light p-3 rounded" style="border-radius:12px;">
+                        <div class="row align-items-center g-3">
+                            <div class="col-md-2 text-center border-end">
+                                <div class="border rounded bg-white p-1 mx-auto d-flex align-items-center justify-content-center" style="width: 100px; height: 100px; overflow: hidden;">
+                                    <?php if (!empty($editStudent['doc_student_photo'])): ?>
+                                        <img src="<?php echo APP_URL . '/' . $editStudent['doc_student_photo']; ?>" class="img-fluid rounded" alt="Student Photo">
+                                    <?php else: ?>
+                                        <i class="fa-solid fa-user-graduate fs-1 text-muted"></i>
+                                    <?php endif; ?>
+                                </div>
+                                <span class="small text-muted mt-1 d-block" style="font-size:0.75rem;">Student Photo</span>
+                            </div>
+                            <div class="col-md-10">
+                                <div class="row g-3">
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Student ID</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['admission_no'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Student Name</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars(($editStudent['first_name'] ?? '') . ' ' . ($editStudent['last_name'] ?? '')); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Father Name</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['father_name'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Academic Type</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['academic_type'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Class</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['class_name'] ?? $editStudent['school_class'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Section</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['section'] ?? $editStudent['school_section'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Guardian Name</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['guardian_name'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small fw-semibold text-muted">Guardian Contact Number</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['guardian_phone'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-muted">Admission Date</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['enrollment_date'] ?? '—'); ?>">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small fw-semibold text-muted">Current Status</label>
+                                        <input type="text" class="form-control form-control-sm bg-white" readonly value="<?php echo htmlspecialchars($editStudent['status'] ?? '—'); ?>">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Complaint parameters details -->
                 <div class="col-md-4">
-                    <label class="form-label small fw-semibold text-muted">Complaint Category *</label>
-                    <select class="form-select" name="category" required>
-                        <option value="Discipline" <?php echo ($complaint['category'] === 'Discipline') ? 'selected' : ''; ?>>Discipline</option>
-                        <option value="Homework" <?php echo ($complaint['category'] === 'Homework') ? 'selected' : ''; ?>>Homework</option>
-                        <option value="Attendance" <?php echo ($complaint['category'] === 'Attendance') ? 'selected' : ''; ?>>Attendance</option>
-                        <option value="Uniform" <?php echo ($complaint['category'] === 'Uniform') ? 'selected' : ''; ?>>Uniform</option>
-                        <option value="Misconduct" <?php echo ($complaint['category'] === 'Misconduct') ? 'selected' : ''; ?>>Misconduct</option>
-                        <option value="Fee" <?php echo ($complaint['category'] === 'Fee') ? 'selected' : ''; ?>>Fee</option>
-                        <option value="Other" <?php echo ($complaint['category'] === 'Other') ? 'selected' : ''; ?>>Other</option>
-                    </select>
+                    <label class="form-label small fw-semibold text-muted">Complaint Category</label>
+                    <input type="text" class="form-control bg-light" readonly value="<?php echo htmlspecialchars($complaint['category']); ?>">
                 </div>
                 <div class="col-md-4">
                     <label class="form-label small fw-semibold text-muted">Complaint Status *</label>
@@ -447,12 +469,12 @@ include_once __DIR__ . '/../../includes/header.php';
                     </select>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label small fw-semibold text-muted">Complaint Title *</label>
-                    <input type="text" class="form-control" name="title" value="<?php echo htmlspecialchars($complaint['title']); ?>" required placeholder="e.g. Incomplete Homework">
+                    <label class="form-label small fw-semibold text-muted">Complaint Title</label>
+                    <input type="text" class="form-control bg-light" readonly value="<?php echo htmlspecialchars($complaint['title']); ?>">
                 </div>
                 <div class="col-12">
-                    <label class="form-label small fw-semibold text-muted">Complaint Description *</label>
-                    <textarea class="form-control" name="description" rows="4" required placeholder="Provide descriptive details of the complaint..."><?php echo htmlspecialchars($complaint['description']); ?></textarea>
+                    <label class="form-label small fw-semibold text-muted">Complaint Description</label>
+                    <textarea class="form-control bg-light" rows="4" readonly><?php echo htmlspecialchars($complaint['description']); ?></textarea>
                 </div>
                 <div class="col-12">
                     <label class="form-label small fw-semibold text-muted">Action Taken</label>
@@ -471,20 +493,6 @@ include_once __DIR__ . '/../../includes/header.php';
         </form>
     </div>
 
-    <script>
-    function autoFillStudentDetails(select) {
-        const selectedOption = select.options[select.selectedIndex];
-        document.getElementById("studentNameInput").value = selectedOption.getAttribute("data-name") || "—";
-        document.getElementById("fatherNameInput").value = selectedOption.getAttribute("data-father") || "—";
-        document.getElementById("academicTypeInput").value = selectedOption.getAttribute("data-type") || "—";
-        document.getElementById("classInput").value = selectedOption.getAttribute("data-class") || "—";
-        document.getElementById("sectionInput").value = selectedOption.getAttribute("data-section") || "—";
-    }
-    
-    document.addEventListener("DOMContentLoaded", () => {
-        autoFillStudentDetails(document.getElementById("studentSelect"));
-    });
-    </script>
 
 <?php else: ?>
     <!-- 6. MASTER COMPLAINTS LIST STATE -->
@@ -547,62 +555,13 @@ include_once __DIR__ . '/../../includes/header.php';
             
             <!-- Filters Panel -->
             <div class="card border border-light shadow-sm bg-white p-4 mb-4" style="border-radius:12px;">
-                <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-filter me-2"></i>Filter Complaint Logs</h6>
-                <form method="GET" action="complaint.php" class="row g-3">
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Complaint No.</label>
-                        <input type="text" class="form-control form-control-sm" name="search_number" value="<?php echo htmlspecialchars($search_number); ?>" placeholder="e.g. COM-2026-0001">
+                <h6 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-search me-2"></i>Search Complaint</h6>
+                <form method="GET" action="complaint.php" class="row g-3 align-items-end">
+                    <div class="col-md-9">
+                        <label class="form-label small fw-semibold text-muted">Enter Student Roll Number</label>
+                        <input type="text" class="form-control form-control-sm" name="search_roll_no" value="<?php echo htmlspecialchars($search_roll_no); ?>" placeholder="e.g. IGS-2026-0001">
                     </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Admission No.</label>
-                        <input type="text" class="form-control form-control-sm" name="search_admission" value="<?php echo htmlspecialchars($search_admission); ?>" placeholder="e.g. ADM-2026-0001">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Complaint Date</label>
-                        <input type="date" class="form-control form-control-sm" name="search_date" value="<?php echo htmlspecialchars($search_date); ?>">
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Class</label>
-                        <select class="form-select form-select-sm" name="search_class">
-                            <option value="">All</option>
-                            <?php foreach (['Play Group', 'Nursery', 'Prep', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8', 'Class 9', 'Class 10', 'Class 11', 'Class 12'] as $cls): ?>
-                                <option value="<?php echo $cls; ?>" <?php echo ($search_class === $cls) ? 'selected' : ''; ?>><?php echo $cls; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Section</label>
-                        <select class="form-select form-select-sm" name="search_section">
-                            <option value="">All</option>
-                            <?php foreach ($sectionsList as $sec): ?>
-                                <option value="<?php echo $sec; ?>" <?php echo ($search_section === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Category</label>
-                        <select class="form-select form-select-sm" name="search_category">
-                            <option value="">All</option>
-                            <option value="Discipline" <?php echo ($search_category === 'Discipline') ? 'selected' : ''; ?>>Discipline</option>
-                            <option value="Homework" <?php echo ($search_category === 'Homework') ? 'selected' : ''; ?>>Homework</option>
-                            <option value="Attendance" <?php echo ($search_category === 'Attendance') ? 'selected' : ''; ?>>Attendance</option>
-                            <option value="Uniform" <?php echo ($search_category === 'Uniform') ? 'selected' : ''; ?>>Uniform</option>
-                            <option value="Misconduct" <?php echo ($search_category === 'Misconduct') ? 'selected' : ''; ?>>Misconduct</option>
-                            <option value="Fee" <?php echo ($search_category === 'Fee') ? 'selected' : ''; ?>>Fee</option>
-                            <option value="Other" <?php echo ($search_category === 'Other') ? 'selected' : ''; ?>>Other</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2">
-                        <label class="form-label small fw-semibold text-muted">Status</label>
-                        <select class="form-select form-select-sm" name="search_status">
-                            <option value="">All</option>
-                            <option value="Pending" <?php echo ($search_status === 'Pending') ? 'selected' : ''; ?>>Pending</option>
-                            <option value="In Progress" <?php echo ($search_status === 'In Progress') ? 'selected' : ''; ?>>In Progress</option>
-                            <option value="Resolved" <?php echo ($search_status === 'Resolved') ? 'selected' : ''; ?>>Resolved</option>
-                            <option value="Closed" <?php echo ($search_status === 'Closed') ? 'selected' : ''; ?>>Closed</option>
-                        </select>
-                    </div>
-                    <div class="col-md-10 text-end">
+                    <div class="col-md-3">
                         <button type="submit" class="btn btn-sm btn-primary px-4"><i class="fa-solid fa-magnifying-glass me-2"></i>Search</button>
                         <a href="complaint.php" class="btn btn-sm btn-outline-secondary px-3">Reset</a>
                     </div>
@@ -615,30 +574,27 @@ include_once __DIR__ . '/../../includes/header.php';
                     <table class="table custom-table table-hover align-middle mb-0">
                         <thead>
                             <tr>
-                                <th>Complaint No.</th>
-                                <th>Date</th>
-                                <th>Admission No.</th>
+                                <th>Complaint Number</th>
+                                <th>Student ID</th>
                                 <th>Student Name</th>
                                 <th>Class</th>
-                                <th>Section</th>
-                                <th>Category</th>
-                                <th>Status</th>
+                                <th>Complaint Category</th>
+                                <th>Complaint Status</th>
+                                <th>Complaint Date</th>
                                 <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($complaints)): ?>
                                 <tr>
-                                    <td colspan="9" class="text-center py-4 text-muted">No student complaint records found match active criteria.</td>
+                                    <td colspan="8" class="text-center py-4 text-muted">No student complaint records found match active criteria.</td>
                                 </tr>
                             <?php else: foreach ($complaints as $row): ?>
                                 <tr>
                                     <td><strong class="text-primary font-monospace"><?php echo sanitize($row['complaint_number']); ?></strong></td>
-                                    <td><strong><?php echo date('M d, Y', strtotime($row['complaint_date'])); ?></strong></td>
-                                    <td class="fw-bold"><?php echo sanitize($row['admission_no']); ?></td>
+                                    <td class="fw-bold"><?php echo sanitize($row['admission_no'] ?: '—'); ?></td>
                                     <td><?php echo sanitize($row['first_name'] . ' ' . $row['last_name']); ?></td>
                                     <td><?php echo sanitize($row['class_name'] ?? $row['school_class'] ?? '—'); ?></td>
-                                    <td><?php echo sanitize($row['section'] ?? $row['school_section'] ?? 'A'); ?></td>
                                     <td><span class="badge bg-secondary"><?php echo sanitize($row['category']); ?></span></td>
                                     <td>
                                         <?php
@@ -650,6 +606,7 @@ include_once __DIR__ . '/../../includes/header.php';
                                         ?>
                                         <span class="badge <?php echo $statusBadge; ?>"><?php echo sanitize($row['status']); ?></span>
                                     </td>
+                                    <td><strong><?php echo date('M d, Y', strtotime($row['complaint_date'])); ?></strong></td>
                                     <td class="text-end">
                                         <div class="btn-group">
                                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="viewComplaintDetails(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="View Details">
@@ -660,6 +617,9 @@ include_once __DIR__ . '/../../includes/header.php';
                                                     <i class="fa-regular fa-pen-to-square"></i>
                                                 </a>
                                             <?php endif; ?>
+                                            <button type="button" class="btn btn-outline-info btn-sm" onclick="printSingleComplaint(<?php echo htmlspecialchars(json_encode($row)); ?>)" title="Print Complaint">
+                                                <i class="fa-solid fa-print"></i>
+                                            </button>
                                             <?php if (hasPermission('student_delete')): ?>
                                                 <button type="button" class="btn btn-outline-danger btn-sm" onclick="triggerDelete(<?php echo $row['id']; ?>)" title="Delete Complaint">
                                                     <i class="fa-regular fa-trash-can"></i>
@@ -679,15 +639,15 @@ include_once __DIR__ . '/../../includes/header.php';
                 <nav aria-label="Page navigation" class="mb-4">
                     <ul class="pagination justify-content-center">
                         <li class="page-item <?php echo ($page <= 1) ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $search_number ? '&search_number='.$search_number : ''; ?><?php echo $search_admission ? '&search_admission='.$search_admission : ''; ?><?php echo $search_date ? '&search_date='.$search_date : ''; ?><?php echo $search_class ? '&search_class='.$search_class : ''; ?><?php echo $search_section ? '&search_section='.$search_section : ''; ?><?php echo $search_category ? '&search_category='.$search_category : ''; ?><?php echo $search_status ? '&search_status='.$search_status : ''; ?>">Previous</a>
+                            <a class="page-link" href="?page=<?php echo $page - 1; ?><?php echo $search_roll_no ? '&search_roll_no='.$search_roll_no : ''; ?>">Previous</a>
                         </li>
                         <?php for ($i = 1; $i <= $totalPages; $i++): ?>
                             <li class="page-item <?php echo ($page == $i) ? 'active' : ''; ?>">
-                               <a class="page-link" href="?page=<?php echo $i; ?><?php echo $search_number ? '&search_number='.$search_number : ''; ?><?php echo $search_admission ? '&search_admission='.$search_admission : ''; ?><?php echo $search_date ? '&search_date='.$search_date : ''; ?><?php echo $search_class ? '&search_class='.$search_class : ''; ?><?php echo $search_section ? '&search_section='.$search_section : ''; ?><?php echo $search_category ? '&search_category='.$search_category : ''; ?><?php echo $search_status ? '&search_status='.$search_status : ''; ?>"><?php echo $i; ?></a>
+                               <a class="page-link" href="?page=<?php echo $i; ?><?php echo $search_roll_no ? '&search_roll_no='.$search_roll_no : ''; ?>"><?php echo $i; ?></a>
                             </li>
                         <?php endfor; ?>
                         <li class="page-item <?php echo ($page >= $totalPages) ? 'disabled' : ''; ?>">
-                            <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $search_number ? '&search_number='.$search_number : ''; ?><?php echo $search_admission ? '&search_admission='.$search_admission : ''; ?><?php echo $search_date ? '&search_date='.$search_date : ''; ?><?php echo $search_class ? '&search_class='.$search_class : ''; ?><?php echo $search_section ? '&search_section='.$search_section : ''; ?><?php echo $search_category ? '&search_category='.$search_category : ''; ?><?php echo $search_status ? '&search_status='.$search_status : ''; ?>">Next</a>
+                            <a class="page-link" href="?page=<?php echo $page + 1; ?><?php echo $search_roll_no ? '&search_roll_no='.$search_roll_no : ''; ?>">Next</a>
                         </li>
                     </ul>
                 </nav>
@@ -712,43 +672,73 @@ include_once __DIR__ . '/../../includes/header.php';
                             <input type="date" class="form-control" name="complaint_date" value="<?php echo date('Y-m-d'); ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Select Student (Admission No) *</label>
-                            <select class="form-select" name="student_id" id="studentSelectNew" onchange="autoFillStudentDetailsNew(this)" required>
-                                <option value="" data-name="" data-father="" data-type="" data-class="" data-section="">— Select Student —</option>
-                                <?php foreach ($studentsList as $st): ?>
-                                    <option value="<?php echo $st['id']; ?>"
-                                            data-admission="<?php echo htmlspecialchars($st['admission_no']); ?>"
-                                            data-name="<?php echo htmlspecialchars($st['first_name'] . ' ' . $st['last_name']); ?>"
-                                            data-father="<?php echo htmlspecialchars($st['father_name'] ?? '—'); ?>"
-                                            data-type="<?php echo htmlspecialchars($st['academic_type'] ?? 'School'); ?>"
-                                            data-class="<?php echo htmlspecialchars($st['class_name'] ?? $st['school_class'] ?? '—'); ?>"
-                                            data-section="<?php echo htmlspecialchars($st['section'] ?? $st['school_section'] ?? 'A'); ?>">
-                                        <?php echo htmlspecialchars($st['admission_no'] . ' - ' . $st['first_name'] . ' ' . $st['last_name']); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
+                            <label class="form-label small fw-semibold text-muted">Search Student (Admission No or CNIC/B-Form) *</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="studentSearchQueryNew" placeholder="e.g. IGS-2026-0001 or 42101-1234567-1">
+                                <button type="button" class="btn btn-primary btn-sm px-3" onclick="searchStudentForComplaint()"><i class="fa-solid fa-search"></i> Search</button>
+                            </div>
+                            <small class="text-muted text-xs" style="font-size:0.75rem;">Press Search to locate student records.</small>
+                            <!-- Hidden student ID input -->
+                            <input type="hidden" name="student_id" id="student_id_val_new" required>
                         </div>
                         
-                        <!-- Auto-filled student indicators -->
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Student Name</label>
-                            <input type="text" class="form-control bg-light" id="studentNameInputNew" readonly value="—">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Father Name</label>
-                            <input type="text" class="form-control bg-light" id="fatherNameInputNew" readonly value="—">
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label small fw-semibold text-muted">Academic Type</label>
-                            <input type="text" class="form-control bg-light" id="academicTypeInputNew" readonly value="—">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Class</label>
-                            <input type="text" class="form-control bg-light" id="classInputNew" readonly value="—">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Section</label>
-                            <input type="text" class="form-control bg-light" id="sectionInputNew" readonly value="—">
+                        <!-- Student details panel card -->
+                        <div class="col-12">
+                            <div class="card border border-light bg-light p-3 rounded" style="border-radius:12px;">
+                                <div class="row align-items-center g-3">
+                                    <div class="col-md-2 text-center border-end">
+                                        <div class="border rounded bg-white p-1 mx-auto d-flex align-items-center justify-content-center" style="width: 100px; height: 100px; overflow: hidden;">
+                                            <img id="studentPhotoNew" src="" class="img-fluid rounded d-none" alt="Student Photo">
+                                            <i id="studentPhotoPlaceholderNew" class="fa-solid fa-user-graduate fs-1 text-muted"></i>
+                                        </div>
+                                        <span class="small text-muted mt-1 d-block" style="font-size:0.75rem;">Student Photo</span>
+                                    </div>
+                                    <div class="col-md-10">
+                                        <div class="row g-3">
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Student ID</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="studentAdmissionInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Student Name</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="studentNameInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Father Name</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="fatherNameInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Academic Type</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="academicTypeInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Class</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="classInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Section</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="sectionInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Guardian Name</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="guardianNameInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-3">
+                                                <label class="form-label small fw-semibold text-muted">Guardian Contact Number</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="guardianContactInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-semibold text-muted">Admission Date</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="enrollmentDateInputNew" readonly value="—">
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-semibold text-muted">Current Status</label>
+                                                <input type="text" class="form-control form-control-sm bg-white" id="studentStatusInputNew" readonly value="—">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Parameters Details -->
@@ -877,14 +867,80 @@ include_once __DIR__ . '/../../includes/header.php';
     </div>
 
     <script>
-    function autoFillStudentDetailsNew(select) {
-        const selectedOption = select.options[select.selectedIndex];
-        document.getElementById("studentNameInputNew").value = selectedOption.getAttribute("data-name") || "—";
-        document.getElementById("fatherNameInputNew").value = selectedOption.getAttribute("data-father") || "—";
-        document.getElementById("academicTypeInputNew").value = selectedOption.getAttribute("data-type") || "—";
-        document.getElementById("classInputNew").value = selectedOption.getAttribute("data-class") || "—";
-        document.getElementById("sectionInputNew").value = selectedOption.getAttribute("data-section") || "—";
+    function searchStudentForComplaint() {
+        const query = document.getElementById("studentSearchQueryNew").value.trim();
+        if (query === "") {
+            alert("Please enter a valid Admission Number or B-Form/CNIC number.");
+            return;
+        }
+
+        fetch(`complaint.php?ajax_search_student=1&query=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const st = data.student;
+                    document.getElementById("student_id_val_new").value = st.id;
+                    document.getElementById("studentAdmissionInputNew").value = st.admission_no || "—";
+                    document.getElementById("studentNameInputNew").value = st.first_name + ' ' + st.last_name;
+                    document.getElementById("fatherNameInputNew").value = st.father_name || "—";
+                    document.getElementById("academicTypeInputNew").value = st.academic_type || "School";
+                    document.getElementById("classInputNew").value = st.class_name || st.school_class || "—";
+                    document.getElementById("sectionInputNew").value = st.section || st.school_section || "—";
+                    document.getElementById("guardianNameInputNew").value = st.guardian_name || "—";
+                    document.getElementById("guardianContactInputNew").value = st.guardian_phone || "—";
+                    document.getElementById("enrollmentDateInputNew").value = st.enrollment_date || "—";
+                    document.getElementById("studentStatusInputNew").value = st.status || "—";
+
+                    // Load Student Photo
+                    const photoImg = document.getElementById("studentPhotoNew");
+                    const photoPlaceholder = document.getElementById("studentPhotoPlaceholderNew");
+                    if (st.doc_student_photo) {
+                        photoImg.src = "<?php echo APP_URL; ?>/" + st.doc_student_photo;
+                        photoImg.classList.remove("d-none");
+                        photoPlaceholder.classList.add("d-none");
+                    } else {
+                        photoImg.src = "";
+                        photoImg.classList.add("d-none");
+                        photoPlaceholder.classList.remove("d-none");
+                    }
+                } else {
+                    alert("No student found with the provided Student ID or CNIC.");
+                    // Reset fields
+                    document.getElementById("student_id_val_new").value = "";
+                    document.getElementById("studentAdmissionInputNew").value = "—";
+                    document.getElementById("studentNameInputNew").value = "—";
+                    document.getElementById("fatherNameInputNew").value = "—";
+                    document.getElementById("academicTypeInputNew").value = "—";
+                    document.getElementById("classInputNew").value = "—";
+                    document.getElementById("sectionInputNew").value = "—";
+                    document.getElementById("guardianNameInputNew").value = "—";
+                    document.getElementById("guardianContactInputNew").value = "—";
+                    document.getElementById("enrollmentDateInputNew").value = "—";
+                    document.getElementById("studentStatusInputNew").value = "—";
+
+                    // Reset Photo
+                    document.getElementById("studentPhotoNew").src = "";
+                    document.getElementById("studentPhotoNew").classList.add("d-none");
+                    document.getElementById("studentPhotoPlaceholderNew").classList.remove("d-none");
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Error communicating with registration database.");
+            });
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const searchInput = document.getElementById("studentSearchQueryNew");
+        if (searchInput) {
+            searchInput.addEventListener("keydown", function(e) {
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    searchStudentForComplaint();
+                }
+            });
+        }
+    });
 
     const viewModal = new bootstrap.Modal(document.getElementById("viewComplaintModal"));
     function viewComplaintDetails(d) {
@@ -918,19 +974,46 @@ include_once __DIR__ . '/../../includes/header.php';
 
     function printSingleArea() {
         const printContent = document.getElementById("printableSingleArea").innerHTML;
-        const originalContent = document.body.innerHTML;
-        
-        document.body.innerHTML = `
+        let printSec = document.getElementById("printSection");
+        if (!printSec) {
+            printSec = document.createElement("div");
+            printSec.id = "printSection";
+            document.body.appendChild(printSec);
+        }
+        printSec.innerHTML = `
             <div style="padding:40px; font-family: sans-serif;">
                 <h2 style="text-align:center; margin-bottom: 2px;">INDUS GRAMMAR SCHOOL & ACADEMY</h2>
-                <h4 style="text-align:center; color: #555; border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0;">Student Complaint Dossier Record</h4>
+                <h4 style="text-align:center; color: #555; border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 20px;">Student Complaint Dossier Record</h4>
                 ${printContent}
             </div>
         `;
-        
         window.print();
-        document.body.innerHTML = originalContent;
-        window.location.reload();
+        printSec.innerHTML = "";
+    }
+
+    // Print CSS styles injection
+    const styleEl = document.createElement('style');
+    styleEl.innerHTML = `
+        @media print {
+            body > *:not(#printSection) {
+                display: none !important;
+            }
+            #printSection, #printSection * {
+                display: block !important;
+            }
+            #printSection {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+        }
+    `;
+    document.head.appendChild(styleEl);
+
+    function printSingleComplaint(d) {
+        viewComplaintDetails(d);
+        setTimeout(printSingleArea, 300);
     }
 
     const delModal = new bootstrap.Modal(document.getElementById("deleteComplaintModal"));

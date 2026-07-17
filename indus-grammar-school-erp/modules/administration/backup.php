@@ -1,123 +1,206 @@
 <?php
 /**
- * Indus Grammar School ERP - Database Backup Guide & Tools
- * Version 1.0.0
+ * Indus Grammar School ERP - Database Backup & Restore Panel
+ * Version 4.0.0
  */
 
-$pageTitle = 'Database Backup';
+$pageTitle = 'Backup & Restore';
 $breadcrumbActive = 'Administration';
 include_once __DIR__ . '/../../includes/header.php';
 AuthMiddleware::requirePermission('system_settings');
 
-$dbName = DB_NAME;
-$backupMessage = '';
-$backupSuccess = false;
+$db = Database::getConnection();
 
-if (isset($_POST['backup_now'])) {
-    // Generate a backup file in storage/backups (or a temporary directory inside workspace)
-    $backupDir = DIR_STORAGE . '/backups';
-    if (!is_dir($backupDir)) {
-        mkdir($backupDir, 0777, true);
-    }
-    
-    $filename = $dbName . '_backup_' . date('Ymd_His') . '.sql';
-    $filepath = $backupDir . '/' . $filename;
-    
-    // We are on Windows running XAMPP typically, so mysqldump might not be on system PATH.
-    // Let's try to export using standard PHP PDO to generate a structured SQL dump.
-    try {
-        $db = Database::getConnection();
-        $tables = [];
-        $result = $db->query("SHOW TABLES");
-        while ($row = $result->fetch(PDO::FETCH_NUM)) {
-            $tables[] = $row[0];
-        }
-        
-        $sqlDump = "-- Indus Grammar School ERP SQL Backup\n";
-        $sqlDump .= "-- Generated: " . date('Y-m-d H:i:s') . "\n";
-        $sqlDump .= "-- Database: " . $dbName . "\n\n";
-        $sqlDump .= "SET FOREIGN_KEY_CHECKS=0;\n\n";
-        
-        foreach ($tables as $table) {
-            // Get Create Table query
-            $createTableStmt = $db->query("SHOW CREATE TABLE `$table`")->fetch(PDO::FETCH_ASSOC);
-            $sqlDump .= "\n\n" . $createTableStmt['Create Table'] . ";\n\n";
-            
-            // Get Table Data
-            $rows = $db->query("SELECT * FROM `$table`")->fetchAll(PDO::FETCH_ASSOC);
-            if (!empty($rows)) {
-                foreach ($rows as $row) {
-                    $keys = array_keys($row);
-                    $escapedKeys = array_map(fn($k) => "`$k`", $keys);
-                    $values = array_values($row);
-                    $escapedValues = array_map(function($v) use ($db) {
-                        if ($v === null) return 'NULL';
-                        return $db->quote($v);
-                    }, $values);
-                    
-                    $sqlDump .= "INSERT INTO `$table` (" . implode(', ', $escapedKeys) . ") VALUES (" . implode(', ', $escapedValues) . ");\n";
-                }
-            }
-        }
-        $sqlDump .= "\nSET FOREIGN_KEY_CHECKS=1;\n";
-        
-        file_put_contents($filepath, $sqlDump);
-        
-        $backupSuccess = true;
-        $backupMessage = "Backup successfully created: <code>" . htmlspecialchars($filename) . "</code> (Size: " . number_format(strlen($sqlDump)/1024, 2) . " KB)";
-        auditLog('Database Backup', "Backup generated: " . $filename);
-    } catch (Exception $e) {
-        $backupSuccess = false;
-        $backupMessage = "Backup failed: " . htmlspecialchars($e->getMessage());
-    }
+// Fetch previous backups registered in database
+$backups = [];
+try {
+    $backups = $db->query("
+        SELECT bh.*, u.username as creator_name 
+        FROM backup_history bh 
+        LEFT JOIN users u ON bh.created_by = u.id 
+        ORDER BY bh.created_at DESC
+    ")->fetchAll();
+} catch (Exception $e) {
+    error_log("Error loading backups list: " . $e->getMessage());
 }
 ?>
 
 <div class="row mb-4 align-items-center">
     <div class="col-sm-6">
-        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-database me-2 text-primary"></i>Database Backup</h3>
+        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-database me-2 text-primary"></i>Backup & Restore</h3>
+        <p class="text-muted small mb-0">Generate database backups, download SQL archives, or restore the ERP database state from past snapshots.</p>
+    </div>
+    <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
+        <button class="btn btn-primary px-4" id="btnBackupNow">
+            <i class="fa-solid fa-file-export me-2"></i>Create SQL Backup
+        </button>
     </div>
 </div>
-
-<?php if ($backupMessage): ?>
-    <div class="alert alert-<?php echo $backupSuccess ? 'success' : 'danger'; ?> alert-dismissible fade show" role="alert">
-        <i class="fa-solid <?php echo $backupSuccess ? 'fa-circle-check' : 'fa-circle-exclamation'; ?> me-2"></i>
-        <?php echo $backupMessage; ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    </div>
-<?php endif; ?>
 
 <div class="row g-4">
-    <div class="col-lg-7">
-        <div class="card border-0 shadow-sm" style="border-radius:12px;">
-            <div class="card-body p-4">
-                <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-download me-2"></i>Generate Instant Backup</h5>
-                <p class="text-muted small">Generate a complete SQL schema and data export of your school ERP database. This backup includes roles, users, students, fee registers, cash logs, and grade transcripts.</p>
-                
-                <form method="POST">
-                    <button type="submit" name="backup_now" class="btn btn-primary px-4 py-2 mt-2">
-                        <i class="fa-solid fa-file-export me-2"></i>Generate & Save SQL Backup
-                    </button>
-                </form>
+    <!-- Backup History Table -->
+    <div class="col-lg-12">
+        <div class="custom-table-card shadow-sm border-0">
+            <div class="p-4 border-bottom">
+                <h5 class="fw-bold mb-0 text-secondary">Historical System Snapshots</h5>
             </div>
-        </div>
-    </div>
-    
-    <div class="col-lg-5">
-        <div class="card border-0 shadow-sm" style="border-radius:12px;">
-            <div class="card-body p-4">
-                <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-circle-question me-2"></i>Alternative Backup (phpMyAdmin)</h5>
-                <p class="text-muted small">You can also manage backups directly from MySQL database manager:</p>
-                <ol class="small text-muted ps-3">
-                    <li class="mb-2">Open your XAMPP Control Panel.</li>
-                    <li class="mb-2">Click <strong>Admin</strong> next to the MySQL service (or visit <code>http://localhost/phpmyadmin</code>).</li>
-                    <li class="mb-2">Select the database <code><?php echo $dbName; ?></code> from the sidebar list.</li>
-                    <li class="mb-2">Click the <strong>Export</strong> tab in the top navigation menu.</li>
-                    <li class="mb-2">Choose "Quick" export method and click <strong>Go</strong> to download the raw SQL file directly.</li>
-                </ol>
+            
+            <div class="table-responsive">
+                <table class="table custom-table table-hover align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Backup File Name</th>
+                            <th>Export Date</th>
+                            <th>File Size</th>
+                            <th>Generated By</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (empty($backups)): ?>
+                            <tr><td colspan="6" class="text-center py-5 text-muted">No database snapshots generated yet.</td></tr>
+                        <?php else: foreach ($backups as $b): ?>
+                            <tr>
+                                <td>#<?php echo $b['id']; ?></td>
+                                <td class="fw-bold text-dark"><?php echo sanitize($b['backup_name']); ?></td>
+                                <td>
+                                    <div><?php echo date('d M Y', strtotime($b['created_at'])); ?></div>
+                                    <small class="text-muted" style="font-size:0.75rem;"><?php echo date('h:i A', strtotime($b['created_at'])); ?></small>
+                                </td>
+                                <td><span class="badge bg-light text-dark border"><?php echo number_format($b['size_kb'], 2); ?> KB</span></td>
+                                <td><code><?php echo sanitize($b['creator_name'] ?: 'System'); ?></code></td>
+                                <td class="text-end">
+                                    <a href="../../ajax/admin.php?action=download_backup&id=<?php echo $b['id']; ?>" class="btn btn-sm btn-outline-primary me-1" title="Download SQL File">
+                                        <i class="fa-solid fa-download"></i> Download
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-warning btn-restore-backup me-1" data-id="<?php echo $b['id']; ?>" title="Restore Snapshot">
+                                        <i class="fa-solid fa-clock-rotate-left"></i> Restore
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger btn-delete-backup" data-id="<?php echo $b['id']; ?>" title="Delete Backup">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 </div>
 
-<?php include_once __DIR__ . '/../../includes/footer.php'; ?>
+<!-- Toast Feedback -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999;">
+    <div id="bkpToast" class="toast align-items-center text-white border-0" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold" id="bkpToastMsg"></div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+<!-- Backdrop Loading Spinner Overlay -->
+<div id="loadingOverlay" class="d-none position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-50 align-items-center justify-content-center" style="z-index: 10000;">
+    <div class="bg-white p-4 rounded-3 text-center shadow-lg border">
+        <div class="spinner-border text-primary mb-2" role="status"></div>
+        <div class="fw-bold text-secondary" id="loadingMsg">Executing process, please wait...</div>
+    </div>
+</div>
+
+<?php $extraJS = '<script>
+function showToast(msg, ok) {
+    const t = document.getElementById("bkpToast");
+    const m = document.getElementById("bkpToastMsg");
+    t.classList.remove("bg-success","bg-danger");
+    t.classList.add(ok ? "bg-success" : "bg-danger");
+    m.textContent = msg;
+    new bootstrap.Toast(t).show();
+}
+
+function showLoading(show, msg = "Processing...") {
+    const loader = document.getElementById("loadingOverlay");
+    const label = document.getElementById("loadingMsg");
+    if (show) {
+        label.textContent = msg;
+        loader.classList.remove("d-none");
+        loader.classList.add("d-flex");
+    } else {
+        loader.classList.remove("d-flex");
+        loader.classList.add("d-none");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    
+    // Create Backup Action
+    const btnBackup = document.getElementById("btnBackupNow");
+    if (btnBackup) {
+        btnBackup.addEventListener("click", function() {
+            showLoading(true, "Generating SQL schema and data export dump...");
+            const fd = new FormData();
+            fd.append("action", "create_backup");
+            fd.append("csrf_token", "' . csrfToken() . '");
+            
+            fetch("../../ajax/admin.php", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    showLoading(false);
+                    showToast(data.message, data.success);
+                    if (data.success) setTimeout(() => location.reload(), 1000);
+                })
+                .catch(() => { showLoading(false); showToast("Network communication error.", false); });
+        });
+    }
+
+    // Delete Backup
+    document.querySelectorAll(".btn-delete-backup").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const id = this.dataset.id;
+            if(!confirm("Are you sure you want to permanently delete this backup archive from storage? This cannot be undone.")) return;
+            
+            showLoading(true, "Removing snapshot backup file...");
+            const fd = new FormData();
+            fd.append("action", "delete_backup");
+            fd.append("csrf_token", "' . csrfToken() . '");
+            fd.append("id", id);
+            
+            fetch("../../ajax/admin.php", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    showLoading(false);
+                    showToast(data.message, data.success);
+                    if (data.success) setTimeout(() => location.reload(), 1000);
+                })
+                .catch(() => { showLoading(false); showToast("Network error.", false); });
+        });
+    });
+
+    // Restore Backup
+    document.querySelectorAll(".btn-restore-backup").forEach(btn => {
+        btn.addEventListener("click", function() {
+            const id = this.dataset.id;
+            if(!confirm("WARNING: Restoring the database will overwrite all current tables, students, marks, registers, and transactions with the selected snapshot. Are you sure you want to proceed?")) return;
+            
+            showLoading(true, "Restoring database state... Please do not close this window.");
+            const fd = new FormData();
+            fd.append("action", "restore_backup");
+            fd.append("csrf_token", "' . csrfToken() . '");
+            fd.append("id", id);
+            
+            fetch("../../ajax/admin.php", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    showLoading(false);
+                    showToast(data.message, data.success);
+                    if (data.success) setTimeout(() => {
+                        // Redirect to dashboard on successful restore to ensure correct sessions
+                        window.location.href = "dashboard.php";
+                    }, 2000);
+                })
+                .catch(() => { showLoading(false); showToast("Network error during restoration.", false); });
+        });
+    });
+});
+</script>';
+include_once __DIR__ . '/../../includes/footer.php'; ?>

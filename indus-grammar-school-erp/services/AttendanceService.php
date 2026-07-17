@@ -80,9 +80,19 @@ class AttendanceService {
 
         try {
             $db = Database::getConnection();
+
+            // Get staff_id corresponding to user_id
+            $getStaffStmt = $db->prepare("SELECT id FROM staff WHERE user_id = :uid");
+            $getStaffStmt->execute(['uid' => $userId]);
+            $staffId = $getStaffStmt->fetchColumn();
+
+            if (!$staffId) {
+                return ['status' => false, 'message' => 'This user is not associated with any staff member.'];
+            }
+
             $stmt = $db->prepare("
-                INSERT INTO staff_attendance (user_id, date, status, check_in_time, check_out_time, remarks)
-                VALUES (:uid, :date, :status, :cin, :cout, :remarks)
+                INSERT INTO staff_attendance (staff_id, date, status, check_in_time, check_out_time, remarks)
+                VALUES (:sid, :date, :status, :cin, :cout, :remarks)
                 ON DUPLICATE KEY UPDATE
                     status = VALUES(status),
                     check_in_time = VALUES(check_in_time),
@@ -90,7 +100,7 @@ class AttendanceService {
                     remarks = VALUES(remarks)
             ");
             $ok = $stmt->execute([
-                'uid'     => $userId,
+                'sid'     => $staffId,
                 'date'    => $date,
                 'status'  => $status,
                 'cin'     => $checkIn ?: null,
@@ -98,7 +108,7 @@ class AttendanceService {
                 'remarks' => $remarks ?: null,
             ]);
             if ($ok) {
-                auditLog('Staff Attendance', "Marked staff attendance for user ID $userId: $status on $date");
+                auditLog('Staff Attendance', "Marked staff attendance for staff ID $staffId: $status on $date");
                 return ['status' => true, 'message' => 'Staff attendance saved.'];
             }
         } catch (PDOException $e) {

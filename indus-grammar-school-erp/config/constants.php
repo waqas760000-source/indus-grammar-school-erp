@@ -14,10 +14,10 @@ define('SCHOOL_ADDRESS', 'Main Campus, Karachi, Pakistan');
 
 // Auto-generated numbers prefixes & settings
 define('PREFIX_STUDENT_ID', 'STU');
-define('PREFIX_ADMISSION_NO', 'ADM');
-define('PREFIX_REGISTRATION_NO', 'REG');
-define('PREFIX_ROLL_NO', 'ROLL');
-define('PREFIX_ENROLLMENT_NO', 'ENR');
+define('PREFIX_ADMISSION_NO', 'IGS');
+define('PREFIX_REGISTRATION_NO', 'IGS');
+define('PREFIX_ROLL_NO', 'IGS');
+define('PREFIX_ENROLLMENT_NO', 'IGS');
 
 // Role Codes (must match the database `roles` table)
 define('ROLE_SUPER_ADMIN', 'super_admin');

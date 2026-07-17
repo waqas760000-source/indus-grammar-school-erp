@@ -12,6 +12,14 @@ AuthMiddleware::requirePermission('fee_view');
 // Fetch recent student assignments
 try {
     $db = Database::getConnection();
+    
+    // Ensure all active students have structure assignments initialized
+    $studentsStmt = $db->query("SELECT id FROM students WHERE status = 'Active'");
+    $studentIds = $studentsStmt->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($studentIds as $sid) {
+        Fee::ensureStudentAssignment($sid);
+    }
+
     $stmt = $db->query("
         SELECT sfa.*, s.first_name, s.last_name, s.admission_no, c.class_name, c.section, fs.academic_type, fs.academic_year
         FROM student_fee_assignments sfa

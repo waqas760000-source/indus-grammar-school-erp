@@ -40,8 +40,8 @@ try {
     // 4. Staff Attendance Today
     $staffPresent = (int)$db->query("SELECT COUNT(*) FROM staff_attendance WHERE date = CURRENT_DATE AND status = 'Present'")->fetchColumn();
     $staffAbsent = (int)$db->query("SELECT COUNT(*) FROM staff_attendance WHERE date = CURRENT_DATE AND status = 'Absent'")->fetchColumn();
-    $maleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.user_id = s.user_id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Male'")->fetchColumn();
-    $femaleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.user_id = s.user_id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Female'")->fetchColumn();
+    $maleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.staff_id = s.id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Male'")->fetchColumn();
+    $femaleStaffPresent = (int)$db->query("SELECT COUNT(sa.id) FROM staff_attendance sa JOIN staff s ON sa.staff_id = s.id WHERE sa.date = CURRENT_DATE AND sa.status = 'Present' AND s.gender = 'Female'")->fetchColumn();
     
     $totalStaffMarked = $staffPresent + $staffAbsent;
     $staffPresentPct = $totalStaffMarked > 0 ? round(($staffPresent / $totalStaffMarked) * 100, 1) : 0;
@@ -74,7 +74,40 @@ try {
     $closingBalance = (float)$db->query("SELECT COALESCE(closing_balance, 0) FROM cash_register WHERE date = CURRENT_DATE AND status = 'Closed' LIMIT 1")->fetchColumn();
 
     // 9. Notices / Announcements / Exams
-    $announcements = $db->query("SELECT * FROM audit_logs WHERE action = 'Announcement Send' ORDER BY created_at DESC LIMIT 3")->fetchAll();
+    require_once __DIR__ . '/models/Announcement.php';
+    require_once __DIR__ . '/models/Circular.php';
+
+    // Map role to target audience
+    $targetAudience = 'Everyone';
+    if ($userRole === 'student') {
+        $targetAudience = 'Students';
+    } elseif ($userRole === 'parent') {
+        $targetAudience = 'Parents';
+    } elseif ($userRole === 'teacher') {
+        $targetAudience = 'Teachers';
+    } elseif ($userRole === 'staff') {
+        $targetAudience = 'Staff';
+    }
+
+    $activeAnnouncements = Announcement::activeForAudience($targetAudience);
+    $activeCirculars = [];
+    try {
+        // If student is logged in, find their class
+        $classId = 0;
+        $progType = 'School';
+        if ($userRole === 'student') {
+            // Find student class
+            $stmtClass = $db->prepare("SELECT class_id, academic_type FROM students WHERE id = (SELECT student_id FROM users WHERE id = :uid LIMIT 1)");
+            $stmtClass->execute(['uid' => $_SESSION['user_id'] ?? 0]);
+            $stRow = $stmtClass->fetch();
+            if ($stRow) {
+                $classId = (int)$stRow['class_id'];
+                $progType = $stRow['academic_type'] ?: 'School';
+            }
+        }
+        $activeCirculars = Circular::activeForUser($progType, $classId);
+    } catch (Exception $e) {}
+
     $upcomingExams = $db->query("SELECT es.exam_date, e.exam_name, s.subject_name FROM exam_schedules es JOIN exams e ON es.exam_id = e.id JOIN subjects s ON es.subject_id = s.id WHERE es.exam_date >= CURRENT_DATE ORDER BY es.exam_date ASC LIMIT 3")->fetchAll();
 
     // 10. Recent Activities
@@ -311,20 +344,39 @@ try {
             <h5 class="fw-bold text-secondary mb-3"><i class="fa-solid fa-bullhorn text-danger me-2"></i>Notice Board & Announcements</h5>
             
             <div class="d-flex flex-column gap-3">
-                <?php if (empty($announcements)): ?>
-                    <div class="alert alert-light border small mb-0">No active announcements.</div>
-                <?php else: foreach ($announcements as $ann): 
-                    preg_match('/Title: (.*?) \|/', $ann['description'], $matchesTitle);
-                    preg_match('/Message: (.*)/', $ann['description'], $matchesMsg);
-                ?>
+                <?php if (empty($activeAnnouncements) && empty($activeCirculars)): ?>
+                    <div class="alert alert-light border small mb-0">No active notices or announcements.</div>
+                <?php endif; ?>
+
+                <!-- Announcements list -->
+                <?php foreach ($activeAnnouncements as $ann): ?>
                     <div class="border-bottom border-light pb-2">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold text-dark small"><?php echo sanitize($matchesTitle[1] ?? 'System Announcement'); ?></span>
-                            <span class="text-muted small" style="font-size:0.75rem;"><?php echo date('d M Y', strtotime($ann['created_at'])); ?></span>
+                            <span class="fw-bold text-dark small">
+                                <span class="badge bg-<?php echo $ann['priority'] === 'Urgent' ? 'danger' : 'warning'; ?>-soft text-xs me-1"><?php echo $ann['priority']; ?></span>
+                                <?php echo htmlspecialchars($ann['title']); ?>
+                            </span>
+                            <span class="text-muted small" style="font-size:0.75rem;"><?php echo date('d M Y', strtotime($ann['start_date'])); ?></span>
                         </div>
-                        <p class="text-muted small mb-0"><?php echo sanitize($matchesMsg[1] ?? $ann['description']); ?></p>
+                        <p class="text-muted small mb-0"><?php echo htmlspecialchars($ann['content']); ?></p>
                     </div>
-                <?php endforeach; endif; ?>
+                <?php endforeach; ?>
+
+                <!-- Circulars list -->
+                <?php foreach ($activeCirculars as $circ): ?>
+                    <div class="border-bottom border-light pb-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-success small">
+                                <i class="fa-solid fa-file-pdf me-1 text-danger"></i>[Circular] <?php echo htmlspecialchars($circ['title']); ?>
+                            </span>
+                            <span class="text-muted small" style="font-size:0.75rem;"><?php echo date('d M Y', strtotime($circ['issue_date'])); ?></span>
+                        </div>
+                        <p class="text-muted small mb-1"><?php echo htmlspecialchars($circ['description']); ?></p>
+                        <?php if ($circ['attachment_path']): ?>
+                            <a href="<?php echo htmlspecialchars($circ['attachment_path']); ?>" target="_blank" class="btn btn-xs btn-outline-danger px-3 py-1 rounded-pill small"><i class="fa-solid fa-download me-1"></i>Download PDF Notice</a>
+                        <?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

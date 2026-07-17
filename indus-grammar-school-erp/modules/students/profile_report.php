@@ -450,6 +450,265 @@ if ($selectedId > 0) {
     </div>
 <?php endif; ?>
 
+<!-- PRINT ONLY DOSSIER CONTAINER -->
+<?php if ($student): 
+    $outstandingBalance = (float)$db->query("SELECT COALESCE(SUM(total_payable - paid_amount), 0) FROM fee_ledger WHERE student_id = " . (int)$student['id'] . " AND status IN ('Pending', 'Partial')")->fetchColumn();
+?>
+<div id="student-dossier-print" class="d-none d-print-block">
+    <!-- Header Logo / Info -->
+    <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-3 mb-4">
+        <div class="d-flex align-items-center gap-3">
+            <div style="width: 50px; height: 50px; background-color: #1e3a8a; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
+                <i class="fa-solid fa-graduation-cap fa-2x"></i>
+            </div>
+            <div>
+                <h3 class="fw-bold mb-0 text-dark" style="font-family: 'Outfit', sans-serif; font-size: 1.5rem;"><?php echo SCHOOL_NAME; ?></h3>
+                <p class="text-muted small mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-location-dot me-1"></i><?php echo SCHOOL_ADDRESS; ?></p>
+            </div>
+        </div>
+        <div class="text-end">
+            <h4 class="fw-bold text-secondary mb-0" style="font-size: 1.25rem;">STUDENT DOSSIER FILE</h4>
+            <span class="small text-muted" style="font-size: 0.7rem;">Generated: <?php echo date('d-M-Y H:i'); ?></span>
+        </div>
+    </div>
+
+    <!-- Student top summary row with photo -->
+    <div class="row align-items-center mb-4">
+        <div class="col-8">
+            <h5 class="fw-bold text-primary mb-3">Core Dossier Metadata</h5>
+            <table class="table table-sm table-bordered border-dark mb-0" style="font-size: 11px;">
+                <tr>
+                    <th width="35%">Student Name:</th>
+                    <td><strong><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></strong></td>
+                </tr>
+                <tr>
+                    <th>Admission Number:</th>
+                    <td><code><?php echo htmlspecialchars($student['admission_no']); ?></code></td>
+                </tr>
+                <tr>
+                    <th>Student ID / Roll No:</th>
+                    <td><?php echo (int)$student['id']; ?> / <?php echo htmlspecialchars($details['roll_no'] ?? '—'); ?></td>
+                </tr>
+                <tr>
+                    <th>Academic Session:</th>
+                    <td><?php echo htmlspecialchars($details['academic_session'] ?? '—'); ?></td>
+                </tr>
+            </table>
+        </div>
+        <div class="col-4 text-end">
+            <div class="border border-dark rounded p-2 d-inline-block bg-white" style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-left: auto;">
+                <?php if (!empty($details['doc_student_photo'])): ?>
+                    <img src="<?php echo APP_URL . '/' . $details['doc_student_photo']; ?>" class="img-fluid rounded" alt="Photo" style="max-height: 100%;">
+                <?php else: ?>
+                    <i class="fa-solid fa-user-graduate fa-3x text-muted opacity-50"></i>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 1: Personal Profile -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">1. Personal Information</h6>
+    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+        <tr>
+            <th width="20%">Gender:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['gender']); ?></td>
+            <th width="20%">Date of Birth:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['date_of_birth']); ?></td>
+        </tr>
+        <tr>
+            <th>Blood Group:</th>
+            <td><?php echo htmlspecialchars($details['blood_group'] ?? '—'); ?></td>
+            <th>Religion:</th>
+            <td><?php echo htmlspecialchars($details['religion'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Nationality:</th>
+            <td><?php echo htmlspecialchars($details['nationality'] ?? '—'); ?></td>
+            <th>CNIC / B-Form:</th>
+            <td><?php echo htmlspecialchars($details['cnic_no'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Student Mobile:</th>
+            <td><?php echo htmlspecialchars($details['student_mobile'] ?? '—'); ?></td>
+            <th>Student Email:</th>
+            <td><?php echo htmlspecialchars($details['student_email'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Current Address:</th>
+            <td colspan="3"><?php echo htmlspecialchars($details['current_address'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Permanent Address:</th>
+            <td colspan="3"><?php echo htmlspecialchars($details['permanent_address'] ?? '—'); ?></td>
+        </tr>
+    </table>
+
+    <!-- Section 2: Academic Profile -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">2. Academic Information</h6>
+    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+        <tr>
+            <th width="20%">Academic Type:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></td>
+            <th width="20%">School / Academy:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></td>
+        </tr>
+        <tr>
+            <th>Class / Section:</th>
+            <td><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></td>
+            <th>Academic Session:</th>
+            <td><?php echo htmlspecialchars($details['academic_session'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Admission Date:</th>
+            <td><?php echo htmlspecialchars($student['enrollment_date']); ?></td>
+            <th>Registration Status:</th>
+            <td><strong class="text-uppercase"><?php echo htmlspecialchars($student['status']); ?></strong></td>
+        </tr>
+    </table>
+
+    <!-- Section 3: Parent & Guardian Information -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">3. Parental Coordinates</h6>
+    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+        <tr>
+            <th width="20%">Father Name:</th>
+            <td width="30%"><?php echo htmlspecialchars($details['father_name'] ?? '—'); ?></td>
+            <th width="20%">Father CNIC:</th>
+            <td width="30%"><?php echo htmlspecialchars($details['father_cnic'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Father Mobile:</th>
+            <td><?php echo htmlspecialchars($details['father_mobile'] ?? '—'); ?></td>
+            <th>Occupation:</th>
+            <td><?php echo htmlspecialchars($details['father_occupation'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Mother Name:</th>
+            <td><?php echo htmlspecialchars($details['mother_name'] ?? '—'); ?></td>
+            <th>Mother CNIC:</th>
+            <td><?php echo htmlspecialchars($details['mother_cnic'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Mother Mobile:</th>
+            <td><?php echo htmlspecialchars($details['mother_mobile'] ?? '—'); ?></td>
+            <th>Emergency Contact:</th>
+            <td><?php echo htmlspecialchars($details['emergency_contact'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Guardian Name:</th>
+            <td><?php echo htmlspecialchars($student['guardian_name'] ?? '—'); ?></td>
+            <th>Guardian Mobile:</th>
+            <td><?php echo htmlspecialchars($student['guardian_phone'] ?? '—'); ?></td>
+        </tr>
+        <tr>
+            <th>Relationship:</th>
+            <td colspan="3"><?php echo htmlspecialchars($details['guardian_relationship'] ?? '—'); ?></td>
+        </tr>
+    </table>
+
+    <!-- Section 4: Fee & Finances -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">4. Fee & Financial Information</h6>
+    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+        <tr>
+            <th width="20%">Monthly Fee:</th>
+            <td width="30%">Rs. <?php echo number_format((float)($details['fee_monthly'] ?? 0), 2); ?></td>
+            <th width="20%">Admission Fee:</th>
+            <td width="30%">Rs. <?php echo number_format((float)($details['fee_admission'] ?? 0), 2); ?></td>
+        </tr>
+        <tr>
+            <th>Fee Plan:</th>
+            <td><?php echo htmlspecialchars($details['fee_plan'] ?? 'Standard Plan'); ?></td>
+            <th>Outstanding Balance:</th>
+            <td><strong class="text-danger">Rs. <?php echo number_format($outstandingBalance, 2); ?></strong></td>
+        </tr>
+    </table>
+
+    <!-- Section 5: Medical Information -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">5. Medical Information</h6>
+    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+        <tr>
+            <th width="20%">Medical Notes:</th>
+            <td width="30%"><?php echo htmlspecialchars($details['medical_condition'] ?? 'No special medical conditions recorded.'); ?></td>
+            <th width="20%">Allergies:</th>
+            <td width="30%"><?php echo htmlspecialchars($details['allergies'] ?? 'None recorded.'); ?></td>
+        </tr>
+        <tr>
+            <th>Special Instructions:</th>
+            <td colspan="3"><?php echo htmlspecialchars($details['special_notes'] ?? 'None.'); ?></td>
+        </tr>
+    </table>
+
+    <!-- Section 6: Office remarks & Signatures -->
+    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">6. Office Remarks & Signatures</h6>
+    <div class="border border-dark p-2 rounded mb-4" style="min-height: 50px; font-size: 10px;">
+        <strong>Office Remarks:</strong> <?php echo htmlspecialchars($details['remarks'] ?? 'No official remarks logged.'); ?>
+    </div>
+
+    <!-- Signatures and Stamp Block -->
+    <div class="row pt-4 align-items-end" style="font-size: 10px;">
+        <div class="col-4">
+            <div style="border-top: 1px solid #000; width: 160px;" class="pt-2 text-center">
+                <strong>Parent / Guardian Signature</strong>
+            </div>
+        </div>
+        <div class="col-4 text-center">
+            <div style="border: 1px dashed #777; width: 120px; height: 70px; display: inline-flex; align-items: center; justify-content: center; margin: auto;" class="text-muted text-xs">
+                OFFICE STAMP AREA
+            </div>
+        </div>
+        <div class="col-4 text-end">
+            <div style="border-top: 1px solid #000; width: 160px; margin-left: auto;" class="pt-2 text-center">
+                <strong>Principal Signature</strong>
+            </div>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<style>
+#student-dossier-print {
+    display: none;
+}
+@media print {
+    /* Hide all page content elements */
+    body * {
+        visibility: hidden;
+    }
+    /* Render only dossier print block */
+    #student-dossier-print,
+    #student-dossier-print * {
+        visibility: visible;
+    }
+    #student-dossier-print {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 15mm;
+        box-sizing: border-box;
+        background-color: white !important;
+        color: black !important;
+        font-family: Arial, sans-serif;
+    }
+    @page {
+        size: A4 portrait;
+        margin: 0;
+    }
+    .table-bordered th, .table-bordered td {
+        border: 1px solid #000 !important;
+        padding: 5px 8px !important;
+        color: black !important;
+    }
+    .text-primary {
+        color: #1e3a8a !important;
+    }
+    .text-danger {
+        color: #dc3545 !important;
+    }
+}
+</style>
+
 <?php
 include_once __DIR__ . '/../../includes/footer.php';
 ?>
