@@ -33,14 +33,14 @@ if ($selectedClass > 0) {
     // Fetch all active students in current class and check their latest exam result status
     $stmt = $db->prepare("
         SELECT st.id, st.admission_no, st.first_name, st.last_name, 
-               er.status as result_status, er.percentage as result_pct, er.grade as result_grade
+               MAX(er.status) as result_status, MAX(er.percentage) as result_pct, MAX(er.grade) as result_grade
         FROM students st
-        LEFT JOIN exam_results er ON er.student_id = st.id AND er.class_id = :cid
-        WHERE st.class_id = :cid AND st.status = 'Active'
-        GROUP BY st.id
+        LEFT JOIN exam_results er ON er.student_id = st.id AND er.class_id = :cid1
+        WHERE st.class_id = :cid2 AND st.status = 'Active'
+        GROUP BY st.id, st.admission_no, st.first_name, st.last_name
         ORDER BY st.first_name ASC
     ");
-    $stmt->execute(['cid' => $selectedClass]);
+    $stmt->execute(['cid1' => $selectedClass, 'cid2' => $selectedClass]);
     $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 

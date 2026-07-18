@@ -118,14 +118,14 @@ try {
             if ($selectedReport === 'joining_report') {
                 $reportTitle = "Employee Joining History Register";
                 if ($dateFrom !== '') {
-                    $sql .= " AND s.joining_date >= :from";
+                    $sql .= " AND s.date_of_joining >= :from";
                     $params['from'] = $dateFrom;
                 }
                 if ($dateTo !== '') {
-                    $sql .= " AND s.joining_date <= :to";
+                    $sql .= " AND s.date_of_joining <= :to";
                     $params['to'] = $dateTo;
                 }
-                $sql .= " ORDER BY s.joining_date ASC";
+                $sql .= " ORDER BY s.date_of_joining ASC";
             } else if ($selectedReport === 'inactive_staff') {
                 $reportTitle = "Inactive Staff Directory";
                 $sql .= " AND s.status = 'Inactive' ORDER BY s.first_name ASC";
@@ -258,7 +258,7 @@ try {
                                 <td class="fw-semibold text-dark"><?php echo htmlspecialchars($row['designation']); ?></td>
                                 <td><?php echo htmlspecialchars($row['phone']); ?></td>
                                 <td><?php echo htmlspecialchars($row['email'] ?: '—'); ?></td>
-                                <td class="text-center small"><?php echo $row['joining_date'] ? date('d-M-Y', strtotime($row['joining_date'])) : '—'; ?></td>
+                                <td class="text-center small"><?php $jDate = $row['date_of_joining'] ?? $row['joining_date'] ?? null; echo !empty($jDate) ? date('d-M-Y', strtotime($jDate)) : '—'; ?></td>
                                 <td class="text-end fw-bold text-dark">Rs. <?php echo number_format($row['salary'], 2); ?></td>
                                 <td class="text-center">
                                     <span class="badge bg-<?php echo $row['status'] === 'Active' ? 'success' : 'secondary'; ?>-soft px-3 py-1 rounded-pill fw-semibold"><?php echo $row['status']; ?></span>

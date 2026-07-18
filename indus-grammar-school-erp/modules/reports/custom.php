@@ -42,11 +42,11 @@ $modules = [
             'designation'   => 'Designation',
             'phone'         => 'Phone Mobile',
             'email'         => 'Email Address',
-            'joining_date'  => 'Joining Date',
-            'salary'        => 'Base Salary',
-            'status'        => 'Status'
+            'date_of_joining' => 'Joining Date',
+            'salary'          => 'Base Salary',
+            'status'          => 'Status'
         ],
-        'date_field' => 'joining_date'
+        'date_field' => 'date_of_joining'
     ],
     'fee_payments' => [
         'name' => 'Fee Collection Payments',

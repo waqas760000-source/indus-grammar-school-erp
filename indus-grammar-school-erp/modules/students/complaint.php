@@ -17,25 +17,42 @@ if (isset($_GET['ajax_search_student'])) {
     $query = sanitize($_GET['query'] ?? '');
     try {
         $cleanQuery = str_replace('-', '', $query);
+        $likeQuery = '%' . $query . '%';
+        $isNumeric = is_numeric($query) ? (int)$query : 0;
+
         $stmtSearch = $db->prepare("
             SELECT s.id, s.admission_no, s.first_name, s.last_name, s.academic_type,
                    c.class_name, c.section, d.father_name, d.cnic_no, s.guardian_phone,
                    s.guardian_name, s.enrollment_date, s.status, d.doc_student_photo,
-                   s.school_class, s.school_section
+                   s.school_class, s.school_section, d.roll_no
             FROM students s
             LEFT JOIN classes c ON s.class_id = c.id
             LEFT JOIN student_registration_details d ON s.id = d.student_id
-            WHERE s.admission_no = :query 
-               OR d.cnic_no = :query 
-               OR REPLACE(d.cnic_no, '-', '') = :cleanQuery
+            WHERE s.admission_no = :q1 
+               OR REPLACE(s.admission_no, '-', '') = :cq1
+               OR d.cnic_no = :q2 
+               OR REPLACE(d.cnic_no, '-', '') = :cq2
+               OR d.roll_no = :q3
+               OR REPLACE(d.roll_no, '-', '') = :cq3
+               OR (:num > 0 AND s.id = :num)
+               OR CONCAT(s.first_name, ' ', s.last_name) LIKE :likeQ
             LIMIT 1
         ");
-        $stmtSearch->execute(['query' => $query, 'cleanQuery' => $cleanQuery]);
+        $stmtSearch->execute([
+            'q1' => $query,
+            'cq1' => $cleanQuery,
+            'q2' => $query,
+            'cq2' => $cleanQuery,
+            'q3' => $query,
+            'cq3' => $cleanQuery,
+            'num' => $isNumeric,
+            'likeQ' => $likeQuery
+        ]);
         $st = $stmtSearch->fetch(PDO::FETCH_ASSOC);
         if ($st) {
             echo json_encode(['status' => 'success', 'student' => $st]);
         } else {
-            echo json_encode(['status' => 'error', 'message' => 'No student found with the provided Student ID or CNIC.']);
+            echo json_encode(['status' => 'error', 'message' => 'No student found with the provided Student Roll Number, ID, or CNIC.']);
         }
     } catch (Exception $e) {
         echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
@@ -141,9 +158,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $stmt = $db->prepare("
                     INSERT INTO student_complaints (
-                        complaint_number, student_id, class_id, complaint_date, category, title, description, action_taken, status, remarks, created_by
+                        complaint_number, student_id, class_id, complaint_date, category, priority, title, description, action_taken, status, remarks, created_by
                     ) VALUES (
-                        :complaint_number, :student_id, :class_id, :complaint_date, :category, :title, :description, :action_taken, :status, :remarks, :created_by
+                        :complaint_number, :student_id, :class_id, :complaint_date, :category, :priority, :title, :description, :action_taken, :status, :remarks, :created_by
                     )
                 ");
                 $stmt->execute([
@@ -152,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'class_id' => $class_id ?: null,
                     'complaint_date' => $complaint_date,
                     'category' => $category,
+                    'priority' => 'Medium',
                     'title' => $title,
                     'description' => $description,
                     'action_taken' => $action_taken,
@@ -1025,19 +1043,26 @@ include_once __DIR__ . '/../../includes/header.php';
     // Form validation loader triggers
     document.getElementById("createComplaintForm").addEventListener("submit", function(e) {
         const form = this;
+        const studentIdVal = document.getElementById("student_id_val_new").value;
+        if (!studentIdVal || parseInt(studentIdVal) <= 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert("Please search and select a student first before saving the complaint.");
+            return;
+        }
+
         if (!form.checkValidity()) {
             e.preventDefault();
             e.stopPropagation();
             alert("Please fill in all required fields indicated by *.");
             form.classList.add("was-validated");
         } else {
-            const btnSave = document.getElementById("createBtn");
-            const btnNew = document.getElementById("createNewBtn");
-            if (btnSave) {
-                btnSave.disabled = true;
-                btnSave.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...';
-            }
-            if (btnNew) btnNew.disabled = true;
+            setTimeout(() => {
+                const btnSave = document.getElementById("createBtn");
+                const btnNew = document.getElementById("createNewBtn");
+                if (btnSave) btnSave.disabled = true;
+                if (btnNew) btnNew.disabled = true;
+            }, 10);
         }
     });
 

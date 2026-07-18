@@ -52,7 +52,7 @@ try {
                     $sql .= " AND er.class_id = :cid";
                     $params['cid'] = $selectedClass;
                 }
-                $sql .= " GROUP BY c.id ORDER BY c.class_name ASC";
+                $sql .= " GROUP BY c.id, c.class_name, c.section ORDER BY c.class_name ASC";
                 $stmt = $db->prepare($sql);
                 $stmt->execute($params);
                 $reportData = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -72,7 +72,7 @@ try {
                     FROM subjects s
                     LEFT JOIN student_marks sm ON sm.subject_id = s.id AND sm.exam_type_id = :etid
                     WHERE s.class_id = :cid AND s.status = 'Active'
-                    GROUP BY s.id
+                    GROUP BY s.id, s.subject_name, s.subject_code, s.total_marks, s.passing_marks
                     ORDER BY s.subject_name ASC
                 ");
                 $stmt->execute(['etid' => $selectedExam, 'cid' => $selectedClass]);

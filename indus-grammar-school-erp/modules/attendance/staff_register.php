@@ -175,7 +175,7 @@ if ($filterEmpId !== '' && !empty($records)) {
                     </tr>
                     <tr>
                         <td class="text-muted">Date of Joining:</td>
-                        <td class="fw-bold text-dark text-end"><?php echo date('d M Y', strtotime($singleEmployee['joining_date'])); ?></td>
+                        <td class="fw-bold text-dark text-end"><?php echo !empty($singleEmployee['joining_date']) ? date('d M Y', strtotime($singleEmployee['joining_date'])) : '—'; ?></td>
                     </tr>
                 </table>
 
