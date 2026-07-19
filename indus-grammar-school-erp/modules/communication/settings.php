@@ -40,10 +40,16 @@ $settings = CommSetting::get();
                     <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-mobile-screen me-2 text-primary"></i>SMS Gateway Configuration</h5>
                 </div>
                 <div class="card-body p-4 pt-2">
-                    <div class="row g-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Gateway API Key</label>
-                            <input type="password" class="form-control" name="sms_gateway_api_key" value="<?php echo htmlspecialchars($settings['sms_gateway_api_key'] ?? ''); ?>" placeholder="Enter API Key">
+                            <label class="form-label small fw-semibold text-muted">Active SMS Provider / Gateway</label>
+                            <select class="form-select" name="sms_provider" id="smsProviderSelect">
+                                <option value="test_mode" <?php echo ($settings['sms_provider'] ?? 'test_mode') === 'test_mode' ? 'selected' : ''; ?>>Test Mode (Simulated Gateway - No Cost)</option>
+                                <option value="twilio" <?php echo ($settings['sms_provider'] ?? '') === 'twilio' ? 'selected' : ''; ?>>Twilio SMS API</option>
+                                <option value="vonage" <?php echo ($settings['sms_provider'] ?? '') === 'vonage' ? 'selected' : ''; ?>>Vonage (Nexmo) SMS API</option>
+                                <option value="clickatell" <?php echo ($settings['sms_provider'] ?? '') === 'clickatell' ? 'selected' : ''; ?>>Clickatell SMS Gateway</option>
+                                <option value="local_pakistan" <?php echo ($settings['sms_provider'] ?? '') === 'local_pakistan' ? 'selected' : ''; ?>>Local Pakistani SMS Gateway (Jazz/Telenor/Veevotech)</option>
+                            </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label small fw-semibold text-muted">Sender Mask / ID</label>
@@ -55,6 +61,17 @@ $settings = CommSetting::get();
                                 <option value="English" <?php echo ($settings['sms_default_lang'] ?? '') === 'English' ? 'selected' : ''; ?>>English</option>
                                 <option value="Urdu" <?php echo ($settings['sms_default_lang'] ?? '') === 'Urdu' ? 'selected' : ''; ?>>Urdu</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Gateway API Key / Account SID</label>
+                            <input type="password" class="form-control" name="sms_gateway_api_key" value="<?php echo htmlspecialchars($settings['sms_gateway_api_key'] ?? ''); ?>" placeholder="Enter API Key / SID">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold text-muted">Gateway API Secret / Auth Token</label>
+                            <input type="password" class="form-control" name="sms_api_secret" value="<?php echo htmlspecialchars($settings['sms_api_secret'] ?? ''); ?>" placeholder="Enter API Secret / Auth Token">
                         </div>
                     </div>
                 </div>
@@ -155,6 +172,11 @@ $settings = CommSetting::get();
 </div>
 
 <?php $extraJS = '<script>
+document.getElementById("settingsForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    submitTestForm(this);
+});
+
 // Handle async form submissions for testing connections
 document.getElementById("testSmsForm").addEventListener("submit", function(e) {
     e.preventDefault();

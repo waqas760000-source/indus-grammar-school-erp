@@ -18,76 +18,11 @@ $classes = SchoolClass::all();
 // Load templates for quick populate
 $templates = $db->query("SELECT id, name, message FROM communication_templates ORDER BY name ASC")->fetchAll(PDO::FETCH_ASSOC);
 
-// Search filtered recipients if post/get request occurs
-$resolvedRecipients = [];
 $selectedType = sanitize($_GET['recipient_type'] ?? 'Single Student');
 $filterClass  = isset($_GET['filter_class']) ? (int)$_GET['filter_class'] : 0;
 $filterAtype  = sanitize($_GET['filter_atype'] ?? '');
 $filterStatus = sanitize($_GET['filter_status'] ?? 'Active');
 
-if (isset($_GET['search_recipients'])) {
-    try {
-        switch ($selectedType) {
-            case 'Single Student':
-            case 'Multiple Students':
-            case 'Parents':
-                $sql = "SELECT id, admission_no as reg_no, first_name, last_name, guardian_phone as phone, guardian_name as contact_person FROM students WHERE status = :status";
-                $params = ['status' => $filterStatus];
-                if ($filterClass > 0) {
-                    $sql .= " AND class_id = :cid";
-                    $params['cid'] = $filterClass;
-                }
-                if ($filterAtype !== '') {
-                    $sql .= " AND academic_type = :atype";
-                    $params['atype'] = $filterAtype;
-                }
-                $sql .= " ORDER BY first_name ASC";
-                $stmt = $db->prepare($sql);
-                $stmt->execute($params);
-                $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                break;
-
-            case 'Entire Class':
-                if ($filterClass > 0) {
-                    $sql = "SELECT id, admission_no as reg_no, first_name, last_name, guardian_phone as phone, guardian_name as contact_person FROM students WHERE class_id = :cid AND status = :status ORDER BY first_name ASC";
-                    $stmt = $db->prepare($sql);
-                    $stmt->execute(['cid' => $filterClass, 'status' => $filterStatus]);
-                    $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                }
-                break;
-
-            case 'Entire School':
-                $sql = "SELECT id, admission_no as reg_no, first_name, last_name, guardian_phone as phone, guardian_name as contact_person FROM students WHERE academic_type = 'School' AND status = :status ORDER BY first_name ASC";
-                $stmt = $db->prepare($sql);
-                $stmt->execute(['status' => $filterStatus]);
-                $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                break;
-
-            case 'Entire Academy':
-                $sql = "SELECT id, admission_no as reg_no, first_name, last_name, guardian_phone as phone, guardian_name as contact_person FROM students WHERE academic_type = 'Academy' AND status = :status ORDER BY first_name ASC";
-                $stmt = $db->prepare($sql);
-                $stmt->execute(['status' => $filterStatus]);
-                $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                break;
-
-            case 'Teachers':
-                $sql = "SELECT id, employee_no as reg_no, first_name, last_name, phone, designation as contact_person FROM staff WHERE status = :status AND designation LIKE '%Teacher%' ORDER BY first_name ASC";
-                $stmt = $db->prepare($sql);
-                $stmt->execute(['status' => $filterStatus]);
-                $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                break;
-
-            case 'Staff':
-                $sql = "SELECT id, employee_no as reg_no, first_name, last_name, phone, designation as contact_person FROM staff WHERE status = :status ORDER BY first_name ASC";
-                $stmt = $db->prepare($sql);
-                $stmt->execute(['status' => $filterStatus]);
-                $resolvedRecipients = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                break;
-        }
-    } catch (Exception $e) {
-        error_log("Recipients resolve error: " . $e->getMessage());
-    }
-}
 ?>
 
 <div class="row mb-4 align-items-center">
@@ -96,9 +31,13 @@ if (isset($_GET['search_recipients'])) {
         <p class="text-muted small mb-0">Dispatch bulk announcements or alerts. Connect to templates and schedule for later delivery.</p>
     </div>
     <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
+        <a href="history.php?comm_type=sms" class="btn btn-outline-primary px-3 me-2"><i class="fa-solid fa-clock-rotate-left me-2"></i>SMS History</a>
         <a href="dashboard.php" class="btn btn-outline-secondary px-3"><i class="fa-solid fa-arrow-left me-2"></i>Dashboard</a>
     </div>
 </div>
+
+<!-- Alert Banner Container for User Notifications -->
+<div id="smsAlertContainer" class="mb-3"></div>
 
 <div class="row g-4">
     <!-- Configuration panel -->
@@ -108,11 +47,10 @@ if (isset($_GET['search_recipients'])) {
                 <h5 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-users me-2 text-primary"></i>1. Resolve Recipients</h5>
             </div>
             <div class="card-body p-4 pt-2">
-                <form method="GET" class="row g-3">
-                    <input type="hidden" name="search_recipients" value="1">
+                <form id="resolveForm" onsubmit="event.preventDefault(); loadRecipients();" class="row g-3">
                     <div class="col-12">
                         <label class="form-label small fw-semibold text-muted">Recipient Category</label>
-                        <select class="form-select" name="recipient_type" id="recipientType" onchange="toggleFilterFields()">
+                        <select class="form-select" name="recipient_type" id="recipientType" onchange="onCategoryChange()">
                             <option value="Single Student" <?php echo $selectedType === 'Single Student' ? 'selected' : ''; ?>>Single Student</option>
                             <option value="Multiple Students" <?php echo $selectedType === 'Multiple Students' ? 'selected' : ''; ?>>Multiple Students</option>
                             <option value="Entire Class" <?php echo $selectedType === 'Entire Class' ? 'selected' : ''; ?>>Entire Class</option>
@@ -128,7 +66,7 @@ if (isset($_GET['search_recipients'])) {
                     <!-- Filter Options -->
                     <div class="col-md-6 filter-opt" id="classFilterBox">
                         <label class="form-label small fw-semibold text-muted">Class Section</label>
-                        <select class="form-select" name="filter_class">
+                        <select class="form-select" name="filter_class" id="filterClass" onchange="loadRecipients()">
                             <option value="0">All Classes</option>
                             <?php foreach ($classes as $c): ?>
                                 <option value="<?php echo $c['id']; ?>" <?php echo $filterClass === (int)$c['id'] ? 'selected' : ''; ?>><?php echo htmlspecialchars($c['class_name'] . ' - ' . $c['section']); ?></option>
@@ -138,7 +76,7 @@ if (isset($_GET['search_recipients'])) {
 
                     <div class="col-md-6 filter-opt" id="atypeFilterBox">
                         <label class="form-label small fw-semibold text-muted">Academic Type</label>
-                        <select class="form-select" name="filter_atype">
+                        <select class="form-select" name="filter_atype" id="filterAtype" onchange="loadRecipients()">
                             <option value="">All Programs</option>
                             <option value="School" <?php echo $filterAtype === 'School' ? 'selected' : ''; ?>>School Only</option>
                             <option value="Academy" <?php echo $filterAtype === 'Academy' ? 'selected' : ''; ?>>Academy Only</option>
@@ -147,14 +85,14 @@ if (isset($_GET['search_recipients'])) {
 
                     <div class="col-md-6 filter-opt" id="statusFilterBox">
                         <label class="form-label small fw-semibold text-muted">Status</label>
-                        <select class="form-select" name="filter_status">
+                        <select class="form-select" name="filter_status" id="filterStatus" onchange="loadRecipients()">
                             <option value="Active" <?php echo $filterStatus === 'Active' ? 'selected' : ''; ?>>Active</option>
                             <option value="Inactive" <?php echo $filterStatus === 'Inactive' ? 'selected' : ''; ?>>Inactive</option>
                         </select>
                     </div>
 
                     <div class="col-12 text-end mt-3">
-                        <a href="sms.php" class="btn btn-outline-secondary px-3 me-2"><i class="fa-solid fa-rotate-left me-2"></i>Reset</a>
+                        <button type="button" class="btn btn-outline-secondary px-3 me-2" onclick="resetFilters()"><i class="fa-solid fa-rotate-left me-2"></i>Reset</button>
                         <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-search me-2"></i>Resolve</button>
                     </div>
                 </form>
@@ -162,17 +100,15 @@ if (isset($_GET['search_recipients'])) {
         </div>
 
         <!-- Custom number direct composer if Custom Mobile is picked -->
-        <?php if ($selectedType === 'Custom Mobile Number'): ?>
-            <div class="card border-0 shadow-sm mb-4" style="border-radius:12px;">
-                <div class="card-body p-4">
-                    <div class="mb-3">
-                        <label class="form-label small fw-semibold text-muted">Target Mobile Number</label>
-                        <input type="text" class="form-control" id="customPhone" placeholder="e.g. 03215551234">
-                        <small class="text-muted text-xs">Direct input mobile number bypassing student/staff database lookup.</small>
-                    </div>
+        <div class="card border-0 shadow-sm mb-4" id="customPhoneCard" style="border-radius:12px; display:none;">
+            <div class="card-body p-4">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold text-muted">Target Mobile Number</label>
+                    <input type="text" class="form-control" name="custom_mobile" id="customPhone" placeholder="e.g. 03215551234" oninput="validateCustomPhone()">
+                    <small class="text-muted text-xs">Direct input mobile number bypassing student/staff database lookup.</small>
                 </div>
             </div>
-        <?php endif; ?>
+        </div>
     </div>
 
     <!-- Message Composer panel -->
@@ -180,7 +116,10 @@ if (isset($_GET['search_recipients'])) {
         <form id="smsForm" method="POST" action="../../ajax/communication.php">
             <input type="hidden" name="action" value="send_sms">
             <input type="hidden" name="csrf_token" value="<?php echo csrfToken(); ?>">
-            <input type="hidden" name="recipient_type" value="<?php echo htmlspecialchars($selectedType); ?>">
+            <input type="hidden" name="recipient_type" id="hiddenRecipientType" value="<?php echo htmlspecialchars($selectedType); ?>">
+            <input type="hidden" name="filter_class" id="hiddenFilterClass" value="<?php echo $filterClass; ?>">
+            <input type="hidden" name="filter_atype" id="hiddenFilterAtype" value="<?php echo htmlspecialchars($filterAtype); ?>">
+            <input type="hidden" name="filter_status" id="hiddenFilterStatus" value="<?php echo htmlspecialchars($filterStatus); ?>">
 
             <div class="card border-0 shadow-sm mb-4" style="border-radius:12px;">
                 <div class="card-header bg-white border-0 pt-4 px-4 d-flex justify-content-between align-items-center">
@@ -197,33 +136,25 @@ if (isset($_GET['search_recipients'])) {
                 <div class="card-body p-4 pt-2">
                     
                     <!-- Resolved recipients display checklist -->
-                    <?php if ($selectedType !== 'Custom Mobile Number'): ?>
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label small fw-semibold text-muted mb-0">Recipients (<?php echo count($resolvedRecipients); ?> found)</label>
-                                <?php if (!empty($resolvedRecipients)): ?>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" checked>
-                                        <label class="form-check-label small text-muted" for="selectAllCheckbox">Select All</label>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <div class="border rounded p-3 bg-light" style="max-height: 140px; overflow-y: auto;">
-                                <?php if (empty($resolvedRecipients)): ?>
-                                    <p class="text-muted text-center small mb-0 py-2">Click "Resolve" to load recipient list.</p>
-                                <?php else: foreach ($resolvedRecipients as $r): ?>
-                                    <div class="form-check mb-1">
-                                        <!-- Keep checked by default so they can be unselected -->
-                                        <input class="form-check-input recipient-checkbox" type="checkbox" name="student_ids[]" value="<?php echo $r['id']; ?>" id="rec_<?php echo $r['id']; ?>" checked>
-                                        <label class="form-check-label small text-dark" for="rec_<?php echo $r['id']; ?>">
-                                            <?php echo htmlspecialchars($r['first_name'] . ' ' . $r['last_name'] . ' (' . $r['reg_no'] . ') - Phone: ' . $r['phone']); ?>
-                                        </label>
-                                    </div>
-                                <?php endforeach; endif; ?>
+                    <div class="mb-3" id="recipientsListSection">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-primary-soft text-primary fw-bold px-3 py-2" id="recipientBadge">Recipients Found: 0</span>
+                            <div class="form-check" id="selectAllBox" style="display:none;">
+                                <input class="form-check-input" type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" checked>
+                                <label class="form-check-label small text-muted" for="selectAllCheckbox">Select All</label>
                             </div>
                         </div>
-                    <?php endif; ?>
+                        
+                        <div class="border rounded p-3 bg-light" style="max-height: 160px; overflow-y: auto;" id="recipientsContainer">
+                            <p class="text-muted text-center small mb-0 py-2">Loading recipient list...</p>
+                        </div>
+                    </div>
+
+                    <!-- No Valid Mobile Numbers Warning Alert -->
+                    <div class="alert alert-warning border-0 shadow-sm mb-3 text-xs" id="noRecipientsAlert" style="display:none;">
+                        <i class="fa-solid fa-circle-exclamation me-2 fs-6"></i>
+                        <strong>Notice:</strong> No valid mobile numbers are available for the selected recipients. Please update the student's or guardian's contact information.
+                    </div>
 
                     <!-- Message Body -->
                     <div class="mb-3">
@@ -261,7 +192,7 @@ if (isset($_GET['search_recipients'])) {
                     <!-- Submit Actions -->
                     <div class="text-end">
                         <button type="button" class="btn btn-outline-success px-4 me-2" onclick="saveDraft()"><i class="fa-solid fa-file-invoice me-2"></i>Save Draft</button>
-                        <button type="submit" class="btn btn-primary px-5"><i class="fa-solid fa-paper-plane me-2"></i>Send SMS (Simulated)</button>
+                        <button type="submit" class="btn btn-primary px-5" id="sendSmsBtn"><i class="fa-solid fa-paper-plane me-2"></i>Send SMS</button>
                     </div>
 
                 </div>
@@ -271,19 +202,30 @@ if (isset($_GET['search_recipients'])) {
 </div>
 
 <style>
-.bg-primary-soft { background-color: rgba(30, 58, 138, 0.1); }
+.bg-primary-soft { background-color: rgba(30, 58, 138, 0.1); color: #1e3a8a; }
+.bg-success-soft { background-color: rgba(16, 185, 129, 0.1); color: #047857; }
+.bg-warning-soft { background-color: rgba(245, 158, 11, 0.1); color: #b45309; }
 </style>
 
 <?php $extraJS = '<script>
+function onCategoryChange() {
+    toggleFilterFields();
+    loadRecipients();
+}
+
 function toggleFilterFields() {
     const type = document.getElementById("recipientType").value;
     const classBox = document.getElementById("classFilterBox");
     const atypeBox = document.getElementById("atypeFilterBox");
     const statusBox = document.getElementById("statusFilterBox");
+    const customCard = document.getElementById("customPhoneCard");
+    const recSection = document.getElementById("recipientsListSection");
 
     classBox.style.display = "none";
     atypeBox.style.display = "none";
     statusBox.style.display = "none";
+    customCard.style.display = "none";
+    recSection.style.display = "block";
 
     if (["Single Student", "Multiple Students", "Entire Class", "Parents"].includes(type)) {
         classBox.style.display = "block";
@@ -293,12 +235,118 @@ function toggleFilterFields() {
     }
     if (type !== "Custom Mobile Number") {
         statusBox.style.display = "block";
+    } else {
+        customCard.style.display = "block";
+        recSection.style.display = "none";
+    }
+
+    // Update hidden input fields
+    document.getElementById("hiddenRecipientType").value = type;
+}
+
+function loadRecipients() {
+    const type = document.getElementById("recipientType").value;
+    const filterClass = document.getElementById("filterClass").value;
+    const filterAtype = document.getElementById("filterAtype").value;
+    const filterStatus = document.getElementById("filterStatus").value;
+
+    document.getElementById("hiddenFilterClass").value = filterClass;
+    document.getElementById("hiddenFilterAtype").value = filterAtype;
+    document.getElementById("hiddenFilterStatus").value = filterStatus;
+
+    if (type === "Custom Mobile Number") {
+        validateCustomPhone();
+        return;
+    }
+
+    const container = document.getElementById("recipientsContainer");
+    const badge = document.getElementById("recipientBadge");
+    const selectAllBox = document.getElementById("selectAllBox");
+    const alertBox = document.getElementById("noRecipientsAlert");
+    const sendBtn = document.getElementById("sendSmsBtn");
+
+    container.innerHTML = \'<p class="text-muted text-center small mb-0 py-2"><i class="fa-solid fa-spinner fa-spin me-2"></i>Loading recipient numbers...</p>\';
+
+    const url = `../../ajax/communication.php?action=resolve_recipients&recipient_type=${encodeURIComponent(type)}&filter_class=${filterClass}&filter_atype=${encodeURIComponent(filterAtype)}&filter_status=${encodeURIComponent(filterStatus)}`;
+
+    fetch(url)
+        .then(r => r.json())
+        .then(res => {
+            if (res.status === "success") {
+                const list = res.data || [];
+                const count = list.length;
+                badge.textContent = `Recipients Found: ${count}`;
+
+                if (count > 0) {
+                    alertBox.style.display = "none";
+                    sendBtn.disabled = false;
+                    selectAllBox.style.display = "block";
+
+                    let html = "";
+                    list.forEach(r => {
+                        html += `
+                            <div class="form-check mb-1">
+                                <input class="form-check-input recipient-checkbox" type="checkbox" name="student_ids[]" value="${r.id}" id="rec_${r.id}" checked onchange="updateSelectedCount()">
+                                <label class="form-check-label small text-dark" for="rec_${r.id}">
+                                    <strong>${r.first_name} ${r.last_name}</strong> (${r.reg_no}) - Contact: ${r.contact_person} - <span class="badge bg-secondary-soft text-dark">${r.phone}</span>
+                                </label>
+                            </div>
+                        `;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    selectAllBox.style.display = "none";
+                    container.innerHTML = \'<p class="text-muted text-center small mb-0 py-2">No matching recipients found in database.</p>\';
+                    alertBox.style.display = "block";
+                    sendBtn.disabled = true;
+                }
+            } else {
+                container.innerHTML = `<p class="text-danger text-center small mb-0 py-2">${res.message || "Failed to load recipients."}</p>`;
+                sendBtn.disabled = true;
+            }
+        })
+        .catch(err => {
+            container.innerHTML = \'<p class="text-danger text-center small mb-0 py-2">Error connecting to server to resolve recipients.</p>\';
+            sendBtn.disabled = true;
+        });
+}
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll(".recipient-checkbox:checked");
+    const badge = document.getElementById("recipientBadge");
+    const sendBtn = document.getElementById("sendSmsBtn");
+    const alertBox = document.getElementById("noRecipientsAlert");
+
+    const count = checked.length;
+    badge.textContent = `Recipients Selected: ${count}`;
+
+    if (count > 0) {
+        sendBtn.disabled = false;
+        alertBox.style.display = "none";
+    } else {
+        sendBtn.disabled = true;
+        alertBox.style.display = "block";
+    }
+}
+
+function validateCustomPhone() {
+    const phone = document.getElementById("customPhone").value.trim();
+    const sendBtn = document.getElementById("sendSmsBtn");
+    const alertBox = document.getElementById("noRecipientsAlert");
+
+    if (phone.length >= 7) {
+        sendBtn.disabled = false;
+        alertBox.style.display = "none";
+    } else {
+        sendBtn.disabled = true;
+        alertBox.style.display = "block";
     }
 }
 
 function toggleSelectAll(master) {
     const checkboxes = document.querySelectorAll(".recipient-checkbox");
     checkboxes.forEach(c => c.checked = master.checked);
+    updateSelectedCount();
 }
 
 function countChars(textarea) {
@@ -311,7 +359,7 @@ function countChars(textarea) {
 
     let pages = 1;
     if (len > 160) {
-        pages = Math.ceil(len / 153); // SMS protocol splits message body at 153 chars for multi-page
+        pages = Math.ceil(len / 153);
     }
     
     counter.textContent = `${len} / ${pages * 160} characters (${pages} SMS Page(s))`;
@@ -335,31 +383,98 @@ function toggleScheduleInput() {
     input.style.display = (sched === "later") ? "block" : "none";
 }
 
+function resetFilters() {
+    document.getElementById("recipientType").value = "Single Student";
+    document.getElementById("filterClass").value = "0";
+    document.getElementById("filterAtype").value = "";
+    document.getElementById("filterStatus").value = "Active";
+    onCategoryChange();
+}
+
+function showAlert(type, message) {
+    const container = document.getElementById("smsAlertContainer");
+    container.innerHTML = `
+        <div class="alert alert-${type} alert-dismissible fade show border-0 shadow-sm" role="alert">
+            <i class="fa-solid ${type === "success" ? "fa-circle-check" : "fa-triangle-exclamation"} me-2 fs-5"></i>
+            <strong>${type === "success" ? "Success!" : "Notice:"}</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+document.getElementById("smsForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const sendBtn = document.getElementById("sendSmsBtn");
+    const originalText = sendBtn.innerHTML;
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = \'<i class="fa-solid fa-spinner fa-spin me-2"></i>Processing...\';
+
+    // Inject custom mobile into form data if selected
+    let formData = new FormData(this);
+    if (document.getElementById("recipientType").value === "Custom Mobile Number") {
+        formData.append("custom_mobile", document.getElementById("customPhone").value.trim());
+    }
+
+    fetch(this.action, {
+        method: "POST",
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = originalText;
+        if (data.status === "success") {
+            showAlert("success", data.message);
+            document.getElementById("messageText").value = "";
+            countChars(document.getElementById("messageText"));
+        } else {
+            showAlert("danger", data.message || "Failed to process SMS request.");
+        }
+    })
+    .catch(err => {
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = originalText;
+        showAlert("danger", "An unexpected network error occurred while sending SMS.");
+    });
+});
+
 function saveDraft() {
-    const msg = document.getElementById("messageText").value;
+    const msg = document.getElementById("messageText").value.trim();
     if (!msg) {
-        alert("Please enter message body before saving draft.");
+        showAlert("warning", "Please enter message body before saving draft.");
         return;
     }
-    // Modify form action to mark as Draft
+    
     let form = document.getElementById("smsForm");
-    let schedTime = document.getElementById("scheduledTime");
-    schedTime.value = ""; // Clear schedule
+    let formData = new FormData(form);
+    formData.set("status", "Draft");
 
-    // Inject draft input status
-    let draftInput = document.createElement("input");
-    draftInput.type = "hidden";
-    draftInput.name = "status";
-    draftInput.value = "Draft";
-    form.appendChild(draftInput);
+    if (document.getElementById("recipientType").value === "Custom Mobile Number") {
+        formData.append("custom_mobile", document.getElementById("customPhone").value.trim());
+    }
 
-    // Submit form via standard ajax controller request
-    form.submit();
+    fetch(form.action, {
+        method: "POST",
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === "success") {
+            showAlert("success", "SMS Draft saved successfully.");
+        } else {
+            showAlert("danger", data.message || "Failed to save draft.");
+        }
+    })
+    .catch(err => {
+        showAlert("danger", "Network error while saving draft.");
+    });
 }
 
 document.addEventListener("DOMContentLoaded", function() {
     toggleFilterFields();
     toggleScheduleInput();
+    loadRecipients();
 });
 </script>';
 include_once __DIR__ . '/../../includes/footer.php'; ?>

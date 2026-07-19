@@ -512,3 +512,86 @@ CREATE TABLE IF NOT EXISTS `results` (
   UNIQUE KEY `idx_result_unique` (`exam_id`, `student_id`, `subject_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ========================================================
+-- PHASE 7 TABLES: COMMUNICATION
+-- ========================================================
+
+-- --------------------------------------------------------
+-- Table structure for table `communication_settings`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `communication_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `sms_provider` VARCHAR(50) DEFAULT 'test_mode',
+  `sms_gateway_api_key` VARCHAR(255) NULL,
+  `sms_api_secret` VARCHAR(255) NULL,
+  `sms_sender_id` VARCHAR(50) NULL,
+  `sms_default_lang` VARCHAR(20) DEFAULT 'English',
+  `smtp_host` VARCHAR(150) NULL,
+  `smtp_port` INT DEFAULT 587,
+  `smtp_username` VARCHAR(150) NULL,
+  `smtp_password` VARCHAR(255) NULL,
+  `smtp_encryption` VARCHAR(20) DEFAULT 'tls',
+  `default_sender_email` VARCHAR(150) NULL,
+  `default_sender_name` VARCHAR(150) NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table structure for table `sms_history`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `sms_history` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `recipient_type` VARCHAR(50) NOT NULL,
+  `recipient_count` INT NOT NULL DEFAULT 1,
+  `recipients_list` TEXT NOT NULL,
+  `message` TEXT NOT NULL,
+  `sent_by` INT NULL,
+  `status` VARCHAR(30) DEFAULT 'Test Sent',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`sent_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- --------------------------------------------------------
+-- Table structure for table `whatsapp_history`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `whatsapp_history` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `recipient_type` VARCHAR(50) NOT NULL DEFAULT 'Single Student',
+  `recipient_name` VARCHAR(150) NOT NULL,
+  `phone` VARCHAR(30) NOT NULL,
+  `message` TEXT NOT NULL,
+  `template_name` VARCHAR(100) NULL,
+  `sent_by` INT NULL,
+  `status` VARCHAR(30) DEFAULT 'Opened',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`sent_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table structure for table `whatsapp_templates`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `whatsapp_templates` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `name` VARCHAR(100) NOT NULL UNIQUE,
+  `category` VARCHAR(50) NOT NULL DEFAULT 'Custom Template',
+  `body` TEXT NOT NULL,
+  `is_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table structure for table `whatsapp_settings`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `whatsapp_settings` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `mode` VARCHAR(30) NOT NULL DEFAULT 'click_to_chat',
+  `access_token` TEXT NULL,
+  `phone_number_id` VARCHAR(100) NULL,
+  `business_account_id` VARCHAR(100) NULL,
+  `webhook_url` VARCHAR(255) NULL,
+  `api_version` VARCHAR(20) DEFAULT 'v18.0',
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+

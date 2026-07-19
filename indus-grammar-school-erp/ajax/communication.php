@@ -10,6 +10,7 @@ require_once __DIR__ . '/../models/CommTemplate.php';
 require_once __DIR__ . '/../models/Announcement.php';
 require_once __DIR__ . '/../models/Circular.php';
 require_once __DIR__ . '/../models/CommHistory.php';
+require_once __DIR__ . '/../services/SmsService.php';
 
 AuthMiddleware::requirePermission('communication_send');
 
@@ -148,71 +149,73 @@ try {
             }
             break;
 
+        case 'resolve_recipients':
+            $recType = sanitize($_REQUEST['recipient_type'] ?? 'Single Student');
+            $filterClass = (int)($_REQUEST['filter_class'] ?? 0);
+            $filterAtype = sanitize($_REQUEST['filter_atype'] ?? '');
+            $filterStatus = sanitize($_REQUEST['filter_status'] ?? 'Active');
+
+            $recipients = resolveSmsRecipients($db, $recType, $filterClass, $filterAtype, $filterStatus);
+            echo json_encode([
+                'status' => 'success',
+                'count'  => count($recipients),
+                'data'   => $recipients
+            ]);
+            break;
+
         case 'send_sms':
             if (!validateCsrf($_POST['csrf_token'] ?? '')) {
                 echo json_encode(['status' => 'error', 'message' => 'CSRF verification failed.']);
                 exit;
             }
             
-            $recType = sanitize($_POST['recipient_type'] ?? '');
-            $message = sanitize($_POST['message'] ?? '');
+            $recType   = sanitize($_POST['recipient_type'] ?? '');
+            $message   = sanitize($_POST['message'] ?? '');
             $schedTime = sanitize($_POST['scheduled_time'] ?? '');
-            $status = ($schedTime !== '') ? 'Scheduled' : 'Sent';
+            $draftFlag = sanitize($_POST['status'] ?? '');
+
+            if (empty($message)) {
+                echo json_encode(['status' => 'error', 'message' => 'SMS message text body cannot be empty.']);
+                exit;
+            }
 
             $phones = [];
             
             // Resolve recipient phone numbers
             if ($recType === 'Custom Mobile Number') {
                 $customNo = sanitize($_POST['custom_mobile'] ?? '');
-                if (!empty($customNo)) {
-                    $phones[$customNo] = 'Custom Recipient';
+                $cleanNo  = preg_replace('/[^0-9+]/', '', $customNo);
+                if (!empty($cleanNo) && strlen($cleanNo) >= 7) {
+                    $phones[$cleanNo] = 'Custom Recipient';
                 }
             } else {
                 $stIds = $_POST['student_ids'] ?? [];
-                if (!empty($stIds)) {
-                    $idsStr = implode(',', array_map('intval', $stIds));
-                    if ($recType === 'Teachers' || $recType === 'Staff') {
-                        $list = $db->query("SELECT phone, first_name, last_name FROM staff WHERE id IN ($idsStr)")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($list as $p) {
-                            if ($p['phone']) {
-                                $phones[$p['phone']] = $p['first_name'] . ' ' . $p['last_name'];
-                            }
-                        }
-                    } else {
-                        // Student/Parent categories
-                        $list = $db->query("SELECT guardian_phone, guardian_name, first_name, last_name FROM students WHERE id IN ($idsStr)")->fetchAll(PDO::FETCH_ASSOC);
-                        foreach ($list as $p) {
-                            $phoneNum = $p['guardian_phone'];
-                            $name = ($recType === 'Parents') ? $p['guardian_name'] : ($p['first_name'] . ' ' . $p['last_name']);
-                            if ($phoneNum) {
-                                $phones[$phoneNum] = $name;
-                            }
-                        }
-                    }
+                $filterClass = (int)($_POST['filter_class'] ?? 0);
+                $filterAtype = sanitize($_POST['filter_atype'] ?? '');
+                $filterStatus = sanitize($_POST['filter_status'] ?? 'Active');
+
+                $resolvedList = resolveSmsRecipients($db, $recType, $filterClass, $filterAtype, $filterStatus, $stIds);
+                foreach ($resolvedList as $r) {
+                    $phones[$r['phone']] = $r['contact_person'];
                 }
             }
 
             if (empty($phones)) {
-                echo json_encode(['status' => 'error', 'message' => 'No active target phone numbers resolved.']);
+                echo json_encode([
+                    'status'  => 'error',
+                    'message' => "No valid mobile numbers are available for the selected recipients. Please update the student's or guardian's contact information."
+                ]);
                 exit;
             }
 
-            // Save to SMS History
-            $logSuccess = CommHistory::logSms([
-                'recipient_type'  => $recType,
-                'recipient_count' => count($phones),
-                'recipients_list' => $phones,
-                'message'         => $message,
-                'scheduled_time'  => $schedTime,
-                'status'          => $status
-            ]);
+            $smsService = new SmsService();
+            $result = $smsService->dispatch($recType, $phones, $message, $schedTime ?: null, $draftFlag ?: null);
 
-            if ($logSuccess) {
-                auditLog('SMS Dispatched', "Recipients Count: " . count($phones) . " | Msg: $message");
-                echo json_encode(['status' => 'success', 'message' => 'SMS processed successfully! ' . count($phones) . ' recipients queued.']);
-            } else {
-                echo json_encode(['status' => 'error', 'message' => 'Failed to save SMS history details.']);
+            if ($result['status'] === 'success') {
+                auditLog('SMS Dispatched', "Type: $recType | Recipients Count: " . count($phones) . " | Msg: $message");
             }
+
+            echo json_encode($result);
             break;
 
         case 'send_email':
@@ -352,3 +355,119 @@ try {
 } catch (Exception $e) {
     echo json_encode(['status' => 'error', 'message' => 'System exception occurred: ' . $e->getMessage()]);
 }
+
+/**
+ * Resolve target recipient mobile numbers from Students, Registration Details, and Staff databases.
+ */
+function resolveSmsRecipients(PDO $db, string $type, int $classId = 0, string $academicType = '', string $status = 'Active', array $selectedIds = []): array {
+    $results = [];
+    $type = sanitize($type);
+    $status = !empty($status) ? sanitize($status) : 'Active';
+
+    if ($type === 'Teachers' || $type === 'Staff') {
+        $sql = "SELECT id, employee_no as reg_no, first_name, last_name, designation as contact_person, 
+                       NULLIF(TRIM(phone), '') as phone 
+                FROM staff 
+                WHERE status = :status";
+        $params = ['status' => $status];
+
+        if ($type === 'Teachers') {
+            $sql .= " AND (designation LIKE '%Teacher%' OR department = 'Academic')";
+        }
+
+        if (!empty($selectedIds)) {
+            $idsClean = array_map('intval', array_filter($selectedIds));
+            if (!empty($idsClean)) {
+                $sql .= " AND id IN (" . implode(',', $idsClean) . ")";
+            }
+        }
+
+        $sql .= " ORDER BY first_name ASC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $r) {
+            $p = trim($r['phone'] ?? '');
+            if (!empty($p) && strlen(preg_replace('/[^0-9]/', '', $p)) >= 7) {
+                $results[] = [
+                    'id'             => $r['id'],
+                    'reg_no'         => $r['reg_no'],
+                    'first_name'     => $r['first_name'],
+                    'last_name'      => $r['last_name'],
+                    'contact_person' => $r['first_name'] . ' ' . $r['last_name'] . ' (' . $r['contact_person'] . ')',
+                    'class_name'     => 'Staff',
+                    'section'        => '',
+                    'phone'          => $p
+                ];
+            }
+        }
+    } else {
+        // Students / Parents categories
+        $phoneSelect = ($type === 'Parents')
+            ? "COALESCE(NULLIF(TRIM(srd.father_mobile), ''), NULLIF(TRIM(srd.mother_mobile), ''), NULLIF(TRIM(s.guardian_phone), ''), NULLIF(TRIM(srd.student_mobile), ''), NULLIF(TRIM(srd.emergency_contact), ''))"
+            : "COALESCE(NULLIF(TRIM(srd.student_mobile), ''), NULLIF(TRIM(s.guardian_phone), ''), NULLIF(TRIM(srd.father_mobile), ''), NULLIF(TRIM(srd.mother_mobile), ''), NULLIF(TRIM(srd.emergency_contact), ''))";
+
+        $contactSelect = ($type === 'Parents')
+            ? "COALESCE(NULLIF(TRIM(srd.father_name), ''), NULLIF(TRIM(s.guardian_name), ''), NULLIF(TRIM(srd.mother_name), ''), CONCAT(s.first_name, ' ', s.last_name))"
+            : "s.guardian_name";
+
+        $sql = "SELECT s.id, s.admission_no as reg_no, s.first_name, s.last_name, 
+                       c.class_name, c.section,
+                       $contactSelect as contact_person,
+                       $phoneSelect as phone
+                FROM students s
+                LEFT JOIN student_registration_details srd ON s.id = srd.student_id
+                LEFT JOIN classes c ON s.class_id = c.id
+                WHERE s.status = :status";
+
+        $params = ['status' => $status];
+
+        if ($type === 'Entire Class' || $classId > 0) {
+            if ($classId > 0) {
+                $sql .= " AND s.class_id = :cid";
+                $params['cid'] = $classId;
+            }
+        }
+
+        if ($type === 'Entire School') {
+            $sql .= " AND s.academic_type = 'School'";
+        } elseif ($type === 'Entire Academy') {
+            $sql .= " AND s.academic_type = 'Academy'";
+        } elseif (!empty($academicType)) {
+            $sql .= " AND s.academic_type = :atype";
+            $params['atype'] = $academicType;
+        }
+
+        if (!empty($selectedIds)) {
+            $idsClean = array_map('intval', array_filter($selectedIds));
+            if (!empty($idsClean)) {
+                $sql .= " AND s.id IN (" . implode(',', $idsClean) . ")";
+            }
+        }
+
+        $sql .= " ORDER BY s.first_name ASC";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($rows as $r) {
+            $p = trim($r['phone'] ?? '');
+            if (!empty($p) && strlen(preg_replace('/[^0-9]/', '', $p)) >= 7) {
+                $results[] = [
+                    'id'             => $r['id'],
+                    'reg_no'         => $r['reg_no'],
+                    'first_name'     => $r['first_name'],
+                    'last_name'      => $r['last_name'],
+                    'contact_person' => $r['contact_person'] ?: ($r['first_name'] . ' ' . $r['last_name']),
+                    'class_name'     => $r['class_name'] ?? '',
+                    'section'        => $r['section'] ?? '',
+                    'phone'          => $p
+                ];
+            }
+        }
+    }
+
+    return $results;
+}
+
