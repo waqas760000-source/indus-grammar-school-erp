@@ -18,9 +18,10 @@ class Student {
         try {
             $db = Database::getConnection();
             
-            $sql = "SELECT s.*, c.class_name, c.section 
+            $sql = "SELECT s.*, c.class_name, c.section, d.campus, d.roll_no 
                     FROM students s
                     LEFT JOIN classes c ON s.class_id = c.id
+                    LEFT JOIN student_registration_details d ON s.id = d.student_id
                     WHERE 1=1";
             $params = [];
 

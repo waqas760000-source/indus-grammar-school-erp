@@ -18,28 +18,47 @@
             </li>
 
             <!-- 2. Student Registration -->
+            <?php 
+            $diaryPages = ['daily_diary.php', 'edit_diary.php', 'diary_report.php', 'view_diary.php', 'print_diary.php'];
+            $currentScript = basename($_SERVER['PHP_SELF']);
+            $isStudentRegActive = str_contains($_SERVER['PHP_SELF'], '/modules/students/') && !in_array($currentScript, $diaryPages);
+            $isStudentDiaryActive = str_contains($_SERVER['PHP_SELF'], '/modules/students/') && in_array($currentScript, $diaryPages);
+            ?>
             <?php if (hasPermission('student_view')): ?>
-            <li class="menu-item-has-children <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/students/') ? 'active' : ''; ?>">
-                <a href="#studentSubmenu" data-bs-toggle="collapse" class="sidebar-link-toggle <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/students/') ? '' : 'collapsed'; ?>" aria-expanded="<?php echo str_contains($_SERVER['PHP_SELF'], '/modules/students/') ? 'true' : 'false'; ?>">
+            <li class="menu-item-has-children <?php echo $isStudentRegActive ? 'active' : ''; ?>">
+                <a href="#studentSubmenu" data-bs-toggle="collapse" class="sidebar-link-toggle <?php echo $isStudentRegActive ? '' : 'collapsed'; ?>" aria-expanded="<?php echo $isStudentRegActive ? 'true' : 'false'; ?>">
                     <span>
                         <i class="fa-solid fa-user-graduate"></i>
                         <span>Student Registration</span>
                     </span>
                     <i class="fa-solid fa-chevron-right arrow-icon"></i>
                 </a>
-                <ul class="collapse list-unstyled submenu <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/students/') ? 'show' : ''; ?>" id="studentSubmenu" data-bs-parent="#sidebarMenu">
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/registration.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/registration.php">Registration</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/detail_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/detail_report.php">Student Detail Report</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/daily_diary.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/daily_diary.php">Daily Diary</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/edit_diary.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/edit_diary.php">Edit Diary</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/diary_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/diary_report.php">Diary Report</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/complaint.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/complaint.php">Student Complaint</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/card_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/card_report.php">Student Card Report</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/name_cnic_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/name_cnic_report.php">Student Name / CNIC Report</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/add_sponsor.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/add_sponsor.php">Add Sponsor</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/family_phone_list.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/family_phone_list.php">Family Wise Phone List</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/profile_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/profile_report.php">Student Profile Report</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/summary_report.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/summary_report.php">Student Summary Report</a></li>
+                <ul class="collapse list-unstyled submenu <?php echo $isStudentRegActive ? 'show' : ''; ?>" id="studentSubmenu" data-bs-parent="#sidebarMenu">
+                    <li class="<?php echo $currentScript === 'registration.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/registration.php">Registration</a></li>
+                    <li class="<?php echo $currentScript === 'card_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/card_report.php">Student Card Report</a></li>
+                    <li class="<?php echo $currentScript === 'family_phone_list.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/family_phone_list.php">Family Phone Numbers List</a></li>
+                    <li class="<?php echo $currentScript === 'profile_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/profile_report.php">Student Profile Dossier</a></li>
+                    <li class="<?php echo $currentScript === 'summary_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/summary_report.php">Student Summary Report</a></li>
+                </ul>
+            </li>
+            <?php endif; ?>
+
+            <!-- 3. Student Diary -->
+            <?php if (hasPermission('student_view')): ?>
+            <li class="menu-item-has-children <?php echo $isStudentDiaryActive ? 'active' : ''; ?>">
+                <a href="#studentDiarySubmenu" data-bs-toggle="collapse" class="sidebar-link-toggle <?php echo $isStudentDiaryActive ? '' : 'collapsed'; ?>" aria-expanded="<?php echo $isStudentDiaryActive ? 'true' : 'false'; ?>">
+                    <span>
+                        <i class="fa-solid fa-book-bookmark"></i>
+                        <span>Student Diary</span>
+                    </span>
+                    <i class="fa-solid fa-chevron-right arrow-icon"></i>
+                </a>
+                <ul class="collapse list-unstyled submenu <?php echo $isStudentDiaryActive ? 'show' : ''; ?>" id="studentDiarySubmenu" data-bs-parent="#sidebarMenu">
+                    <li class="<?php echo ($currentScript === 'diary_report.php' && ($_GET['view'] ?? '') === 'dashboard') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/diary_report.php?view=dashboard">Diary Dashboard</a></li>
+                    <li class="<?php echo $currentScript === 'daily_diary.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/daily_diary.php">Daily Diary</a></li>
+                    <li class="<?php echo $currentScript === 'edit_diary.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/edit_diary.php">Edit Diary</a></li>
+                    <li class="<?php echo ($currentScript === 'diary_report.php' && (empty($_GET['view']) || $_GET['view'] === 'report')) ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/diary_report.php">Diary Report</a></li>
+                    <li class="<?php echo ($currentScript === 'diary_report.php' && ($_GET['view'] ?? '') === 'analysis') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/diary_report.php?view=analysis">Diary Analysis</a></li>
                 </ul>
             </li>
             <?php endif; ?>
@@ -59,7 +78,6 @@
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/daily.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/daily.php">Daily Report</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/monthly.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/monthly.php">Monthly Report</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/reports.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/reports.php">Attendance Register</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/leave.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/leave.php">Leave Management</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/attendance/settings.php">Attendance Settings</a></li>
                 </ul>
             </li>
@@ -80,8 +98,6 @@
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/collection.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/collection.php">Collect Fee</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/challan.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/challan.php">Fee Challan</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/dues.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/dues.php">Pending Dues</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/discounts.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/discounts.php">Discounts</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/fines.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/fines.php">Fine Management</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/receipts.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/receipts.php">Fee Receipts</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/reports.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/fees/reports.php">Fee Reports</a></li>
                 </ul>
@@ -223,33 +239,6 @@
             </li>
             <?php endif; ?>
 
-            <!-- 11. Communication -->
-            <?php if (hasPermission('communication_send')): ?>
-            <li class="menu-item-has-children <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/communication/') ? 'active' : ''; ?>">
-                <a href="#communicationSubmenu" data-bs-toggle="collapse" class="sidebar-link-toggle <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/communication/') ? '' : 'collapsed'; ?>" aria-expanded="<?php echo str_contains($_SERVER['PHP_SELF'], '/modules/communication/') ? 'true' : 'false'; ?>">
-                    <span>
-                        <i class="fa-solid fa-comments"></i>
-                        <span>Communication</span>
-                    </span>
-                    <i class="fa-solid fa-chevron-right arrow-icon"></i>
-                </a>
-                <ul class="collapse list-unstyled submenu <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/communication/') ? 'show' : ''; ?>" id="communicationSubmenu" data-bs-parent="#sidebarMenu">
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/dashboard.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/dashboard.php">Comm Dashboard</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp.php"><i class="fa-brands fa-whatsapp text-success me-1"></i>Send WhatsApp</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_bulk.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_bulk.php">Bulk WhatsApp</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/sms.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/sms.php">SMS Dispatcher</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/email.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/email.php">Email Broadcast</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/announcements.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/announcements.php">Announcements Log</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/circulars.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/circulars.php">Printable Circulars</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_history.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_history.php">WhatsApp History</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/history.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/history.php">Comm History</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_templates.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_templates.php">WhatsApp Templates</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/templates.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/templates.php">SMS Templates</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_settings.php">WhatsApp Settings</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/settings.php">Gateway Settings</a></li>
-                </ul>
-            </li>
-            <?php endif; ?>
 
             <!-- 12. Logout -->
             <li class="border-top border-secondary pt-2 mt-2">
@@ -264,3 +253,4 @@
 
 <!-- Mobile Overlay Layer -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
+                                                                                                                                                                                                                                       

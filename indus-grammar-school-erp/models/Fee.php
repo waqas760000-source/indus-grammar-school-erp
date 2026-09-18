@@ -147,11 +147,16 @@ class Fee {
             $st = $stStmt->fetch();
             if (!$st) return false;
             
+            $academicType = !empty($st['academic_type']) ? $st['academic_type'] : 'School';
+            
             $fsStmt = $db->prepare("
                 SELECT id FROM fee_structure 
-                WHERE class_id = :cid AND academic_type = :type AND academic_year = :year LIMIT 1
+                WHERE class_id = :cid 
+                  AND (academic_type = :type OR academic_type IS NULL OR academic_type = '') 
+                  AND academic_year = :year 
+                ORDER BY id DESC LIMIT 1
             ");
-            $fsStmt->execute(['cid' => $st['class_id'], 'type' => $st['academic_type'], 'year' => CURRENT_ACADEMIC_YEAR]);
+            $fsStmt->execute(['cid' => $st['class_id'], 'type' => $academicType, 'year' => CURRENT_ACADEMIC_YEAR]);
             $fid = $fsStmt->fetchColumn();
             
             if (!$fid) {
@@ -160,7 +165,7 @@ class Fee {
                     INSERT INTO fee_structure (academic_type, class_id, academic_year, admission_fee, tuition_fee, computer_fee, exam_fee, transport_fee, annual_charges, security_deposit, other_charges, status)
                     VALUES (:type, :cid, :year, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 'Active')
                 ");
-                $insFs->execute(['type' => $st['academic_type'], 'cid' => $st['class_id'], 'year' => CURRENT_ACADEMIC_YEAR]);
+                $insFs->execute(['type' => $academicType, 'cid' => $st['class_id'], 'year' => CURRENT_ACADEMIC_YEAR]);
                 $fid = (int)$db->lastInsertId();
             }
             
@@ -228,8 +233,11 @@ class Fee {
                 $params['month'] = $filters['month'];
             }
             if (!empty($filters['search'])) {
-                $where .= " AND (s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q)";
-                $params['q'] = '%' . $filters['search'] . '%';
+                $where .= " AND (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
             }
 
             $stmt = $db->prepare("
@@ -279,8 +287,11 @@ class Fee {
                 $params['month'] = $filters['month'];
             }
             if (!empty($filters['search'])) {
-                $where .= " AND (s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q)";
-                $params['q'] = '%' . $filters['search'] . '%';
+                $where .= " AND (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
             }
 
             $stmt = $db->prepare("
@@ -294,6 +305,71 @@ class Fee {
         } catch (PDOException $e) {
             error_log("Fee::countChallans error: " . $e->getMessage());
             return 0;
+        }
+    }
+
+    public static function getFilteredLedgerSummary($filters = []) {
+        try {
+            $db = Database::getConnection();
+            $where = "WHERE 1=1";
+            $params = [];
+
+            if (!empty($filters['status'])) {
+                $where .= " AND fl.status = :status";
+                $params['status'] = $filters['status'];
+            }
+            if (!empty($filters['academic_type'])) {
+                $where .= " AND s.academic_type = :type";
+                $params['type'] = $filters['academic_type'];
+            }
+            if (!empty($filters['class_id'])) {
+                $where .= " AND s.class_id = :class_id";
+                $params['class_id'] = (int)$filters['class_id'];
+            }
+            if (!empty($filters['month'])) {
+                $where .= " AND fl.month = :month";
+                $params['month'] = $filters['month'];
+            }
+            if (!empty($filters['search'])) {
+                $where .= " AND (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
+            }
+
+            $stmt = $db->prepare("
+                SELECT 
+                    COUNT(*) as total_records,
+                    COALESCE(SUM(fl.total_payable), 0) as total_payable,
+                    COALESCE(SUM(fl.paid_amount), 0) as total_paid,
+                    COALESCE(SUM(fl.total_payable - fl.paid_amount), 0) as total_outstanding,
+                    SUM(CASE WHEN fl.status = 'Paid' THEN 1 ELSE 0 END) as paid_records,
+                    SUM(CASE WHEN fl.status IN ('Pending', 'Partial') THEN 1 ELSE 0 END) as pending_records
+                FROM fee_ledger fl
+                JOIN students s ON fl.student_id = s.id
+                $where
+            ");
+            $stmt->execute($params);
+            $res = $stmt->fetch();
+            return [
+                'total_records'     => (int)($res['total_records'] ?? 0),
+                'total_payable'     => (float)($res['total_payable'] ?? 0),
+                'total_paid'        => (float)($res['total_paid'] ?? 0),
+                'total_outstanding' => max(0, (float)($res['total_outstanding'] ?? 0)),
+                'paid_records'      => (int)($res['paid_records'] ?? 0),
+                'pending_records'   => (int)($res['pending_records'] ?? 0)
+            ];
+        } catch (PDOException $e) {
+            error_log("Fee::getFilteredLedgerSummary error: " . $e->getMessage());
+            return [
+                'total_records'     => 0,
+                'total_payable'     => 0.00,
+                'total_paid'        => 0.00,
+                'total_outstanding' => 0.00,
+                'paid_records'      => 0,
+                'pending_records'   => 0
+            ];
         }
     }
 
@@ -341,6 +417,18 @@ class Fee {
             $ledger = $stmt->fetch();
             if (!$ledger) {
                 throw new Exception("Ledger month record not found.");
+            }
+            
+            // Calculate dynamic late fine if applicable
+            $feeService = new FeeService();
+            $lateFine = $feeService->calculateLateFineForLedger($ledger);
+            if ($lateFine > (float)$ledger['fine_amount']) {
+                $fineDiff = $lateFine - (float)$ledger['fine_amount'];
+                $ledger['fine_amount'] = $lateFine;
+                $ledger['total_payable'] = (float)$ledger['total_payable'] + $fineDiff;
+                
+                $fineUp = $db->prepare("UPDATE fee_ledger SET fine_amount = :fa, total_payable = :tp WHERE id = :id");
+                $fineUp->execute(['fa' => $lateFine, 'tp' => $ledger['total_payable'], 'id' => $ledger['id']]);
             }
             
             $newPaid = (float)$ledger['paid_amount'] + (float)$data['amount_paid'];
@@ -461,6 +549,10 @@ class Fee {
             $todayColl = (float)$db->query("
                 SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE payment_date = CURDATE()
             ")->fetchColumn();
+
+            $todayReceipts = (int)$db->query("
+                SELECT COUNT(id) FROM fee_payments WHERE payment_date = CURDATE()
+            ")->fetchColumn();
             
             // 2. Today Pending (unpaid/partial ledger rows due on or before today)
             $todayPending = (float)$db->query("
@@ -496,6 +588,8 @@ class Fee {
             
             return [
                 'today_collection'   => $todayColl,
+                'today_collections'  => $todayColl,
+                'today_receipts'     => $todayReceipts,
                 'today_pending'      => $todayPending,
                 'monthly_collection' => $monthColl,
                 'outstanding_dues'   => $outstanding,
@@ -536,8 +630,12 @@ class Fee {
                 $params['method'] = $filters['payment_method'];
             }
             if (!empty($filters['search'])) {
-                $where .= " AND (fr.receipt_no LIKE :q OR s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q)";
-                $params['q'] = '%' . $filters['search'] . '%';
+                $where .= " AND (fr.receipt_no LIKE :q1 OR s.first_name LIKE :q2 OR s.last_name LIKE :q3 OR s.admission_no LIKE :q4)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
+                $params['q4'] = $qVal;
             }
             
             $stmt = $db->prepare("
@@ -584,8 +682,12 @@ class Fee {
                 $params['method'] = $filters['payment_method'];
             }
             if (!empty($filters['search'])) {
-                $where .= " AND (fr.receipt_no LIKE :q OR s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q)";
-                $params['q'] = '%' . $filters['search'] . '%';
+                $where .= " AND (fr.receipt_no LIKE :q1 OR s.first_name LIKE :q2 OR s.last_name LIKE :q3 OR s.admission_no LIKE :q4)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
+                $params['q4'] = $qVal;
             }
             
             $stmt = $db->prepare("

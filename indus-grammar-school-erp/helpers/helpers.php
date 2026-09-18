@@ -54,7 +54,20 @@ function jsonResponse(array $data, int $statusCode = 200): void {
  * @return string
  */
 function csrfToken(): string {
-    return $_SESSION['csrf_token'] ?? '';
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_time'] = time();
+    }
+    return $_SESSION['csrf_token'];
+}
+
+/**
+ * Alias for csrfToken() for backwards compatibility
+ *
+ * @return string
+ */
+function generateCsrf(): string {
+    return csrfToken();
 }
 
 /**
@@ -65,17 +78,26 @@ function csrfToken(): string {
  */
 function validateCsrf(?string $token): bool {
     if (empty($token) || empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_time'] = time();
         return false;
     }
     
     // Check if token has expired (2 hours)
     if (time() - ($_SESSION['csrf_token_time'] ?? 0) > CSRF_TOKEN_EXPIRE) {
-        unset($_SESSION['csrf_token']);
-        unset($_SESSION['csrf_token_time']);
+        // Regenerate fresh token so retry can succeed
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        $_SESSION['csrf_token_time'] = time();
         return false;
     }
 
-    return hash_equals($_SESSION['csrf_token'], $token);
+    if (hash_equals($_SESSION['csrf_token'], $token)) {
+        // Slide expiration window on active usage
+        $_SESSION['csrf_token_time'] = time();
+        return true;
+    }
+
+    return false;
 }
 
 /**

@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['success' => false, 'message' => 'Invalid request method.'], 405);
 }
 if (!validateCsrf($_POST['csrf_token'] ?? '')) {
-    jsonResponse(['success' => false, 'message' => 'Security token expired.'], 403);
+    jsonResponse(['success' => false, 'message' => 'Security token expired. A new token has been generated. Please try again.', 'new_csrf_token' => csrfToken()], 403);
 }
 
 $action     = $_POST['action'] ?? '';
@@ -24,21 +24,28 @@ switch ($action) {
     // ── Save Class Fee Structure ──
     case 'save_structure':
         AuthMiddleware::requirePermission('fee_manage');
+        $class_id = (int)($_POST['class_id'] ?? 0);
+        if ($class_id <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Please select a valid Class for the fee structure.']);
+        }
         $result = Fee::createStructure([
             'academic_type'    => sanitize($_POST['academic_type'] ?? 'School'),
-            'class_id'         => (int)($_POST['class_id'] ?? 0),
-            'admission_fee'    => (float)($_POST['admission_fee'] ?? 0),
-            'tuition_fee'      => (float)($_POST['tuition_fee'] ?? 0),
-            'computer_fee'     => (float)($_POST['computer_fee'] ?? 0),
-            'exam_fee'         => (float)($_POST['exam_fee'] ?? 0),
-            'transport_fee'    => (float)($_POST['transport_fee'] ?? 0),
-            'annual_charges'   => (float)($_POST['annual_charges'] ?? 0),
-            'security_deposit' => (float)($_POST['security_deposit'] ?? 0),
-            'other_charges'    => (float)($_POST['other_charges'] ?? 0),
+            'class_id'         => $class_id,
+            'admission_fee'    => max(0, (float)($_POST['admission_fee'] ?? 0)),
+            'tuition_fee'      => max(0, (float)($_POST['tuition_fee'] ?? 0)),
+            'computer_fee'     => max(0, (float)($_POST['computer_fee'] ?? 0)),
+            'exam_fee'         => max(0, (float)($_POST['exam_fee'] ?? 0)),
+            'transport_fee'    => max(0, (float)($_POST['transport_fee'] ?? 0)),
+            'annual_charges'   => max(0, (float)($_POST['annual_charges'] ?? 0)),
+            'security_deposit' => max(0, (float)($_POST['security_deposit'] ?? 0)),
+            'other_charges'    => max(0, (float)($_POST['other_charges'] ?? 0)),
             'status'           => sanitize($_POST['status'] ?? 'Active'),
             'academic_year'    => sanitize($_POST['academic_year'] ?? CURRENT_ACADEMIC_YEAR),
         ]);
-        jsonResponse(['success' => $result, 'message' => $result ? 'Fee structure saved successfully.' : 'Failed to save fee structure.']);
+        if ($result) {
+            auditLog('Fee Structure Saved', "Fee structure saved/updated for class ID $class_id.");
+        }
+        jsonResponse(['success' => (bool)$result, 'message' => $result ? 'Fee structure saved successfully.' : 'Failed to save fee structure.']);
         break;
 
     // ── Delete Structure ──
@@ -153,8 +160,31 @@ switch ($action) {
     // ── Collect Fee Payment ──
     case 'collect_payment':
         AuthMiddleware::requirePermission('fee_collect');
+        $rawChallan = $_POST['challan_id'] ?? '';
+        $studentId  = (int)($_POST['student_id'] ?? 0);
+        $ledgerId   = 0;
+
+        if (is_string($rawChallan) && str_starts_with($rawChallan, 'new_month:')) {
+            $monthName = trim(substr($rawChallan, 10));
+            if (!empty($monthName) && $studentId > 0) {
+                Fee::ensureStudentAssignment($studentId);
+                $feeService->generateMonthlyLedgerEntry($studentId, $monthName);
+                
+                $db = Database::getConnection();
+                $getL = $db->prepare("SELECT id FROM fee_ledger WHERE student_id = :sid AND month = :m ORDER BY id DESC LIMIT 1");
+                $getL->execute(['sid' => $studentId, 'm' => $monthName]);
+                $ledgerId = (int)$getL->fetchColumn();
+            }
+        } else {
+            $ledgerId = (int)$rawChallan;
+        }
+
+        if ($ledgerId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Please select a valid fee month to collect payment.']);
+        }
+
         $result = $feeService->collectFeePayment([
-            'ledger_id'        => (int)($_POST['challan_id'] ?? 0), // maps to select dropdown value
+            'ledger_id'        => $ledgerId,
             'amount_paid'      => (float)($_POST['amount_paid'] ?? 0),
             'payment_date'     => sanitize($_POST['payment_date'] ?? date('Y-m-d')),
             'payment_method'   => sanitize($_POST['payment_method'] ?? 'Cash'),
@@ -187,8 +217,18 @@ switch ($action) {
                 jsonResponse(['success' => false, 'message' => 'Student not found.']);
             }
 
-            // Ensure assignment exist
+            // Ensure assignment exists
             Fee::ensureStudentAssignment($sid);
+            $assignment = Fee::getStudentAssignment($sid);
+            $estMonthlyFee = $assignment ? ((float)$assignment['tuition_fee'] + (float)$assignment['computer_fee'] + (float)$assignment['exam_fee'] + (float)$assignment['transport_fee'] + (float)$assignment['other_charges']) : 0.00;
+
+            // Auto-generate current month ledger entry if missing for student
+            $currentMonthStr = date('F Y');
+            $chkLedger = $db->prepare("SELECT COUNT(*) FROM fee_ledger WHERE student_id = :sid AND month = :m");
+            $chkLedger->execute(['sid' => $sid, 'm' => $currentMonthStr]);
+            if ($chkLedger->fetchColumn() == 0) {
+                $feeService->generateMonthlyLedgerEntry($sid, $currentMonthStr, date('Y-m-10'));
+            }
 
             // 2. Fetch student ledger entries
             $ledgStmt = $db->prepare("
@@ -211,9 +251,11 @@ switch ($action) {
             $totalPayable = 0.00;
             $paidAmount = 0.00;
             
-            $currentMonthStr = date('F Y');
-            
+            $existingMonthsMap = [];
+
             foreach ($allLedgers as $row) {
+                $existingMonthsMap[strtolower(trim($row['month']))] = $row['status'];
+
                 // Dynamic late fine calculation
                 $lateFine = $feeService->calculateLateFineForLedger($row);
                 $netPayable = (float)$row['total_payable'] + $lateFine;
@@ -233,7 +275,8 @@ switch ($action) {
                         'paid_amount'       => (float)$row['paid_amount'],
                         'remaining_balance' => $remaining,
                         'status'            => $row['status'],
-                        'due_date'          => $row['due_date']
+                        'due_date'          => $row['due_date'],
+                        'is_upcoming'       => false
                     ];
 
                     if (strcasecmp($row['month'], $currentMonthStr) === 0) {
@@ -252,6 +295,26 @@ switch ($action) {
                 $paidAmount += (float)$row['paid_amount'];
             }
             
+            // Generate upcoming advance months if unbilled
+            for ($i = 0; $i <= 3; $i++) {
+                $mName = date('F Y', strtotime("+$i month"));
+                $mKey  = strtolower(trim($mName));
+                if (!isset($existingMonthsMap[$mKey])) {
+                    $pendingFees[] = [
+                        'id'                => 'new_month:' . $mName,
+                        'month'             => $mName . ' (Advance / Next Month)',
+                        'monthly_fee'       => $estMonthlyFee,
+                        'fine'              => 0.00,
+                        'discount'          => 0.00,
+                        'paid_amount'       => 0.00,
+                        'remaining_balance' => $estMonthlyFee,
+                        'status'            => 'Advance Option',
+                        'due_date'          => date('Y-m-15', strtotime("+$i month")),
+                        'is_upcoming'       => true
+                    ];
+                }
+            }
+
             $remainingBalance = $totalPayable;
 
             // 3. Fetch transaction payment history
@@ -393,10 +456,16 @@ switch ($action) {
                 FROM students s 
                 LEFT JOIN classes c ON s.class_id = c.id
                 LEFT JOIN student_registration_details d ON s.id = d.student_id
-                WHERE (s.first_name LIKE :q OR s.last_name LIKE :q OR s.admission_no LIKE :q OR d.roll_no LIKE :q)
+                WHERE (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3 OR d.roll_no LIKE :q4)
                   AND s.status = 'Active' LIMIT 15
             ");
-            $stmt->execute(['q' => '%'.$q.'%']);
+            $searchTerm = '%' . $q . '%';
+            $stmt->execute([
+                'q1' => $searchTerm,
+                'q2' => $searchTerm,
+                'q3' => $searchTerm,
+                'q4' => $searchTerm
+            ]);
             $students = $stmt->fetchAll();
             
             // Calculate pending dues from ledger

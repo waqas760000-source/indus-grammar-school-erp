@@ -1,66 +1,167 @@
 <?php
 /**
- * Indus Grammar School ERP - Student Profile Report (Tabbed dossier)
- * Version 2.0.0
+ * Indus Grammar School ERP - Student Profile Dossier
+ * Version 3.2.1 (Fix: Undefined Array Keys & Unique Family Query Parameters)
  */
 
-$pageTitle = 'Student Profile Report';
+$pageTitle = 'Student Profile Dossier';
 $breadcrumbActive = 'Student Registration';
 include_once __DIR__ . '/../../includes/header.php';
 AuthMiddleware::requirePermission('student_view');
 
 $db = Database::getConnection();
+
+// Input search parameters
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+$searchQuery = trim(sanitize($_GET['search_query'] ?? $_GET['search'] ?? ''));
+$searchError = null;
+$searchNotice = null;
+$searchSystemError = null;
 
-$students = [];
+// Fetch all active students for fallback quick chooser dropdown
+$allStudents = [];
 try {
-    $students = $db->query("SELECT id, admission_no, first_name, last_name FROM students ORDER BY admission_no DESC")->fetchAll();
-} catch (Exception $e) {}
+    $allStudents = $db->query("
+        SELECT s.id, s.admission_no, s.first_name, s.last_name, d.roll_no, d.cnic_no 
+        FROM students s 
+        LEFT JOIN student_registration_details d ON s.id = d.student_id 
+        WHERE s.status = 'Active' 
+        ORDER BY s.first_name ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    error_log("Failed to fetch student dropdown list: " . $e->getMessage());
+}
 
+// Process search by CNIC / B-Form or Roll Number
+if (isset($_GET['search_query']) || isset($_GET['search'])) {
+    if (empty($searchQuery) && $selectedId === 0) {
+        $searchNotice = "Please enter a CNIC/B-Form number or Roll Number.";
+    } elseif (!empty($searchQuery)) {
+        $cleanQuery = preg_replace('/[^a-zA-Z0-9]/', '', $searchQuery);
+        try {
+            // Use unique parameter names for every placeholder to prevent PDO SQLSTATE[HY093]
+            $stmtSearch = $db->prepare("
+                SELECT s.id 
+                FROM students s 
+                LEFT JOIN student_registration_details d ON s.id = d.student_id 
+                WHERE d.cnic_no = :q_cnic_raw 
+                   OR REPLACE(d.cnic_no, '-', '') = :q_cnic_clean
+                   OR d.roll_no = :q_roll
+                   OR s.admission_no = :q_adm
+                   OR s.first_name LIKE :q_fname
+                   OR s.last_name LIKE :q_lname
+                   OR CONCAT(s.first_name, ' ', s.last_name) LIKE :q_fullname
+                ORDER BY s.id DESC 
+                LIMIT 1
+            ");
+            $likeVal = '%' . $searchQuery . '%';
+            $stmtSearch->execute([
+                'q_cnic_raw' => $searchQuery,
+                'q_cnic_clean' => $cleanQuery,
+                'q_roll' => $searchQuery,
+                'q_adm' => $searchQuery,
+                'q_fname' => $likeVal,
+                'q_lname' => $likeVal,
+                'q_fullname' => $likeVal
+            ]);
+            $found = $stmtSearch->fetch(PDO::FETCH_ASSOC);
+
+            if ($found && !empty($found['id'])) {
+                $selectedId = (int)$found['id'];
+            } else {
+                $searchError = "No student profile was found for the entered information.";
+            }
+        } catch (Exception $e) {
+            error_log("Student Dossier Search Exception: " . $e->getMessage());
+            $searchSystemError = "The student profile could not be loaded because of a system issue. Please try again.";
+        }
+    }
+}
+
+// Data containers
 $student = null;
-$details = null;
-
-// Dynamic categories arrays
+$details = [];
 $attendanceLogs = [];
 $attendanceStats = ['Present' => 0, 'Absent' => 0, 'Late' => 0, 'Leave' => 0];
 $feeChallans = [];
 $feeCollections = [];
+$outstandingBalance = 0.00;
 $examMarks = [];
 $homeworkDiaries = [];
-$complaints = [];
 $sponsors = [];
+$familySiblings = [];
 
 if ($selectedId > 0) {
+    // Core Student Record Retrieval with ALL fields joined from student_registration_details
     try {
-        $stmt = $db->prepare("SELECT s.*, c.class_name, c.section FROM students s LEFT JOIN classes c ON s.class_id = c.id WHERE s.id = ?");
+        $stmt = $db->prepare("
+            SELECT s.*, 
+                   c.class_name, c.section,
+                   d.roll_no, d.admission_date, d.academic_session, d.campus,
+                   d.cnic_no, d.student_mobile, d.student_email,
+                   d.father_name, d.father_cnic, d.father_mobile, d.father_occupation,
+                   d.mother_name, d.mother_cnic, d.mother_mobile, d.mother_occupation,
+                   d.guardian_relationship, d.guardian_cnic, d.guardian_address,
+                   d.current_address, d.permanent_address,
+                   d.fee_plan, d.fee_admission, d.fee_monthly,
+                   d.remarks, d.doc_student_photo,
+                   d.blood_group, d.religion, d.nationality,
+                   d.prev_school, d.prev_class, d.prev_result, d.leaving_cert_no,
+                   d.allergies, d.disability, d.emergency_contact, d.doctor_name,
+                   d.transport_required, d.transport_route, d.pickup_point, d.transport_driver,
+                   d.doc_father_cnic, d.doc_mother_cnic, d.doc_bform, d.doc_birth_cert,
+                   d.doc_leaving_cert, d.doc_prev_result, d.doc_medical_cert, d.doc_other
+            FROM students s 
+            LEFT JOIN classes c ON s.class_id = c.id 
+            LEFT JOIN student_registration_details d ON s.id = d.student_id
+            WHERE s.id = ?
+        ");
         $stmt->execute([$selectedId]);
-        $student = $stmt->fetch();
-        
-        if ($student) {
-            $stmtDet = $db->prepare("SELECT * FROM student_registration_details WHERE student_id = ?");
-            $stmtDet->execute([$selectedId]);
-            $details = $stmtDet->fetch();
+        $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        error_log("Main Student Query Exception: " . $e->getMessage());
+        $searchSystemError = "The student profile could not be loaded because of a system issue. Please try again.";
+    }
 
-            // 1. Related Attendance
+    if ($student) {
+        // Details array mirrors student record to ensure complete key mapping
+        $details = $student;
+
+        // Isolated Optional Queries - missing optional data will NOT break student profile rendering
+        
+        // 1. Attendance Records
+        try {
             $stmtAtt = $db->prepare("SELECT date, status, remarks FROM attendance WHERE student_id = ? ORDER BY date DESC LIMIT 30");
             $stmtAtt->execute([$selectedId]);
-            $attendanceLogs = $stmtAtt->fetchAll();
+            $attendanceLogs = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
             foreach ($attendanceLogs as $att) {
                 if (isset($attendanceStats[$att['status']])) {
                     $attendanceStats[$att['status']]++;
                 }
             }
+        } catch (Exception $e) {
+            error_log("Attendance Query Exception: " . $e->getMessage());
+        }
 
-            // 2. Related Fees
-            $stmtFee = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = ? ORDER BY due_date DESC");
+        // 2. Fee Ledger & Payments
+        try {
+            $stmtFee = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = ? ORDER BY due_date DESC LIMIT 12");
             $stmtFee->execute([$selectedId]);
-            $feeChallans = $stmtFee->fetchAll();
+            $feeChallans = $stmtFee->fetchAll(PDO::FETCH_ASSOC);
 
-            $stmtColl = $db->prepare("SELECT fp.*, fr.receipt_no FROM fee_payments fp LEFT JOIN fee_receipts fr ON fp.id = fr.payment_id WHERE fp.student_id = ? ORDER BY fp.payment_date DESC");
+            $stmtColl = $db->prepare("SELECT fp.*, fr.receipt_no FROM fee_payments fp LEFT JOIN fee_receipts fr ON fp.id = fr.payment_id WHERE fp.student_id = ? ORDER BY fp.payment_date DESC LIMIT 12");
             $stmtColl->execute([$selectedId]);
-            $feeCollections = $stmtColl->fetchAll();
+            $feeCollections = $stmtColl->fetchAll(PDO::FETCH_ASSOC);
 
-            // 3. Related Exams
+            $stmtBal = $db->prepare("SELECT COALESCE(SUM(total_payable - paid_amount), 0) FROM fee_ledger WHERE student_id = ? AND status IN ('Pending', 'Partial')");
+            $stmtBal->execute([$selectedId]);
+            $outstandingBalance = (float)$stmtBal->fetchColumn();
+        } catch (Exception $e) {
+            error_log("Fee Ledger Query Exception: " . $e->getMessage());
+        }
+
+        // 3. Examination & Marks
+        try {
             $stmtEx = $db->prepare("
                 SELECT m.*, ex.exam_name, sub.subject_name 
                 FROM marks m 
@@ -70,644 +171,1038 @@ if ($selectedId > 0) {
                 ORDER BY ex.exam_name ASC, sub.subject_name ASC
             ");
             $stmtEx->execute([$selectedId]);
-            $examMarks = $stmtEx->fetchAll();
+            $examMarks = $stmtEx->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Exam Marks Query Exception: " . $e->getMessage());
+        }
 
-            // 4. Related Homework Diaries
-            $stmtDiary = $db->prepare("
-                SELECT d.*, sub.subject_name, u.username as teacher_name
-                FROM daily_diaries d
-                JOIN subjects sub ON d.subject_id = sub.id
-                JOIN users u ON d.teacher_id = u.id
-                WHERE d.class_id = ? AND d.is_published = 1
-                ORDER BY d.diary_date DESC LIMIT 15
-            ");
-            $stmtDiary->execute([$student['class_id']]);
-            $homeworkDiaries = $stmtDiary->fetchAll();
+        // 4. Family Siblings (matched by father CNIC or guardian phone) using unique parameter placeholders
+        try {
+            $fatherCnic = $student['father_cnic'] ?? '';
+            $guardianPhone = $student['guardian_phone'] ?? '';
+            if (!empty($fatherCnic) || !empty($guardianPhone)) {
+                $stmtFam = $db->prepare("
+                    SELECT s.id, s.first_name, s.last_name, s.admission_no, s.academic_type, c.class_name, c.section, d.roll_no
+                    FROM students s
+                    LEFT JOIN classes c ON s.class_id = c.id
+                    LEFT JOIN student_registration_details d ON s.id = d.student_id
+                    WHERE s.id != :curr_id 
+                      AND s.status = 'Active'
+                      AND (
+                        (:fcnic1 != '' AND d.father_cnic = :fcnic2) OR 
+                        (:gphone1 != '' AND (s.guardian_phone = :gphone2 OR d.father_mobile = :gphone3))
+                      )
+                    ORDER BY s.first_name ASC
+                ");
+                $stmtFam->execute([
+                    'curr_id' => $selectedId,
+                    'fcnic1' => $fatherCnic,
+                    'fcnic2' => $fatherCnic,
+                    'gphone1' => $guardianPhone,
+                    'gphone2' => $guardianPhone,
+                    'gphone3' => $guardianPhone
+                ]);
+                $familySiblings = $stmtFam->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Exception $e) {
+            error_log("Family Siblings Query Exception: " . $e->getMessage());
+        }
 
-            // 5. Related Complaints
-            $stmtComp = $db->prepare("
-                SELECT sc.*, u.username as assigned_username 
-                FROM student_complaints sc 
-                LEFT JOIN users u ON sc.assigned_to = u.id 
-                WHERE sc.student_id = ? 
-                ORDER BY sc.complaint_date DESC
-            ");
-            $stmtComp->execute([$selectedId]);
-            $complaints = $stmtComp->fetchAll();
+        // 5. Daily Diaries Homework
+        try {
+            if (!empty($student['class_id'])) {
+                $stmtDiary = $db->prepare("
+                    SELECT d.*, sub.subject_name, u.username as teacher_name
+                    FROM daily_diaries d
+                    JOIN subjects sub ON d.subject_id = sub.id
+                    JOIN users u ON d.teacher_id = u.id
+                    WHERE d.class_id = ? AND d.is_published = 1
+                    ORDER BY d.diary_date DESC LIMIT 10
+                ");
+                $stmtDiary->execute([$student['class_id']]);
+                $homeworkDiaries = $stmtDiary->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Exception $e) {
+            error_log("Homework Diaries Query Exception: " . $e->getMessage());
+        }
 
-            // 6. Related Sponsors
+        // 6. Sponsors
+        try {
             $stmtSpons = $db->prepare("SELECT * FROM student_sponsors WHERE student_id = ?");
             $stmtSpons->execute([$selectedId]);
-            $sponsors = $stmtSpons->fetchAll();
+            $sponsors = $stmtSpons->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Sponsors Query Exception: " . $e->getMessage());
         }
-    } catch (Exception $e) {
-        error_log("Load student profile data links error: " . $e->getMessage());
     }
 }
 ?>
 
-<!-- Header -->
-<div class="row mb-4 align-items-center d-print-none">
-    <div class="col-sm-6">
-        <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-address-card me-2 text-primary"></i>Student Profile Report</h3>
+<!-- Custom Styling for Premium Student Profile Dossier -->
+<style>
+.dossier-header-icon {
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+.dossier-search-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.03);
+}
+
+.dossier-main-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.dossier-banner {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%);
+    color: #ffffff;
+    padding: 2rem;
+    position: relative;
+}
+
+.student-avatar-box {
+    width: 120px;
+    height: 120px;
+    border-radius: 14px;
+    border: 4px solid #ffffff;
+    background: #f8fafc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    overflow: hidden;
+}
+
+.student-avatar-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.dossier-section-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.dossier-section-title {
+    color: #1e3a8a;
+    font-weight: 700;
+    font-size: 1.05rem;
+    border-bottom: 2px solid #eff6ff;
+    padding-bottom: 0.6rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.info-label {
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 0.2rem;
+    display: block;
+}
+
+.info-value {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 0.95rem;
+    word-break: break-word;
+}
+
+.custom-dossier-table {
+    margin-bottom: 0;
+}
+
+.custom-dossier-table th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.custom-dossier-table td {
+    padding: 0.7rem 0.85rem;
+    font-size: 0.875rem;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* Print Specific Rules */
+#student-dossier-print {
+    display: none;
+}
+
+@media print {
+    .d-print-none, #sidebar, header, nav, footer {
+        display: none !important;
+    }
+    body {
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-size: 10pt;
+    }
+    .container-fluid {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    #student-dossier-print {
+        display: block !important;
+        width: 100% !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+    }
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+    .print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin-bottom: 12px;
+    }
+    .print-table th, .print-table td {
+        border: 1px solid #333333 !important;
+        padding: 5px 8px !important;
+        font-size: 9.5pt !important;
+    }
+    .print-table th {
+        background-color: #f1f5f9 !important;
+        color: #000000 !important;
+        font-weight: bold;
+    }
+    .print-section-header {
+        font-weight: 800;
+        font-size: 10.5pt;
+        text-transform: uppercase;
+        border-bottom: 2px solid #000;
+        padding-bottom: 3px;
+        margin-top: 12px;
+        margin-bottom: 8px;
+    }
+}
+</style>
+
+<!-- Page Header Banner (Screen Only) -->
+<div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3 d-print-none">
+    <div class="d-flex align-items-center">
+        <div class="dossier-header-icon me-3">
+            <i class="fa-solid fa-address-card fa-lg"></i>
+        </div>
+        <div>
+            <h3 class="fw-bold text-dark mb-1">Student Profile Dossier</h3>
+            <p class="text-muted small mb-0">Search a student by CNIC/B-Form number or Roll Number to view their complete registered profile and generate a professional printable dossier.</p>
+        </div>
     </div>
+    <?php if ($student): ?>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary px-3 shadow-sm" onclick="window.print()">
+                <i class="fa-solid fa-print me-1"></i> Print Profile
+            </button>
+            <a href="profile_report.php" class="btn btn-sm btn-light border text-secondary px-3">
+                <i class="fa-solid fa-rotate-left me-1"></i> Clear Search
+            </a>
+        </div>
+    <?php endif; ?>
 </div>
 
-<!-- Select Panel -->
-<div class="card border border-light shadow-sm bg-white p-4 mb-4 d-print-none" style="border-radius:12px;">
-    <div class="row align-items-center">
-        <div class="col-md-6">
-            <h5 class="fw-bold text-dark mb-0">Search Profile Dossier</h5>
-            <p class="text-muted small mb-0">Choose a student file to render the complete academic profile dossier.</p>
-        </div>
-        <div class="col-md-6 text-md-end mt-3 mt-md-0">
-            <form method="GET" class="d-inline-block">
-                <select class="form-select" name="id" onchange="this.form.submit()" style="min-width: 300px; border-radius: 8px;">
-                    <option value="">— Choose Student Profile —</option>
-                    <?php foreach ($students as $st): ?>
-                        <option value="<?php echo $st['id']; ?>" <?php echo ($selectedId == $st['id']) ? 'selected' : ''; ?>>
-                            <?php echo sanitize($st['admission_no'] . ' - ' . $st['first_name'] . ' ' . $st['last_name']); ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </form>
-        </div>
+<!-- Search Profile Dossier Workspace Panel (Screen Only) -->
+<div class="card dossier-search-card p-4 mb-4 d-print-none">
+    <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+        <h6 class="fw-bold text-dark mb-0"><i class="fa-solid fa-magnifying-glass text-primary me-2"></i>Search Profile Dossier Workspace</h6>
+        <span class="badge bg-light text-muted border">Enter CNIC/B-Form or Roll Number</span>
     </div>
-</div>
 
-<!-- Render Area -->
-<?php if ($student): ?>
-<div class="card border border-light shadow-sm bg-white p-4" style="border-radius:12px;" id="printableDossier">
-    
-    <!-- Top summary panel banner -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center border-bottom pb-4 mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <div class="border rounded bg-light p-2" style="width: 110px; height: 110px; display: flex; align-items: center; justify-content: center;">
-                <?php if (!empty($details['doc_student_photo'])): ?>
-                    <img src="<?php echo APP_URL . '/' . $details['doc_student_photo']; ?>" class="img-fluid rounded" alt="Student Photo" style="max-height: 100%;">
-                <?php else: ?>
-                    <i class="fa-solid fa-user-graduate fs-1 text-muted"></i>
-                <?php endif; ?>
+    <form method="GET" action="profile_report.php" class="row g-3 align-items-end">
+        <div class="col-md-6 col-lg-7">
+            <label class="form-label small fw-semibold text-secondary mb-1">Enter Student CNIC/B-Form or Roll Number</label>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted"><i class="fa-solid fa-id-card"></i></span>
+                <input type="text" class="form-control" name="search_query" value="<?php echo htmlspecialchars($searchQuery); ?>" placeholder="e.g. 35201-1234567-1 or Roll No 1024 or Adm No...">
             </div>
+        </div>
+
+        <div class="col-md-6 col-lg-5 d-flex gap-2">
+            <button type="submit" class="btn btn-sm btn-primary px-4 shadow-sm w-100">
+                <i class="fa-solid fa-magnifying-glass me-1"></i> Search Profile
+            </button>
+            <a href="profile_report.php" class="btn btn-sm btn-light border text-secondary px-3" title="Clear Search">
+                <i class="fa-solid fa-xmark me-1"></i> Clear
+            </a>
+        </div>
+    </form>
+
+    <!-- Quick Chooser Fallback Dropdown -->
+    <div class="mt-3 pt-3 border-top d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <span class="small text-muted"><i class="fa-solid fa-list-ul me-1 text-secondary"></i>Or select directly from registered student list:</span>
+        <form method="GET" action="profile_report.php" class="d-inline-block">
+            <select class="form-select form-select-sm" name="id" onchange="this.form.submit()" style="min-width: 280px;">
+                <option value="">— Select Registered Student File —</option>
+                <?php foreach ($allStudents as $st): ?>
+                    <option value="<?php echo $st['id']; ?>" <?php echo ($selectedId == $st['id']) ? 'selected' : ''; ?>>
+                        <?php echo htmlspecialchars(($st['first_name'] ?? '') . ' ' . ($st['last_name'] ?? '') . ' (Adm: ' . ($st['admission_no'] ?? '-') . ' | Roll: ' . ($st['roll_no'] ?: '-') . ')'); ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+    </div>
+</div>
+
+<!-- Validation & Error Messages -->
+<?php if ($searchSystemError): ?>
+    <div class="alert alert-danger border-danger shadow-sm rounded-4 p-4 mb-4 d-print-none">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-triangle-exclamation fa-2x text-danger me-3"></i>
             <div>
-                <h3 class="fw-bold text-dark mb-1"><?php echo sanitize($student['first_name'] . ' ' . $student['last_name']); ?></h3>
-                <span class="badge bg-secondary px-3 rounded-pill">Type: <?php echo sanitize($student['academic_type'] ?? 'School'); ?></span>
-                <span class="badge bg-info px-3 rounded-pill">Class: <?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></span>
+                <h6 class="fw-bold text-dark mb-1">System Issue</h6>
+                <p class="mb-0 text-secondary small"><?php echo htmlspecialchars($searchSystemError); ?></p>
             </div>
         </div>
-        <div class="mt-3 mt-md-0 d-print-none">
-            <button class="btn btn-outline-secondary px-3" onclick="window.print()"><i class="fa-solid fa-print me-2"></i>Print Profile Dossier</button>
-            <button class="btn btn-primary px-3 ms-1" onclick="window.print()"><i class="fa-solid fa-file-pdf me-2"></i>Export PDF</button>
-        </div>
-    </div>
-
-    <!-- 12 Tabs Nav Menu list (Horizontal Scrollable on mobile) -->
-    <ul class="nav nav-tabs border-bottom mb-4 d-print-none" id="profileTabs" role="tablist" style="overflow-x: auto; flex-wrap: nowrap; white-space: nowrap;">
-        <li class="nav-item"><button class="nav-link active fw-semibold" id="personal-tab" data-bs-toggle="tab" data-bs-target="#personalPane" type="button">Personal</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="parents-tab" data-bs-toggle="tab" data-bs-target="#parentsPane" type="button">Parents</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="academic-tab" data-bs-toggle="tab" data-bs-target="#academicPane" type="button">Academic</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="attendance-tab" data-bs-toggle="tab" data-bs-target="#attendancePane" type="button">Attendance</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="fee-tab" data-bs-toggle="tab" data-bs-target="#feePane" type="button">Fees</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="exam-tab" data-bs-toggle="tab" data-bs-target="#examPane" type="button">Examination</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="medical-tab" data-bs-toggle="tab" data-bs-target="#medicalPane" type="button">Medical</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="transport-tab" data-bs-toggle="tab" data-bs-target="#transportPane" type="button">Transport</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="documents-tab" data-bs-toggle="tab" data-bs-target="#documentsPane" type="button">Documents</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="diary-tab" data-bs-toggle="tab" data-bs-target="#diaryPane" type="button">Diary</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="complaints-tab" data-bs-toggle="tab" data-bs-target="#complaintsPane" type="button">Complaints</button></li>
-        <li class="nav-item"><button class="nav-link fw-semibold" id="sponsor-tab" data-bs-toggle="tab" data-bs-target="#sponsorPane" type="button">Sponsor</button></li>
-    </ul>
-
-    <!-- 12 Tab Panels -->
-    <div class="tab-content" id="profileTabsContent">
-        
-        <!-- Tab 1: Personal -->
-        <div class="tab-pane fade show active" id="personalPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-user me-2 text-primary"></i>Personal Information</h5>
-            <div class="row g-3">
-                <div class="col-md-4"><span class="text-muted small d-block">Gender</span><strong class="text-dark"><?php echo sanitize($student['gender']); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Date of Birth</span><strong class="text-dark"><?php echo sanitize($student['date_of_birth']); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Blood Group</span><strong class="text-dark"><?php echo sanitize($details['blood_group'] ?: '-'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Religion</span><strong class="text-dark"><?php echo sanitize($details['religion'] ?: 'Islam'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Nationality</span><strong class="text-dark"><?php echo sanitize($details['nationality'] ?: 'Pakistani'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">CNIC / B-Form</span><strong class="text-dark"><?php echo sanitize($details['cnic_no'] ?: '-'); ?></strong></div>
-                <div class="col-12"><span class="text-muted small d-block">Current Address</span><strong class="text-dark"><?php echo sanitize($details['current_address'] ?: '-'); ?></strong></div>
-                <div class="col-12"><span class="text-muted small d-block">Permanent Address</span><strong class="text-dark"><?php echo sanitize($details['permanent_address'] ?: '-'); ?></strong></div>
-            </div>
-        </div>
-
-        <!-- Tab 2: Parents -->
-        <div class="tab-pane fade" id="parentsPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-user-group me-2 text-primary"></i>Parental Coordinates</h5>
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <h6 class="fw-bold text-dark border-bottom pb-2">Father Information</h6>
-                    <p class="mb-1 text-muted small">Name: <strong class="text-dark"><?php echo sanitize($details['father_name'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">CNIC: <strong class="text-dark"><?php echo sanitize($details['father_cnic'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">Mobile: <strong class="text-dark"><?php echo sanitize($details['father_mobile'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">Occupation: <strong class="text-dark"><?php echo sanitize($details['father_occupation'] ?: '-'); ?></strong></p>
-                </div>
-                <div class="col-md-6">
-                    <h6 class="fw-bold text-dark border-bottom pb-2">Mother Information</h6>
-                    <p class="mb-1 text-muted small">Name: <strong class="text-dark"><?php echo sanitize($details['mother_name'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">CNIC: <strong class="text-dark"><?php echo sanitize($details['mother_cnic'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">Mobile: <strong class="text-dark"><?php echo sanitize($details['mother_mobile'] ?: '-'); ?></strong></p>
-                    <p class="mb-1 text-muted small">Occupation: <strong class="text-dark"><?php echo sanitize($details['mother_occupation'] ?: '-'); ?></strong></p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tab 3: Academic -->
-        <div class="tab-pane fade" id="academicPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-graduation-cap me-2 text-primary"></i>Academic Profile</h5>
-            <div class="row g-3">
-                <div class="col-md-4"><span class="text-muted small d-block">Academic Type</span><strong class="text-dark"><?php echo sanitize($student['academic_type'] ?? 'School'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Class & Section</span><strong class="text-dark"><?php echo sanitize(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Previous School class</span><strong class="text-dark"><?php echo sanitize($details['prev_school'] ?: '-'); ?> (Class: <?php echo sanitize($details['prev_class'] ?: '-'); ?>)</strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Result / Obtained marks</span><strong class="text-dark"><?php echo sanitize($details['prev_result'] ?: '-'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Leaving Certificate No</span><strong class="text-dark"><?php echo sanitize($details['leaving_cert_no'] ?: '-'); ?></strong></div>
-                <div class="col-md-4"><span class="text-muted small d-block">Active Session</span><strong class="text-dark"><?php echo sanitize($details['academic_session'] ?: '-'); ?></strong></div>
-            </div>
-        </div>
-
-        <!-- Tab 4: Attendance -->
-        <div class="tab-pane fade" id="attendancePane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-calendar-check me-2 text-primary"></i>Attendance Ledger</h5>
-            <div class="row mb-3 g-2">
-                <div class="col-6 col-md-3"><div class="p-2 border rounded text-center bg-success-soft">Present: <strong class="d-block fs-5"><?php echo $attendanceStats['Present']; ?></strong></div></div>
-                <div class="col-6 col-md-3"><div class="p-2 border rounded text-center bg-danger-soft">Absent: <strong class="d-block fs-5"><?php echo $attendanceStats['Absent']; ?></strong></div></div>
-                <div class="col-6 col-md-3"><div class="p-2 border rounded text-center bg-warning-soft">Leave: <strong class="d-block fs-5"><?php echo $attendanceStats['Leave']; ?></strong></div></div>
-                <div class="col-6 col-md-3"><div class="p-2 border rounded text-center bg-secondary-soft">Late: <strong class="d-block fs-5"><?php echo $attendanceStats['Late']; ?></strong></div></div>
-            </div>
-            <div class="table-responsive">
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Date</th><th>Status</th><th>Remarks</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($attendanceLogs)): ?>
-                            <tr><td colspan="3" class="text-center text-muted">No attendance logs recorded.</td></tr>
-                        <?php else: foreach ($attendanceLogs as $att): ?>
-                            <tr>
-                                <td><?php echo sanitize($att['date']); ?></td>
-                                <td><span class="badge bg-<?php echo ($att['status'] === 'Present') ? 'success' : (($att['status'] === 'Absent') ? 'danger' : 'warning'); ?>-soft"><?php echo sanitize($att['status']); ?></span></td>
-                                <td><?php echo sanitize($att['remarks'] ?: '-'); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab 5: Fee -->
-        <div class="tab-pane fade" id="feePane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-receipt me-2 text-primary"></i>Financial Statements</h5>
-            <div class="table-responsive mb-4">
-                <h6 class="fw-bold text-dark mb-2">Generated Fee Challans</h6>
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Challan No</th><th>Month</th><th>Amount</th><th>Status</th><th>Due Date</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($feeChallans)): ?>
-                            <tr><td colspan="5" class="text-center text-muted">No monthly fee ledger sheets generated.</td></tr>
-                        <?php else: foreach ($feeChallans as $challan): ?>
-                            <tr>
-                                <td>#<?php echo str_pad($challan['id'], 5, '0', STR_PAD_LEFT); ?></td>
-                                <td><?php echo sanitize($challan['month']); ?></td>
-                                <td>Rs. <?php echo number_format($challan['total_payable'], 2); ?></td>
-                                <td><span class="badge bg-<?php echo ($challan['status'] === 'Paid') ? 'success' : 'danger'; ?>-soft"><?php echo sanitize($challan['status']); ?></span></td>
-                                <td><?php echo sanitize($challan['due_date']); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-            <div class="table-responsive">
-                <h6 class="fw-bold text-dark mb-2">Payment Collections History</h6>
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Receipt No</th><th>Paid Amount</th><th>Payment Date</th><th>Method</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($feeCollections)): ?>
-                            <tr><td colspan="4" class="text-center text-muted">No receipt logs recorded.</td></tr>
-                        <?php else: foreach ($feeCollections as $coll): ?>
-                            <tr>
-                                <td><?php echo sanitize($coll['receipt_no']); ?></td>
-                                <td>Rs. <?php echo number_format($coll['amount_paid'], 2); ?></td>
-                                <td><?php echo sanitize($coll['payment_date']); ?></td>
-                                <td><?php echo sanitize($coll['payment_method']); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab 6: Examination -->
-        <div class="tab-pane fade" id="examPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-list-check me-2 text-primary"></i>Exam Marks Ledger</h5>
-            <div class="table-responsive">
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Exam Name</th><th>Subject</th><th>Obtained Marks</th><th>Total</th><th>Remarks</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($examMarks)): ?>
-                            <tr><td colspan="5" class="text-center text-muted">No exam scores recorded for this student file.</td></tr>
-                        <?php else: foreach ($examMarks as $marks): ?>
-                            <tr>
-                                <td><?php echo sanitize($marks['exam_name']); ?></td>
-                                <td><?php echo sanitize($marks['subject_name']); ?></td>
-                                <td class="fw-bold"><?php echo (float)$marks['marks_obtained']; ?></td>
-                                <td><?php echo (int)$marks['total_marks']; ?></td>
-                                <td><?php echo sanitize($marks['remarks'] ?: '-'); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab 7: Medical -->
-        <div class="tab-pane fade" id="medicalPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-heart-pulse me-2 text-primary"></i>Medical Information</h5>
-            <div class="row g-3">
-                <div class="col-md-6"><span class="text-muted small d-block">Allergies</span><strong class="text-danger"><?php echo sanitize($details['allergies'] ?: 'None recorded'); ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Physical Disabilities</span><strong class="text-danger"><?php echo sanitize($details['disability'] ?: 'None recorded'); ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Emergency Contact Person</span><strong class="text-dark"><?php echo sanitize($details['emergency_contact'] ?: '-'); ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Family Doctor Details</span><strong class="text-dark"><?php echo sanitize($details['doctor_name'] ?: '-'); ?></strong></div>
-            </div>
-        </div>
-
-        <!-- Tab 8: Transport -->
-        <div class="tab-pane fade" id="transportPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-bus me-2 text-primary"></i>Transport Configuration</h5>
-            <div class="row g-3">
-                <div class="col-md-6"><span class="text-muted small d-block">Transport Service required</span><strong class="text-dark"><?php echo (!empty($details['transport_required'])) ? 'Yes' : 'No'; ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Route Details</span><strong class="text-dark"><?php echo sanitize($details['transport_route'] ?: '-'); ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Pickup & Drop point</span><strong class="text-dark"><?php echo sanitize($details['pickup_point'] ?: '-'); ?></strong></div>
-                <div class="col-md-6"><span class="text-muted small d-block">Assigned Driver Name</span><strong class="text-dark"><?php echo sanitize($details['transport_driver'] ?: '-'); ?></strong></div>
-            </div>
-        </div>
-
-        <!-- Tab 9: Documents -->
-        <div class="tab-pane fade" id="documentsPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-file-arrow-down me-2 text-primary"></i>Uploaded Document files</h5>
-            <div class="d-flex flex-wrap gap-2">
-                <?php
-                $docs = [
-                    'doc_father_cnic' => 'Father CNIC Card',
-                    'doc_mother_cnic' => 'Mother CNIC Card',
-                    'doc_bform' => 'B-Form Doc',
-                    'doc_birth_cert' => 'Birth Certificate',
-                    'doc_leaving_cert' => 'School Leaving Cert',
-                    'doc_prev_result' => 'Previous Result',
-                    'doc_medical_cert' => 'Medical Certificate',
-                    'doc_other' => 'Other Attachment'
-                ];
-                
-                $hasDocs = false;
-                foreach ($docs as $key => $label) {
-                    if (!empty($details[$key])) {
-                        $hasDocs = true;
-                        echo '<a href="' . APP_URL . '/' . $details[$key] . '" target="_blank" class="btn btn-outline-primary"><i class="fa-solid fa-cloud-arrow-down me-1"></i>' . $label . '</a>';
-                    }
-                }
-                if (!$hasDocs) {
-                    echo '<p class="text-muted small">No profile document files uploaded.</p>';
-                }
-                ?>
-            </div>
-        </div>
-
-        <!-- Tab 10: Diary -->
-        <div class="tab-pane fade" id="diaryPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-book-open me-2 text-primary"></i>Daily Diary Homework (Class: <?php echo sanitize($student['class_name'] . ' - ' . $student['section']); ?>)</h5>
-            <div class="table-responsive">
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Date</th><th>Subject</th><th>Title & Instructions</th><th>Published By</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($homeworkDiaries)): ?>
-                            <tr><td colspan="4" class="text-center text-muted">No published homework diaries active for this class.</td></tr>
-                        <?php else: foreach ($homeworkDiaries as $diary): ?>
-                            <tr>
-                                <td><?php echo sanitize($diary['diary_date']); ?></td>
-                                <td><?php echo sanitize($diary['subject_name']); ?></td>
-                                <td><strong><?php echo sanitize($diary['title']); ?></strong><br><small><?php echo sanitize($diary['description']); ?></small></td>
-                                <td><?php echo sanitize($diary['teacher_name']); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab 11: Complaints -->
-        <div class="tab-pane fade" id="complaintsPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-face-frown me-2 text-primary"></i>Registered Complaint logs</h5>
-            <div class="table-responsive">
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Date</th><th>Category</th><th>Title & Details</th><th>Resolution details</th><th>Status</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($complaints)): ?>
-                            <tr><td colspan="5" class="text-center text-muted">No complaint logs recorded.</td></tr>
-                        <?php else: foreach ($complaints as $comp): ?>
-                            <tr>
-                                <td><?php echo sanitize($comp['complaint_date']); ?></td>
-                                <td><?php echo sanitize($comp['category']); ?></td>
-                                <td><strong><?php echo sanitize($comp['title']); ?></strong><br><small class="text-muted"><?php echo sanitize($comp['description']); ?></small></td>
-                                <td><?php echo sanitize($comp['resolution'] ?: 'Under investigation'); ?></td>
-                                <td><span class="badge bg-<?php echo ($comp['status'] === 'Resolved' || $comp['status'] === 'Closed') ? 'success' : 'warning'; ?>-soft"><?php echo sanitize($comp['status']); ?></span></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <!-- Tab 12: Sponsor -->
-        <div class="tab-pane fade" id="sponsorPane" role="tabpanel">
-            <h5 class="fw-bold mb-3 text-secondary"><i class="fa-solid fa-handshake-angle me-2 text-primary"></i>Sponsor & Scholarship Details</h5>
-            <div class="table-responsive">
-                <table class="table custom-table table-hover table-sm">
-                    <thead><tr><th>Sponsor Name</th><th>Organization</th><th>Amount (Rs.)</th><th>Duration</th><th>Remarks</th></tr></thead>
-                    <tbody>
-                        <?php if (empty($sponsors)): ?>
-                            <tr><td colspan="5" class="text-center text-muted">No charity sponsorships linked.</td></tr>
-                        <?php else: foreach ($sponsors as $spons): ?>
-                            <tr>
-                                <td class="fw-bold"><?php echo sanitize($spons['sponsor_name']); ?></td>
-                                <td><?php echo sanitize($spons['organization'] ?: '-'); ?></td>
-                                <td class="fw-bold text-success">Rs. <?php echo number_format($spons['amount'], 2); ?></td>
-                                <td><?php echo sanitize($spons['duration'] ?: '-'); ?></td>
-                                <td><?php echo sanitize($spons['remarks'] ?: '-'); ?></td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </div>
-</div>
-<?php else: ?>
-    <div class="text-center py-5 bg-white shadow-sm border border-light" style="border-radius:12px;">
-        <i class="fa-solid fa-address-card fs-1 text-muted opacity-50 mb-3 d-block"></i>
-        <h5 class="text-muted">Choose a student profile above to load dynamic tabs.</h5>
     </div>
 <?php endif; ?>
 
-<!-- PRINT ONLY DOSSIER CONTAINER -->
-<?php if ($student): 
-    $outstandingBalance = (float)$db->query("SELECT COALESCE(SUM(total_payable - paid_amount), 0) FROM fee_ledger WHERE student_id = " . (int)$student['id'] . " AND status IN ('Pending', 'Partial')")->fetchColumn();
-?>
-<div id="student-dossier-print" class="d-none d-print-block">
-    <!-- Header Logo / Info -->
-    <div class="d-flex align-items-center justify-content-between border-bottom border-dark pb-3 mb-4">
-        <div class="d-flex align-items-center gap-3">
-            <div style="width: 50px; height: 50px; background-color: #1e3a8a; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white;">
-                <i class="fa-solid fa-graduation-cap fa-2x"></i>
-            </div>
+<?php if ($searchError): ?>
+    <div class="alert alert-warning border-warning shadow-sm rounded-4 p-4 mb-4 d-print-none">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-circle-xmark fa-2x text-warning me-3"></i>
             <div>
-                <h3 class="fw-bold mb-0 text-dark" style="font-family: 'Outfit', sans-serif; font-size: 1.5rem;"><?php echo SCHOOL_NAME; ?></h3>
-                <p class="text-muted small mb-0" style="font-size: 0.75rem;"><i class="fa-solid fa-location-dot me-1"></i><?php echo SCHOOL_ADDRESS; ?></p>
+                <h6 class="fw-bold text-dark mb-1">Student Record Not Found</h6>
+                <p class="mb-0 text-secondary small"><?php echo htmlspecialchars($searchError); ?></p>
             </div>
-        </div>
-        <div class="text-end">
-            <h4 class="fw-bold text-secondary mb-0" style="font-size: 1.25rem;">STUDENT DOSSIER FILE</h4>
-            <span class="small text-muted" style="font-size: 0.7rem;">Generated: <?php echo date('d-M-Y H:i'); ?></span>
         </div>
     </div>
+<?php endif; ?>
 
-    <!-- Student top summary row with photo -->
-    <div class="row align-items-center mb-4">
-        <div class="col-8">
-            <h5 class="fw-bold text-primary mb-3">Core Dossier Metadata</h5>
-            <table class="table table-sm table-bordered border-dark mb-0" style="font-size: 11px;">
-                <tr>
-                    <th width="35%">Student Name:</th>
-                    <td><strong><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></strong></td>
-                </tr>
-                <tr>
-                    <th>Admission Number:</th>
-                    <td><code><?php echo htmlspecialchars($student['admission_no']); ?></code></td>
-                </tr>
-                <tr>
-                    <th>Student ID / Roll No:</th>
-                    <td><?php echo (int)$student['id']; ?> / <?php echo htmlspecialchars($details['roll_no'] ?? '—'); ?></td>
-                </tr>
-                <tr>
-                    <th>Academic Session:</th>
-                    <td><?php echo htmlspecialchars($details['academic_session'] ?? '—'); ?></td>
-                </tr>
-            </table>
+<?php if ($searchNotice): ?>
+    <div class="alert alert-info border-info shadow-sm rounded-4 p-4 mb-4 d-print-none">
+        <div class="d-flex align-items-center">
+            <i class="fa-solid fa-circle-info fa-2x text-info me-3"></i>
+            <div>
+                <h6 class="fw-bold text-dark mb-1">Search Notice</h6>
+                <p class="mb-0 text-secondary small"><?php echo htmlspecialchars($searchNotice); ?></p>
+            </div>
         </div>
-        <div class="col-4 text-end">
-            <div class="border border-dark rounded p-2 d-inline-block bg-white" style="width: 120px; height: 120px; display: flex; align-items: center; justify-content: center; margin-left: auto;">
-                <?php if (!empty($details['doc_student_photo'])): ?>
-                    <img src="<?php echo APP_URL . '/' . $details['doc_student_photo']; ?>" class="img-fluid rounded" alt="Photo" style="max-height: 100%;">
+    </div>
+<?php endif; ?>
+
+<!-- No Selection Default State -->
+<?php if (!$student && !$searchError && !$searchSystemError): ?>
+    <div class="card border-0 shadow-sm p-5 text-center bg-white rounded-4 mb-4 d-print-none">
+        <div class="mb-3 text-muted">
+            <i class="fa-solid fa-address-card fa-4x text-primary opacity-25"></i>
+        </div>
+        <h5 class="fw-bold text-dark mb-1">No Student Profile Loaded</h5>
+        <p class="text-muted small max-width-400 mx-auto mb-3">Enter a student's CNIC/B-Form number or Roll Number in the search bar above to generate their complete profile dossier.</p>
+    </div>
+<?php endif; ?>
+
+<!-- Render Area: Student Profile Dossier (Screen View) -->
+<?php if ($student): ?>
+<div class="dossier-main-card mb-4 d-print-none">
+    
+    <!-- SECTION A: PROFILE HEADER BANNER -->
+    <div class="dossier-banner d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="student-avatar-box">
+                <?php if (!empty($student['doc_student_photo'])): ?>
+                    <img src="<?php echo APP_URL . '/' . htmlspecialchars($student['doc_student_photo']); ?>" alt="Student Photo">
                 <?php else: ?>
-                    <i class="fa-solid fa-user-graduate fa-3x text-muted opacity-50"></i>
+                    <div class="text-center text-muted p-2">
+                        <i class="fa-solid fa-user-graduate fa-3x text-secondary opacity-50 mb-1"></i>
+                        <span class="d-block text-xs fw-semibold">No Photo Available</span>
+                    </div>
                 <?php endif; ?>
             </div>
+            <div>
+                <span class="badge bg-white bg-opacity-20 text-white border border-white border-opacity-20 px-3 py-1 rounded-pill mb-2">
+                    <i class="fa-solid fa-graduation-cap me-1"></i><?php echo SCHOOL_NAME; ?>
+                </span>
+                <h2 class="fw-bold text-white mb-1"><?php echo htmlspecialchars(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')); ?></h2>
+                <div class="d-flex flex-wrap align-items-center gap-2 text-white-50 small">
+                    <span><i class="fa-solid fa-hashtag me-1"></i>Adm No: <strong class="text-white"><?php echo htmlspecialchars($student['admission_no'] ?? '—'); ?></strong></span>
+                    <span>•</span>
+                    <span><i class="fa-solid fa-id-badge me-1"></i>Roll No: <strong class="text-white"><?php echo htmlspecialchars($student['roll_no'] ?? '—'); ?></strong></span>
+                    <span>•</span>
+                    <span><i class="fa-solid fa-layer-group me-1"></i>Class: <strong class="text-white"><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 align-self-stretch align-self-md-auto">
+            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-20 px-3 py-2 rounded-pill fs-6 fw-semibold align-self-center">
+                <i class="fa-solid fa-circle-check me-1"></i><?php echo htmlspecialchars($student['status'] ?? 'Active'); ?>
+            </span>
+            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-20 px-3 py-2 rounded-pill fs-6 fw-semibold align-self-center">
+                <?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?>
+            </span>
         </div>
     </div>
 
-    <!-- Section 1: Personal Profile -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">1. Personal Information</h6>
-    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+    <!-- Dossier Content Body -->
+    <div class="p-4 bg-light">
+        
+        <!-- Navigation Section Tabs -->
+        <ul class="nav nav-pills mb-4 bg-white p-2 rounded-3 border gap-1" id="dossierTabs" role="tablist" style="overflow-x: auto; flex-wrap: nowrap; white-space: nowrap;">
+            <li class="nav-item"><button class="nav-link active btn-sm fw-semibold" id="tab-overview" data-bs-toggle="tab" data-bs-target="#pane-overview" type="button"><i class="fa-solid fa-user me-1"></i>Personal & Academic</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-parents" data-bs-toggle="tab" data-bs-target="#pane-parents" type="button"><i class="fa-solid fa-users me-1"></i>Parents & Guardian</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-contact" data-bs-toggle="tab" data-bs-target="#pane-contact" type="button"><i class="fa-solid fa-phone me-1"></i>Contact & Address</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-family" data-bs-toggle="tab" data-bs-target="#pane-family" type="button"><i class="fa-solid fa-people-roof me-1"></i>Family & Siblings</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-attendance" data-bs-toggle="tab" data-bs-target="#pane-attendance" type="button"><i class="fa-solid fa-calendar-check me-1"></i>Attendance</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-fees" data-bs-toggle="tab" data-bs-target="#pane-fees" type="button"><i class="fa-solid fa-receipt me-1"></i>Fee Ledger</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-exams" data-bs-toggle="tab" data-bs-target="#pane-exams" type="button"><i class="fa-solid fa-square-poll-vertical me-1"></i>Exams</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-medical" data-bs-toggle="tab" data-bs-target="#pane-medical" type="button"><i class="fa-solid fa-shield-heart me-1"></i>Medical & Transport</button></li>
+            <li class="nav-item"><button class="nav-link btn-sm fw-semibold" id="tab-docs" data-bs-toggle="tab" data-bs-target="#pane-docs" type="button"><i class="fa-solid fa-folder-open me-1"></i>Documents & Remarks</button></li>
+        </ul>
+
+        <div class="tab-content" id="dossierTabsContent">
+            
+            <!-- Tab 1: Personal & Academic Overview -->
+            <div class="tab-pane fade show active" id="pane-overview" role="tabpanel">
+                <div class="row g-3">
+                    <!-- SECTION B: PERSONAL INFORMATION -->
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-user-circle text-primary"></i>Personal Information
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Full Name</span>
+                                    <span class="info-value"><?php echo htmlspecialchars(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Gender</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['gender'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Date of Birth</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['date_of_birth'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">CNIC / B-Form No</span>
+                                    <span class="info-value text-primary font-monospace"><?php echo htmlspecialchars($student['cnic_no'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Blood Group</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['blood_group'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Religion</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['religion'] ?? 'Islam'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Nationality</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['nationality'] ?? 'Pakistani'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Birth Certificate No</span>
+                                    <span class="info-value"><?php echo htmlspecialchars(!empty($student['doc_birth_cert']) ? 'Available' : '—'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION C: ACADEMIC INFORMATION -->
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-graduation-cap text-primary"></i>Academic Information
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Admission Number</span>
+                                    <span class="info-value text-primary font-monospace"><?php echo htmlspecialchars($student['admission_no'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Roll Number</span>
+                                    <span class="info-value font-monospace"><?php echo htmlspecialchars($student['roll_no'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Academic Type</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Campus Location</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['campus'] ?? 'Main Campus'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Class & Section</span>
+                                    <span class="info-value"><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Academic Session</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['academic_session'] ?? date('Y')); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Admission Date</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['enrollment_date'] ?? ($student['admission_date'] ?? '—')); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Previous School</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['prev_school'] ?? '—'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Parents & Guardian Information -->
+            <div class="tab-pane fade" id="pane-parents" role="tabpanel">
+                <!-- SECTION D: PARENT / GUARDIAN INFORMATION -->
+                <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-user-tie text-primary"></i>Father Information
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Father's Name</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['father_name'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Father's CNIC</span>
+                                    <span class="info-value font-monospace"><?php echo htmlspecialchars($student['father_cnic'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Father Mobile</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['father_mobile'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Father Occupation</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['father_occupation'] ?? '—'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-person-breastfeeding text-primary"></i>Mother & Guardian Details
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Mother's Name</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['mother_name'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Mother's CNIC</span>
+                                    <span class="info-value font-monospace"><?php echo htmlspecialchars($student['mother_cnic'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Guardian Name</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['guardian_name'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Guardian Relationship</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['guardian_relationship'] ?? 'Father'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Contact and Address Information -->
+            <div class="tab-pane fade" id="pane-contact" role="tabpanel">
+                <!-- SECTION E: CONTACT AND ADDRESS INFORMATION -->
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-location-dot text-primary"></i>Contact & Address Coordinates
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <span class="info-label">Primary Guardian Phone</span>
+                            <span class="info-value text-primary"><i class="fa-solid fa-phone me-1"></i><?php echo htmlspecialchars($student['guardian_phone'] ?? ($student['father_mobile'] ?? '—')); ?></span>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="info-label">Student Mobile No</span>
+                            <span class="info-value"><?php echo htmlspecialchars($student['student_mobile'] ?? '—'); ?></span>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="info-label">Emergency Contact</span>
+                            <span class="info-value text-danger"><i class="fa-solid fa-truck-medical me-1"></i><?php echo htmlspecialchars($student['emergency_contact'] ?? '—'); ?></span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="info-label">Current Residential Address</span>
+                            <span class="info-value"><?php echo htmlspecialchars($student['current_address'] ?? '—'); ?></span>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="info-label">Permanent Address</span>
+                            <span class="info-value"><?php echo htmlspecialchars($student['permanent_address'] ?? '—'); ?></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Family & Siblings Information -->
+            <div class="tab-pane fade" id="pane-family" role="tabpanel">
+                <!-- SECTION F: FAMILY INFORMATION -->
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-people-roof text-primary"></i>Verified Family & Sibling Details
+                    </div>
+                    <?php if (empty($familySiblings)): ?>
+                        <p class="text-muted small mb-0">No additional verified sibling records are linked to this family in the system database.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table custom-dossier-table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Sibling Name</th>
+                                        <th>Admission No</th>
+                                        <th>Roll No</th>
+                                        <th>Class & Section</th>
+                                        <th>Academic Type</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($familySiblings as $sib): ?>
+                                        <tr>
+                                            <td><strong><?php echo htmlspecialchars(($sib['first_name'] ?? '') . ' ' . ($sib['last_name'] ?? '')); ?></strong></td>
+                                            <td><code class="text-primary"><?php echo htmlspecialchars($sib['admission_no'] ?? '—'); ?></code></td>
+                                            <td><?php echo htmlspecialchars($sib['roll_no'] ?? '-'); ?></td>
+                                            <td><?php echo htmlspecialchars(($sib['class_name'] ?? '-') . ' ' . ($sib['section'] ?? '')); ?></td>
+                                            <td><span class="badge bg-light text-dark border"><?php echo htmlspecialchars($sib['academic_type'] ?? 'School'); ?></span></td>
+                                            <td>
+                                                <a href="profile_report.php?id=<?php echo $sib['id']; ?>" class="btn btn-xs btn-outline-primary py-1 px-2">
+                                                    <i class="fa-solid fa-arrow-right me-1"></i>View Profile
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <!-- Tab 5: Attendance Information -->
+            <div class="tab-pane fade" id="pane-attendance" role="tabpanel">
+                <!-- SECTION G: ATTENDANCE INFORMATION -->
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-calendar-days text-primary"></i>Attendance Ledger Summary
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 border rounded-3 bg-success bg-opacity-10 text-center">
+                                <span class="info-label text-success">Present Days</span>
+                                <span class="fs-4 fw-bold text-success"><?php echo $attendanceStats['Present']; ?></span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 border rounded-3 bg-danger bg-opacity-10 text-center">
+                                <span class="info-label text-danger">Absent Days</span>
+                                <span class="fs-4 fw-bold text-danger"><?php echo $attendanceStats['Absent']; ?></span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 border rounded-3 bg-warning bg-opacity-10 text-center">
+                                <span class="info-label text-warning">Leave Days</span>
+                                <span class="fs-4 fw-bold text-warning"><?php echo $attendanceStats['Leave']; ?></span>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="p-3 border rounded-3 bg-secondary bg-opacity-10 text-center">
+                                <span class="info-label text-secondary">Late Days</span>
+                                <span class="fs-4 fw-bold text-secondary"><?php echo $attendanceStats['Late']; ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table custom-dossier-table">
+                            <thead>
+                                <tr><th>Date</th><th>Status</th><th>Remarks</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($attendanceLogs)): ?>
+                                    <tr><td colspan="3" class="text-center text-muted">Attendance information is not available.</td></tr>
+                                <?php else: foreach ($attendanceLogs as $att): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($att['date'] ?? '—'); ?></td>
+                                        <td>
+                                            <span class="badge bg-<?php echo (($att['status'] ?? '') === 'Present') ? 'success' : ((($att['status'] ?? '') === 'Absent') ? 'danger' : 'warning'); ?>-subtle text-<?php echo (($att['status'] ?? '') === 'Present') ? 'success' : ((($att['status'] ?? '') === 'Absent') ? 'danger' : 'warning'); ?> rounded-pill">
+                                                <?php echo htmlspecialchars($att['status'] ?? '—'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($att['remarks'] ?? '—'); ?></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 6: Fee Information -->
+            <div class="tab-pane fade" id="pane-fees" role="tabpanel">
+                <!-- SECTION H: FEE INFORMATION -->
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-money-bill-wave text-primary"></i>Fee & Financial Ledger Summary
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-white">
+                                <span class="info-label">Monthly Tuition Fee</span>
+                                <span class="fs-5 fw-bold text-dark">Rs. <?php echo number_format((float)($student['fee_monthly'] ?? 3000), 2); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-white">
+                                <span class="info-label">Admission Fee</span>
+                                <span class="fs-5 fw-bold text-dark">Rs. <?php echo number_format((float)($student['fee_admission'] ?? 5000), 2); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-danger bg-opacity-10">
+                                <span class="info-label text-danger">Outstanding Dues Balance</span>
+                                <span class="fs-5 fw-bold text-danger">Rs. <?php echo number_format($outstandingBalance, 2); ?></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-dark mb-2">Recent Monthly Fee Ledger Statements</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table custom-dossier-table">
+                            <thead>
+                                <tr><th>Challan ID</th><th>Month</th><th>Payable Amount</th><th>Status</th><th>Due Date</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($feeChallans)): ?>
+                                    <tr><td colspan="5" class="text-center text-muted">Fee ledger records are not available.</td></tr>
+                                <?php else: foreach ($feeChallans as $ch): ?>
+                                    <tr>
+                                        <td><code>#<?php echo str_pad($ch['id'], 5, '0', STR_PAD_LEFT); ?></code></td>
+                                        <td><?php echo htmlspecialchars($ch['month'] ?? '—'); ?></td>
+                                        <td>Rs. <?php echo number_format((float)($ch['total_payable'] ?? 0), 2); ?></td>
+                                        <td>
+                                            <span class="badge bg-<?php echo (($ch['status'] ?? '') === 'Paid') ? 'success' : 'danger'; ?>-subtle text-<?php echo (($ch['status'] ?? '') === 'Paid') ? 'success' : 'danger'; ?> rounded-pill">
+                                                <?php echo htmlspecialchars($ch['status'] ?? 'Pending'); ?>
+                                            </span>
+                                        </td>
+                                        <td><?php echo htmlspecialchars($ch['due_date'] ?? '—'); ?></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 7: Examination / Result Information -->
+            <div class="tab-pane fade" id="pane-exams" role="tabpanel">
+                <!-- SECTION I: EXAMINATION / RESULT INFORMATION -->
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-list-check text-primary"></i>Examination Results & Marks Summary
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table custom-dossier-table">
+                            <thead>
+                                <tr><th>Exam Name</th><th>Subject</th><th>Obtained Marks</th><th>Total Marks</th><th>Remarks</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($examMarks)): ?>
+                                    <tr><td colspan="5" class="text-center text-muted">Examination result records are not available for this student.</td></tr>
+                                <?php else: foreach ($examMarks as $m): ?>
+                                    <tr>
+                                        <td><strong><?php echo htmlspecialchars($m['exam_name'] ?? '—'); ?></strong></td>
+                                        <td><?php echo htmlspecialchars($m['subject_name'] ?? '—'); ?></td>
+                                        <td><strong class="text-primary"><?php echo (float)($m['marks_obtained'] ?? 0); ?></strong></td>
+                                        <td><?php echo (int)($m['total_marks'] ?? 100); ?></td>
+                                        <td><?php echo htmlspecialchars($m['remarks'] ?? '—'); ?></td>
+                                    </tr>
+                                <?php endforeach; endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 8: Medical & Transport Information -->
+            <div class="tab-pane fade" id="pane-medical" role="tabpanel">
+                <div class="row g-3">
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-heart-pulse text-primary"></i>Medical Profile
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Allergies</span>
+                                    <span class="info-value text-danger"><?php echo htmlspecialchars($student['allergies'] ?? 'None recorded'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Physical Disability</span>
+                                    <span class="info-value text-danger"><?php echo htmlspecialchars($student['disability'] ?? 'None recorded'); ?></span>
+                                </div>
+                                <div class="col-12">
+                                    <span class="info-label">Family Doctor / Clinic</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['doctor_name'] ?? '—'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-lg-6">
+                        <div class="dossier-section-card h-100">
+                            <div class="dossier-section-title">
+                                <i class="fa-solid fa-bus text-primary"></i>Transport Details
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <span class="info-label">Transport Service</span>
+                                    <span class="info-value"><?php echo (!empty($student['transport_required'])) ? 'Subscribed' : 'Not Subscribed'; ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Route Details</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['transport_route'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Pickup Point</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['pickup_point'] ?? '—'); ?></span>
+                                </div>
+                                <div class="col-6">
+                                    <span class="info-label">Driver Name</span>
+                                    <span class="info-value"><?php echo htmlspecialchars($student['transport_driver'] ?? '—'); ?></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 9: Documents & Remarks -->
+            <div class="tab-pane fade" id="pane-docs" role="tabpanel">
+                <!-- SECTION J: DOCUMENTS AND ADDITIONAL INFORMATION -->
+                <div class="dossier-section-card mb-3">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-folder-open text-primary"></i>Uploaded Verification Documents
+                    </div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php
+                        $docs = [
+                            'doc_father_cnic' => 'Father CNIC Card',
+                            'doc_mother_cnic' => 'Mother CNIC Card',
+                            'doc_bform' => 'B-Form Copy',
+                            'doc_birth_cert' => 'Birth Certificate',
+                            'doc_leaving_cert' => 'School Leaving Cert',
+                            'doc_prev_result' => 'Previous Result',
+                            'doc_medical_cert' => 'Medical Certificate',
+                            'doc_other' => 'Other Attachment'
+                        ];
+                        $hasDocs = false;
+                        foreach ($docs as $key => $label) {
+                            if (!empty($student[$key])) {
+                                $hasDocs = true;
+                                echo '<a href="' . APP_URL . '/' . htmlspecialchars($student[$key]) . '" target="_blank" class="btn btn-sm btn-outline-primary px-3 rounded-pill"><i class="fa-solid fa-file-arrow-down me-1"></i>' . $label . '</a>';
+                            }
+                        }
+                        if (!$hasDocs) {
+                            echo '<p class="text-muted small mb-0">No official document files attached to this student record.</p>';
+                        }
+                        ?>
+                    </div>
+                </div>
+
+                <div class="dossier-section-card">
+                    <div class="dossier-section-title">
+                        <i class="fa-solid fa-clipboard text-primary"></i>Registration Remarks & Special Notes
+                    </div>
+                    <p class="mb-0 text-dark font-monospace bg-light p-3 rounded-3 border"><?php echo htmlspecialchars($student['remarks'] ?? 'No special registration remarks logged for this student file.'); ?></p>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<!-- ========================================================= -->
+<!-- PRINT-READY DOSSIER CONTAINER (VISIBLE ONLY IN PRINT)     -->
+<!-- ========================================================= -->
+<?php if ($student): ?>
+<div id="student-dossier-print">
+    <!-- Official Print Header -->
+    <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h2 style="font-weight: 800; margin: 0; font-size: 1.6rem; color: #000; font-family: 'Outfit', Arial, sans-serif;"><?php echo SCHOOL_NAME; ?></h2>
+            <h4 style="margin: 2px 0 0 0; font-size: 1.1rem; color: #333;">STUDENT PROFILE DOSSIER</h4>
+            <span style="font-size: 8.5pt; color: #555;"><?php echo SCHOOL_ADDRESS; ?></span>
+        </div>
+        <div style="text-align: right;">
+            <div style="width: 90px; height: 90px; border: 2px solid #000; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-left: auto;">
+                <?php if (!empty($student['doc_student_photo'])): ?>
+                    <img src="<?php echo APP_URL . '/' . htmlspecialchars($student['doc_student_photo']); ?>" style="max-width: 100%; max-height: 100%;">
+                <?php else: ?>
+                    <span style="font-size: 8pt; color: #666; text-align: center;">No Photo Available</span>
+                <?php endif; ?>
+            </div>
+            <span style="font-size: 7.5pt; color: #666; display: block; margin-top: 3px;">Printed: <?php echo date('d-M-Y h:i A'); ?></span>
+        </div>
+    </div>
+
+    <!-- 1. Metadata Summary Table -->
+    <table class="print-table">
+        <tr>
+            <th width="18%">Student Name:</th>
+            <td width="32%"><strong><?php echo htmlspecialchars(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')); ?></strong></td>
+            <th width="18%">Admission No:</th>
+            <td width="32%"><strong><?php echo htmlspecialchars($student['admission_no'] ?? '—'); ?></strong></td>
+        </tr>
+        <tr>
+            <th>Roll Number:</th>
+            <td><?php echo htmlspecialchars($student['roll_no'] ?? '—'); ?></td>
+            <th>Academic Type:</th>
+            <td><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></td>
+        </tr>
+        <tr>
+            <th>Class & Section:</th>
+            <td><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></td>
+            <th>Campus Location:</th>
+            <td><?php echo htmlspecialchars($student['campus'] ?? 'Main Campus'); ?></td>
+        </tr>
+        <tr>
+            <th>Academic Session:</th>
+            <td><?php echo htmlspecialchars($student['academic_session'] ?? date('Y')); ?></td>
+            <th>Student Status:</th>
+            <td><strong><?php echo htmlspecialchars($student['status'] ?? 'Active'); ?></strong></td>
+        </tr>
+    </table>
+
+    <!-- 2. Personal Information -->
+    <div class="print-section-header">1. Personal Information</div>
+    <table class="print-table">
         <tr>
             <th width="20%">Gender:</th>
-            <td width="30%"><?php echo htmlspecialchars($student['gender']); ?></td>
+            <td width="30%"><?php echo htmlspecialchars($student['gender'] ?? '—'); ?></td>
             <th width="20%">Date of Birth:</th>
-            <td width="30%"><?php echo htmlspecialchars($student['date_of_birth']); ?></td>
+            <td width="30%"><?php echo htmlspecialchars($student['date_of_birth'] ?? '—'); ?></td>
         </tr>
         <tr>
+            <th>CNIC / B-Form No:</th>
+            <td><strong><?php echo htmlspecialchars($student['cnic_no'] ?? '—'); ?></strong></td>
             <th>Blood Group:</th>
-            <td><?php echo htmlspecialchars($details['blood_group'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['blood_group'] ?? '—'); ?></td>
+        </tr>
+        <tr>
             <th>Religion:</th>
-            <td><?php echo htmlspecialchars($details['religion'] ?? '—'); ?></td>
-        </tr>
-        <tr>
+            <td><?php echo htmlspecialchars($student['religion'] ?? 'Islam'); ?></td>
             <th>Nationality:</th>
-            <td><?php echo htmlspecialchars($details['nationality'] ?? '—'); ?></td>
-            <th>CNIC / B-Form:</th>
-            <td><?php echo htmlspecialchars($details['cnic_no'] ?? '—'); ?></td>
-        </tr>
-        <tr>
-            <th>Student Mobile:</th>
-            <td><?php echo htmlspecialchars($details['student_mobile'] ?? '—'); ?></td>
-            <th>Student Email:</th>
-            <td><?php echo htmlspecialchars($details['student_email'] ?? '—'); ?></td>
-        </tr>
-        <tr>
-            <th>Current Address:</th>
-            <td colspan="3"><?php echo htmlspecialchars($details['current_address'] ?? '—'); ?></td>
-        </tr>
-        <tr>
-            <th>Permanent Address:</th>
-            <td colspan="3"><?php echo htmlspecialchars($details['permanent_address'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['nationality'] ?? 'Pakistani'); ?></td>
         </tr>
     </table>
 
-    <!-- Section 2: Academic Profile -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">2. Academic Information</h6>
-    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
-        <tr>
-            <th width="20%">Academic Type:</th>
-            <td width="30%"><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></td>
-            <th width="20%">School / Academy:</th>
-            <td width="30%"><?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?></td>
-        </tr>
-        <tr>
-            <th>Class / Section:</th>
-            <td><?php echo htmlspecialchars(($student['class_name'] ?? $student['school_class'] ?? '-') . ' - ' . ($student['section'] ?? $student['school_section'] ?? 'A')); ?></td>
-            <th>Academic Session:</th>
-            <td><?php echo htmlspecialchars($details['academic_session'] ?? '—'); ?></td>
-        </tr>
-        <tr>
-            <th>Admission Date:</th>
-            <td><?php echo htmlspecialchars($student['enrollment_date']); ?></td>
-            <th>Registration Status:</th>
-            <td><strong class="text-uppercase"><?php echo htmlspecialchars($student['status']); ?></strong></td>
-        </tr>
-    </table>
-
-    <!-- Section 3: Parent & Guardian Information -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">3. Parental Coordinates</h6>
-    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+    <!-- 3. Parent & Guardian Details -->
+    <div class="print-section-header">2. Parent & Guardian Coordinates</div>
+    <table class="print-table">
         <tr>
             <th width="20%">Father Name:</th>
-            <td width="30%"><?php echo htmlspecialchars($details['father_name'] ?? '—'); ?></td>
+            <td width="30%"><?php echo htmlspecialchars($student['father_name'] ?? '—'); ?></td>
             <th width="20%">Father CNIC:</th>
-            <td width="30%"><?php echo htmlspecialchars($details['father_cnic'] ?? '—'); ?></td>
+            <td width="30%"><?php echo htmlspecialchars($student['father_cnic'] ?? '—'); ?></td>
         </tr>
         <tr>
             <th>Father Mobile:</th>
-            <td><?php echo htmlspecialchars($details['father_mobile'] ?? '—'); ?></td>
-            <th>Occupation:</th>
-            <td><?php echo htmlspecialchars($details['father_occupation'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['father_mobile'] ?? '—'); ?></td>
+            <th>Father Occupation:</th>
+            <td><?php echo htmlspecialchars($student['father_occupation'] ?? '—'); ?></td>
         </tr>
         <tr>
             <th>Mother Name:</th>
-            <td><?php echo htmlspecialchars($details['mother_name'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['mother_name'] ?? '—'); ?></td>
             <th>Mother CNIC:</th>
-            <td><?php echo htmlspecialchars($details['mother_cnic'] ?? '—'); ?></td>
-        </tr>
-        <tr>
-            <th>Mother Mobile:</th>
-            <td><?php echo htmlspecialchars($details['mother_mobile'] ?? '—'); ?></td>
-            <th>Emergency Contact:</th>
-            <td><?php echo htmlspecialchars($details['emergency_contact'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['mother_cnic'] ?? '—'); ?></td>
         </tr>
         <tr>
             <th>Guardian Name:</th>
             <td><?php echo htmlspecialchars($student['guardian_name'] ?? '—'); ?></td>
-            <th>Guardian Mobile:</th>
-            <td><?php echo htmlspecialchars($student['guardian_phone'] ?? '—'); ?></td>
-        </tr>
-        <tr>
             <th>Relationship:</th>
-            <td colspan="3"><?php echo htmlspecialchars($details['guardian_relationship'] ?? '—'); ?></td>
+            <td><?php echo htmlspecialchars($student['guardian_relationship'] ?? 'Father'); ?></td>
         </tr>
     </table>
 
-    <!-- Section 4: Fee & Finances -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">4. Fee & Financial Information</h6>
-    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
+    <!-- 4. Contact & Address Information -->
+    <div class="print-section-header">3. Contact & Address Details</div>
+    <table class="print-table">
         <tr>
-            <th width="20%">Monthly Fee:</th>
-            <td width="30%">Rs. <?php echo number_format((float)($details['fee_monthly'] ?? 0), 2); ?></td>
-            <th width="20%">Admission Fee:</th>
-            <td width="30%">Rs. <?php echo number_format((float)($details['fee_admission'] ?? 0), 2); ?></td>
+            <th width="20%">Guardian Phone:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['guardian_phone'] ?? ($student['father_mobile'] ?? '—')); ?></td>
+            <th width="20%">Emergency Contact:</th>
+            <td width="30%"><?php echo htmlspecialchars($student['emergency_contact'] ?? '—'); ?></td>
         </tr>
         <tr>
-            <th>Fee Plan:</th>
-            <td><?php echo htmlspecialchars($details['fee_plan'] ?? 'Standard Plan'); ?></td>
-            <th>Outstanding Balance:</th>
-            <td><strong class="text-danger">Rs. <?php echo number_format($outstandingBalance, 2); ?></strong></td>
-        </tr>
-    </table>
-
-    <!-- Section 5: Medical Information -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">5. Medical Information</h6>
-    <table class="table table-sm table-bordered border-dark mb-3" style="font-size: 10px;">
-        <tr>
-            <th width="20%">Medical Notes:</th>
-            <td width="30%"><?php echo htmlspecialchars($details['medical_condition'] ?? 'No special medical conditions recorded.'); ?></td>
-            <th width="20%">Allergies:</th>
-            <td width="30%"><?php echo htmlspecialchars($details['allergies'] ?? 'None recorded.'); ?></td>
+            <th>Current Address:</th>
+            <td colspan="3"><?php echo htmlspecialchars($student['current_address'] ?? '—'); ?></td>
         </tr>
         <tr>
-            <th>Special Instructions:</th>
-            <td colspan="3"><?php echo htmlspecialchars($details['special_notes'] ?? 'None.'); ?></td>
+            <th>Permanent Address:</th>
+            <td colspan="3"><?php echo htmlspecialchars($student['permanent_address'] ?? '—'); ?></td>
         </tr>
     </table>
 
-    <!-- Section 6: Office remarks & Signatures -->
-    <h6 class="fw-bold mb-2 text-dark border-bottom border-dark pb-1 text-uppercase" style="font-size: 11px; letter-spacing:0.5px;">6. Office Remarks & Signatures</h6>
-    <div class="border border-dark p-2 rounded mb-4" style="min-height: 50px; font-size: 10px;">
-        <strong>Office Remarks:</strong> <?php echo htmlspecialchars($details['remarks'] ?? 'No official remarks logged.'); ?>
+    <!-- 5. Financial Summary -->
+    <div class="print-section-header">4. Fee & Financial Ledger Summary</div>
+    <table class="print-table">
+        <tr>
+            <th width="20%">Monthly Tuition Fee:</th>
+            <td width="30%">Rs. <?php echo number_format((float)($student['fee_monthly'] ?? 3000), 2); ?></td>
+            <th width="20%">Outstanding Dues:</th>
+            <td width="30%"><strong>Rs. <?php echo number_format($outstandingBalance, 2); ?></strong></td>
+        </tr>
+    </table>
+
+    <!-- 6. Remarks & Special Instructions -->
+    <div class="print-section-header">5. Remarks & Notes</div>
+    <div style="border: 1px solid #333; padding: 6px 10px; font-size: 9pt; min-height: 40px; margin-bottom: 25px;">
+        <?php echo htmlspecialchars($student['remarks'] ?? 'No official remarks logged for this student record.'); ?>
     </div>
 
-    <!-- Signatures and Stamp Block -->
-    <div class="row pt-4 align-items-end" style="font-size: 10px;">
-        <div class="col-4">
-            <div style="border-top: 1px solid #000; width: 160px;" class="pt-2 text-center">
-                <strong>Parent / Guardian Signature</strong>
-            </div>
+    <!-- Official Signatures & Stamp Area -->
+    <div style="margin-top: 30px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 9pt;">
+        <div style="text-align: center; border-top: 1px solid #000; width: 180px; padding-top: 4px;">
+            <strong>Parent / Guardian Signature</strong>
         </div>
-        <div class="col-4 text-center">
-            <div style="border: 1px dashed #777; width: 120px; height: 70px; display: inline-flex; align-items: center; justify-content: center; margin: auto;" class="text-muted text-xs">
-                OFFICE STAMP AREA
-            </div>
+        <div style="border: 1px dashed #666; width: 110px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 7pt; color: #666;">
+            OFFICE STAMP AREA
         </div>
-        <div class="col-4 text-end">
-            <div style="border-top: 1px solid #000; width: 160px; margin-left: auto;" class="pt-2 text-center">
-                <strong>Principal Signature</strong>
-            </div>
+        <div style="text-align: center; border-top: 1px solid #000; width: 180px; padding-top: 4px;">
+            <strong>Principal Signature</strong>
         </div>
     </div>
 </div>
 <?php endif; ?>
-
-<style>
-#student-dossier-print {
-    display: none;
-}
-@media print {
-    /* Hide all page content elements */
-    body * {
-        visibility: hidden;
-    }
-    /* Render only dossier print block */
-    #student-dossier-print,
-    #student-dossier-print * {
-        visibility: visible;
-    }
-    #student-dossier-print {
-        display: block !important;
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
-        margin: 0;
-        padding: 15mm;
-        box-sizing: border-box;
-        background-color: white !important;
-        color: black !important;
-        font-family: Arial, sans-serif;
-    }
-    @page {
-        size: A4 portrait;
-        margin: 0;
-    }
-    .table-bordered th, .table-bordered td {
-        border: 1px solid #000 !important;
-        padding: 5px 8px !important;
-        color: black !important;
-    }
-    .text-primary {
-        color: #1e3a8a !important;
-    }
-    .text-danger {
-        color: #dc3545 !important;
-    }
-}
-</style>
 
 <?php
 include_once __DIR__ . '/../../includes/footer.php';

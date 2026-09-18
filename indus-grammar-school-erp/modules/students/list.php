@@ -138,7 +138,10 @@ if ($totalPages < 1) $totalPages = 1;
                             <td><strong class="text-primary font-monospace"><?php echo sanitize($student['admission_no']); ?></strong></td>
                             <td>
                                 <div class="fw-semibold text-dark"><?php echo sanitize($student['first_name'] . ' ' . $student['last_name']); ?></div>
-                                <div class="text-muted small" style="font-size: 0.75rem;">Born: <?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?></div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">
+                                    <span class="badge bg-light text-dark border me-1"><i class="fa-solid fa-building-columns me-1 text-primary"></i><?php echo sanitize($student['campus'] ?? 'Main Campus'); ?></span>
+                                    Born: <?php echo date('M d, Y', strtotime($student['date_of_birth'])); ?>
+                                </div>
                             </td>
                             <td>
                                 <?php

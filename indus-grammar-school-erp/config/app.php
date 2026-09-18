@@ -48,8 +48,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Generate CSRF token if not exists
-if (empty($_SESSION['csrf_token'])) {
+// Generate or renew CSRF token if not exists or expired
+if (empty($_SESSION['csrf_token']) || empty($_SESSION['csrf_token_time']) || (time() - $_SESSION['csrf_token_time'] > CSRF_TOKEN_EXPIRE)) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     $_SESSION['csrf_token_time'] = time();
 }
