@@ -235,13 +235,18 @@
                 </a>
                 <ul class="collapse list-unstyled submenu <?php echo str_contains($_SERVER['PHP_SELF'], '/modules/communication/') ? 'show' : ''; ?>" id="communicationSubmenu" data-bs-parent="#sidebarMenu">
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/dashboard.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/dashboard.php">Comm Dashboard</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp.php"><i class="fa-brands fa-whatsapp text-success me-1"></i>Send WhatsApp</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_bulk.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_bulk.php">Bulk WhatsApp</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/sms.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/sms.php">SMS Dispatcher</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/email.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/email.php">Email Broadcast</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/announcements.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/announcements.php">Announcements Log</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/circulars.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/circulars.php">Printable Circulars</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/history.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/history.php">Comm History</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/templates.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/templates.php">Message Templates</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/settings.php">Gateway Settings</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_history.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_history.php">WhatsApp History</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/history.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/history.php">Comm History</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_templates.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_templates.php">WhatsApp Templates</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/templates.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/templates.php">SMS Templates</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/whatsapp_settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/whatsapp_settings.php">WhatsApp Settings</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') && !str_contains($_SERVER['PHP_SELF'], '/whatsapp_') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/communication/settings.php">Gateway Settings</a></li>
                 </ul>
             </li>
             <?php endif; ?>
