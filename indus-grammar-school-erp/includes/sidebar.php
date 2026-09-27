@@ -140,8 +140,6 @@
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/dashboard.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/dashboard.php">Accounts Dashboard</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/income.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/income.php">Income Ledger</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/expenses.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/expenses.php">Home Expenses</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/opening_balance.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/opening_balance.php">Cash Opening</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/closing.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/closing.php">Cash Closing</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/cashbook.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/cashbook.php">Cash Book Ledger</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/bank.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/bank.php">Bank Transactions</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/financial_reports.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/cash/financial_reports.php">Financial Reports</a></li>
@@ -233,7 +231,6 @@
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/examination.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/reports/examination.php">Examination Reports</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/staff.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/reports/staff.php">Staff Reports</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/payroll.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/reports/payroll.php">Payroll Reports</a></li>
-                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/communication.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/reports/communication.php">Communication Reports</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/custom.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/reports/custom.php">Custom Reports</a></li>
                 </ul>
             </li>

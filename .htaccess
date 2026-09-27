@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /indus-grammar-school-erp/
+
+    # Do not rewrite if already targeting the nested directory
+    RewriteCond %{REQUEST_URI} !^/indus-grammar-school-erp/indus-grammar-school-erp/
+
+    # If the requested file or directory does not exist in the root folder
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+
+    # Rewrite to the nested folder
+    RewriteRule ^(.*)$ indus-grammar-school-erp/$1 [L,QSA]
+</IfModule>

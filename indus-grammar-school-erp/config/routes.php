@@ -57,8 +57,6 @@ return [
     
     // Cash Desk
     'modules/cash/dashboard.php'       => 'cash_view',
-    'modules/cash/opening_balance.php' => 'cash_transaction',
-    'modules/cash/closing.php'         => 'cash_transaction',
     'modules/cash/reconciliation.php'  => 'cash_view',
     'modules/cash/collection.php'      => 'cash_view',
     'modules/cash/expenses.php'        => 'cash_transaction',
@@ -98,7 +96,6 @@ return [
     'modules/reports/examination.php'   => 'report_view',
     'modules/reports/staff.php'         => 'report_view',
     'modules/reports/payroll.php'       => 'report_view',
-    'modules/reports/communication.php' => 'report_view',
     'modules/reports/custom.php'        => 'report_view',
     'modules/reports/export.php'        => 'report_view',
     

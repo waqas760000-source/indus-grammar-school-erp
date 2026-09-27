@@ -337,7 +337,7 @@ try {
                 <span class="badge bg-success-subtle text-success px-3 py-1 rounded-pill fw-semibold"><?php echo $totalCollections; ?> Total Receipts</span>
             </div>
             <div class="text-end text-success fw-bold fs-6 btn-print-hide">
-                Period Total: Rs. <?php echo number_format($totalInView, 2); ?>
+                Period Total: Rs. <?php echo number_format($rangeTotalSum, 2); ?>
             </div>
         </div>
 

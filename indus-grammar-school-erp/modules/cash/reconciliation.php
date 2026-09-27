@@ -9,13 +9,11 @@ $breadcrumbActive = 'Cash Desk';
 include_once __DIR__ . '/../../includes/header.php';
 AuthMiddleware::requirePermission('cash_view');
 
-$register = Cash::getOpenRegister();
-if (!$register) {
-    echo "<script>window.location.href='opening_balance.php';</script>";
-    exit;
-}
-
-$expectedClosing = $register['opening_balance'] + $register['total_collections'] - $register['total_expenses'];
+$register = class_exists('Cash') ? Cash::getOpenRegister() : false;
+$openingBal = $register ? ($register['opening_balance'] ?? 0) : 0;
+$totColl = $register ? ($register['total_collections'] ?? 0) : 0;
+$totExp = $register ? ($register['total_expenses'] ?? 0) : 0;
+$expectedClosing = $openingBal + $totColl - $totExp;
 ?>
 
 <div class="row mb-4 align-items-center">
