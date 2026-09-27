@@ -180,8 +180,8 @@ if ($totalPages < 1) $totalPages = 1;
                                         <i class="fa-regular fa-user"></i>
                                     </a>
                                     <?php if (hasPermission('student_edit')): ?>
-                                        <a href="registration.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-primary btn-sm" title="Edit Student">
-                                            <i class="fa-regular fa-pen-to-square"></i>
+                                        <a href="registration.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-primary btn-sm" title="Edit Student Details">
+                                            <i class="fa-regular fa-pen-to-square me-1"></i>Edit
                                         </a>
                                     <?php endif; ?>
                                     <?php if (hasPermission('student_delete')): ?>

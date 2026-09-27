@@ -355,13 +355,14 @@ switch ($action) {
             $slipNum = 'SLIP-' . $detail['year'] . str_pad($detail['month'], 2, '0', STR_PAD_LEFT) . '-' . str_pad($detail['staff_id'], 4, '0', STR_PAD_LEFT);
             $slipStmt = $db->prepare("
                 INSERT INTO salary_slips (salary_detail_id, slip_number, prepared_by, approved_by)
-                VALUES (:detail_id, :slip_num, :by, :by)
+                VALUES (:detail_id, :slip_num, :prep_by, :appr_by)
                 ON DUPLICATE KEY UPDATE slip_number = VALUES(slip_number)
             ");
             $slipStmt->execute([
                 'detail_id' => $salaryDetailId,
                 'slip_num'  => $slipNum,
-                'by'        => $_SESSION['user_id'] ?? null
+                'prep_by'   => $_SESSION['user_id'] ?? null,
+                'appr_by'   => $_SESSION['user_id'] ?? null
             ]);
 
             // 4. Update advance recovery balances if there was a recovery deduction
@@ -386,7 +387,6 @@ switch ($action) {
                         'id'     => $adv['id']
                     ]);
                 }
-            }
 
             // 5. ACCOUNTS INTEGRATION: Register salary paid as expense in accounts module
             // Find category ID for "Salaries"
@@ -659,41 +659,69 @@ switch ($action) {
 
     // ── 8. PAYROLL SETTINGS ───────────────────────────────────
     case 'save_payroll_settings':
-        $payDate = (int)($_POST['salary_payment_date'] ?? 10);
-        $days    = (int)($_POST['working_days_per_month'] ?? 26);
-        $late    = (float)($_POST['late_deduction_rule'] ?? 0.25);
-        $half    = (float)($_POST['half_day_rule'] ?? 0.50);
-        $absent  = (float)($_POST['absent_deduction_rule'] ?? 1.00);
-        $ot      = (float)($_POST['overtime_rate'] ?? 0.00);
-        $curr    = sanitize($_POST['currency'] ?? 'Rs.');
-        $method  = sanitize($_POST['default_payment_method'] ?? 'Bank Transfer');
+        $payDate     = (int)($_POST['salary_payment_date'] ?? 10);
+        $autoEnabled = isset($_POST['auto_issue_enabled']) ? (int)$_POST['auto_issue_enabled'] : 1;
+        $autoDay     = (int)($_POST['auto_issue_day'] ?? $payDate);
+        $autoStatus  = sanitize($_POST['auto_issue_status'] ?? 'Pending');
+        $days        = (int)($_POST['working_days_per_month'] ?? 26);
+        $late        = (float)($_POST['late_deduction_rule'] ?? 0.25);
+        $half        = (float)($_POST['half_day_rule'] ?? 0.50);
+        $absent      = (float)($_POST['absent_deduction_rule'] ?? 1.00);
+        $ot          = (float)($_POST['overtime_rate'] ?? 0.00);
+        $curr        = sanitize($_POST['currency'] ?? 'Rs.');
+        $method      = sanitize($_POST['default_payment_method'] ?? 'Bank Transfer');
 
         try {
             $stmt = $db->prepare("
                 UPDATE payroll_settings 
-                SET salary_payment_date = :pay, working_days_per_month = :days, late_deduction_rule = :late,
-                    half_day_rule = :half, absent_deduction_rule = :absent, overtime_rate = :ot,
-                    currency = :curr, default_payment_method = :method
+                SET salary_payment_date = :pay, 
+                    auto_issue_enabled = :auto_en,
+                    auto_issue_day = :auto_day,
+                    auto_issue_status = :auto_stat,
+                    working_days_per_month = :days, 
+                    late_deduction_rule = :late,
+                    half_day_rule = :half, 
+                    absent_deduction_rule = :absent, 
+                    overtime_rate = :ot,
+                    currency = :curr, 
+                    default_payment_method = :method
                 WHERE id = 1
             ");
             $ok = $stmt->execute([
-                'pay'    => $payDate,
-                'days'   => $days,
-                'late'   => $late,
-                'half'   => $half,
-                'absent' => $absent,
-                'ot'     => $ot,
-                'curr'   => $curr,
-                'method' => $method
+                'pay'       => $payDate,
+                'auto_en'   => $autoEnabled,
+                'auto_day'  => $autoDay,
+                'auto_stat' => $autoStatus,
+                'days'      => $days,
+                'late'      => $late,
+                'half'      => $half,
+                'absent'    => $absent,
+                'ot'        => $ot,
+                'curr'      => $curr,
+                'method'    => $method
             ]);
 
             if ($ok) {
-                auditLog('Payroll Settings Saved', 'Updated operational payroll settings and late fine ratios.');
-                jsonResponse(['success' => true, 'message' => 'Payroll settings configured successfully.']);
+                auditLog('Payroll Settings Saved', 'Updated operational payroll settings, auto salary issuance rules on 10th, and late fine ratios.');
+                jsonResponse(['success' => true, 'message' => 'Payroll settings and 10th date automatic salary issuance rules updated successfully.']);
             }
             jsonResponse(['success' => false, 'message' => 'Failed to save settings.']);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ── 9. TRIGGER AUTOMATIC PAYROLL ISSUANCE ON DEMAND ───────
+    case 'trigger_auto_payroll':
+        require_once __DIR__ . '/../services/PayrollService.php';
+        $month = isset($_POST['month']) ? (int)$_POST['month'] : (int)date('m');
+        $year  = isset($_POST['year']) ? (int)$_POST['year'] : (int)date('Y');
+        
+        $res = PayrollService::checkAndRunAutoPayroll(true, $month, $year);
+        if ($res['success']) {
+            jsonResponse(['success' => true, 'message' => $res['message']]);
+        } else {
+            jsonResponse(['success' => false, 'message' => $res['message']]);
         }
         break;
 

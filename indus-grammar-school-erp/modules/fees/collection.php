@@ -21,6 +21,15 @@ require_once __DIR__ . '/../../includes/navbar.php';
 
 // Fetch cashier statistics & financial metrics
 $db = Database::getConnection();
+
+// Require FeeService and trigger 1st date automatic fee generation check
+require_once __DIR__ . '/../../services/FeeService.php';
+$feeService = new FeeService();
+$autoFeeRes = $feeService->checkAndRunAutoFee();
+if (!empty($autoFeeRes['status']) && empty($autoFeeRes['already_run']) && !empty($autoFeeRes['generated_count'])) {
+    $_SESSION['flash_success'] = $autoFeeRes['message'];
+}
+
 $todayDate = date('Y-m-d');
 $cashierId = $_SESSION['user_id'] ?? 0;
 
@@ -446,9 +455,50 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
                 <a href="challan.php" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm"><i class="fa-solid fa-calculator me-1"></i>Fee Ledger Sheets</a>
                 <a href="receipts.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-receipt me-1"></i>Receipts Log</a>
                 <a href="dues.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-clock-rotate-left me-1"></i>Defaulters List</a>
+    </div>
+</div>
+
+<?php
+$fSettings = [];
+try {
+    $fSettings = $db->query("SELECT * FROM fee_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+$autoFeeEnabled = !empty($fSettings['auto_fee_enabled']);
+$autoFeeDay = (int)($fSettings['auto_fee_day'] ?? 1);
+$lastAutoFeeRun = $fSettings['last_auto_fee_run'] ?? 'Not executed yet';
+$currentMonthName = date('F Y');
+?>
+
+<!-- 1-Click Monthly Fee Generation for Whole School & Academy -->
+<div class="card border-0 shadow-sm bg-white mb-4 rounded-3 p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="p-2 bg-primary-subtle text-primary rounded-3 fs-4">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <strong class="text-dark fs-6">1-Click Monthly Fee Generation (Whole School & Academy)</strong>
+                    <span class="badge <?php echo $autoFeeEnabled ? 'bg-success' : 'bg-secondary'; ?> text-white px-2 py-1 rounded-pill small">
+                        <?php echo $autoFeeEnabled ? "Auto-Run Scheduled: 1st Date of Every Month" : 'Manual Mode'; ?>
+                    </span>
+                </div>
+                <p class="text-muted small mb-0">
+                    Instantly generate monthly fee ledgers & vouchers for ALL active School & Academy students for <strong><?php echo $currentMonthName; ?></strong> in 1-click.
+                    Last auto-run: <strong><?php echo htmlspecialchars($lastAutoFeeRun); ?></strong>
+                </p>
             </div>
         </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-primary fw-bold px-3 py-2 shadow-sm text-nowrap" id="btnGenerateBulkFees1Click">
+                <i class="fa-solid fa-bolt me-1"></i>Generate Fee 1-Click (<?php echo $currentMonthName; ?>)
+            </button>
+            <a href="challan.php" class="btn btn-sm btn-light border text-secondary px-3 py-2 text-nowrap">
+                <i class="fa-solid fa-calculator me-1"></i>Fee Ledger Sheets
+            </a>
+        </div>
     </div>
+</div>
 
     <!-- Top KPI Executive Metric Cards -->
     <div class="row g-3 mb-4">

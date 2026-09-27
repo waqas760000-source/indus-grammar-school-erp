@@ -18,6 +18,13 @@ if (!in_array($userRole, [ROLE_SUPER_ADMIN, ROLE_SCHOOL_ADMIN, 'accountant'])) {
 
 $db = Database::getConnection();
 
+// Include PayrollService & trigger 10th date automatic salary issuance check
+require_once __DIR__ . '/../../services/PayrollService.php';
+$autoRunRes = PayrollService::checkAndRunAutoPayroll();
+if (!empty($autoRunRes['success']) && empty($autoRunRes['already_run']) && !empty($autoRunRes['count'])) {
+    $_SESSION['flash_success'] = $autoRunRes['message'];
+}
+
 // Selected cycle parameters
 $selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
 $selectedYear  = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
@@ -199,6 +206,46 @@ $runs = $db->query("
                     <i class="fa-solid fa-gears me-1"></i> Process Run
                 </a>
             </form>
+    </div>
+</div>
+
+<?php
+$pSettings = [];
+try {
+    $pSettings = $db->query("SELECT * FROM payroll_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+$autoEnabled = !empty($pSettings['auto_issue_enabled']);
+$autoDay = (int)($pSettings['auto_issue_day'] ?? 10);
+$lastAutoRun = $pSettings['last_auto_issue_run'] ?? 'Not executed yet';
+?>
+
+<!-- Automatic Monthly Salary Issuance Banner (10th Date Rule) -->
+<div class="card border-0 shadow-sm bg-white mb-4 rounded-3 p-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="p-2 bg-success-subtle text-success rounded-3 fs-4">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <strong class="text-dark fs-6">Automatic Monthly Salary Issuance Engine</strong>
+                    <span class="badge <?php echo $autoEnabled ? 'bg-success' : 'bg-secondary'; ?> text-white px-2 py-1 rounded-pill small">
+                        <?php echo $autoEnabled ? "Active: Scheduled Every Month on {$autoDay}th Date" : 'Disabled'; ?>
+                    </span>
+                </div>
+                <p class="text-muted small mb-0">
+                    System automatically calculates & issues monthly staff salaries for all active staff members on the <strong><?php echo $autoDay; ?>th date</strong> of every month.
+                    Last automatic run: <strong><?php echo htmlspecialchars($lastAutoRun); ?></strong>
+                </p>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-success fw-bold px-3 py-2 shadow-sm text-nowrap" id="btnIssueAutoSalaryNow">
+                <i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now (<?php echo $autoDay; ?>th)
+            </button>
+            <a href="payroll_settings.php" class="btn btn-sm btn-light border text-secondary px-3 py-2 text-nowrap">
+                <i class="fa-solid fa-sliders me-1"></i>Configure Rules
+            </a>
         </div>
     </div>
 </div>
@@ -533,6 +580,40 @@ $runs = $db->query("
             </table>
         </div>
     </div>
-</div>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const btnAuto = document.getElementById("btnIssueAutoSalaryNow");
+    if (btnAuto) {
+        btnAuto.addEventListener("click", () => {
+            if (!confirm("Are you sure you want to execute automatic monthly salary issuance now for <?php echo $monthText; ?>?")) return;
+            btnAuto.disabled = true;
+            btnAuto.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Processing...';
+            
+            const fd = new FormData();
+            fd.append("action", "trigger_auto_payroll");
+            fd.append("month", "<?php echo $selectedMonth; ?>");
+            fd.append("year", "<?php echo $selectedYear; ?>");
+            fd.append("csrf_token", "<?php echo csrfToken(); ?>");
+
+            fetch("../../ajax/payroll.php", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    alert(data.message);
+                    if (data.success) {
+                        location.reload();
+                    } else {
+                        btnAuto.disabled = false;
+                        btnAuto.innerHTML = '<i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now (<?php echo $autoDay; ?>th)';
+                    }
+                })
+                .catch(() => {
+                    alert("An error occurred while executing automatic salary issuance.");
+                    btnAuto.disabled = false;
+                    btnAuto.innerHTML = '<i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now (<?php echo $autoDay; ?>th)';
+                });
+        });
+    }
+});
+</script>
 
 <?php include_once __DIR__ . '/../../includes/footer.php'; ?>

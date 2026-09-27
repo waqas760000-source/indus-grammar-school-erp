@@ -420,6 +420,11 @@ if ($selectedId > 0) {
     </div>
     <?php if ($student): ?>
         <div class="d-flex gap-2">
+            <?php if (hasPermission('student_edit')): ?>
+                <a href="registration.php?id=<?php echo $selectedId; ?>" class="btn btn-sm btn-primary text-white fw-bold px-3 shadow-sm" title="Edit Student Profile">
+                    <i class="fa-regular fa-pen-to-square me-1"></i> Edit Student Details
+                </a>
+            <?php endif; ?>
             <a href="../../templates/profile_dossier.php?id=<?php echo $selectedId; ?>" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
                 <i class="fa-solid fa-print me-1"></i> Print Formal A4 Dossier
             </a>

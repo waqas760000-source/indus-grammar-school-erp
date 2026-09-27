@@ -655,6 +655,35 @@ switch ($action) {
         }
         break;
 
+    // ── 1-Click Bulk Monthly Fee Generation (Whole School & Academy) ──
+    case 'generate_bulk_monthly_fees':
+        AuthMiddleware::requirePermission('fee_manage');
+        $month        = sanitize($_POST['month'] ?? date('F Y'));
+        $academicType = sanitize($_POST['academic_type'] ?? 'All');
+        $classId      = isset($_POST['class_id']) && (int)$_POST['class_id'] > 0 ? (int)$_POST['class_id'] : null;
+        $dueDate      = sanitize($_POST['due_date'] ?? date('Y-m-15'));
+
+        $res = $feeService->generateBulkMonthlyFees($month, $academicType, $classId, $dueDate);
+        jsonResponse([
+            'success'         => $res['status'],
+            'message'         => $res['message'],
+            'generated_count' => $res['generated_count'] ?? 0,
+            'skipped_count'   => $res['skipped_count'] ?? 0,
+            'total_billed'    => $res['total_billed'] ?? 0.00
+        ]);
+        break;
+
+    // ── Save Automatic 1st Date Fee Generation Settings ──
+    case 'save_auto_fee_settings':
+        AuthMiddleware::requirePermission('fee_manage');
+        $db = Database::getConnection();
+        $enabled = isset($_POST['auto_fee_enabled']) ? (int)$_POST['auto_fee_enabled'] : 1;
+        $day     = (int)($_POST['auto_fee_day'] ?? 1);
+        
+        $ok = $db->prepare("UPDATE fee_settings SET auto_fee_enabled = :en, auto_fee_day = :day WHERE id = 1")->execute(['en' => $enabled, 'day' => $day]);
+        jsonResponse(['success' => $ok, 'message' => $ok ? 'Automatic 1st date monthly fee generation settings updated successfully.' : 'Failed to update settings.']);
+        break;
+
     default:
         jsonResponse(['success' => false, 'message' => 'Unknown action.']);
 }

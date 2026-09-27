@@ -161,4 +161,147 @@ class FeeService {
         
         return Fee::recordPayment($data);
     }
+
+    /**
+     * Generate monthly fee ledger entries in bulk for ALL active School & Academy students (or specific filters) in 1-click.
+     *
+     * @param string $month Month string (e.g., 'September 2026')
+     * @param string $academicType 'All', 'School', or 'Academy'
+     * @param int|null $classId Optional class ID filter
+     * @param string|null $dueDate Due date for generated ledgers (defaults to 15th of month)
+     * @return array
+     */
+    public function generateBulkMonthlyFees(string $month, string $academicType = 'All', ?int $classId = null, ?string $dueDate = null): array {
+        $db = Database::getConnection();
+
+        try {
+            $where = "WHERE status = 'Active'";
+            $params = [];
+
+            if ($academicType !== 'All' && !empty($academicType)) {
+                $where .= " AND academic_type = :type";
+                $params['type'] = $academicType;
+            }
+
+            if ($classId && $classId > 0) {
+                $where .= " AND class_id = :cid";
+                $params['cid'] = $classId;
+            }
+
+            $stmt = $db->prepare("SELECT id, first_name, last_name, admission_no, academic_type, class_id FROM students $where ORDER BY id ASC");
+            $stmt->execute($params);
+            $students = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            if (empty($students)) {
+                return [
+                    'status'  => false,
+                    'message' => 'No active students found matching the selected filter criteria.'
+                ];
+            }
+
+            if (empty($dueDate)) {
+                $dueDate = date('Y-m-15');
+            }
+
+            $generatedCount = 0;
+            $skippedCount   = 0;
+            $totalBilled    = 0.00;
+
+            foreach ($students as $st) {
+                $res = $this->generateMonthlyLedgerEntry($st['id'], $month, $dueDate);
+                if (!empty($res['status'])) {
+                    $generatedCount++;
+                    $amtStmt = $db->prepare("SELECT total_payable FROM fee_ledger WHERE student_id = ? AND month = ? LIMIT 1");
+                    $amtStmt->execute([$st['id'], $month]);
+                    $totalBilled += (float)$amtStmt->fetchColumn();
+                } else {
+                    $skippedCount++;
+                }
+            }
+
+            $auditType = ($academicType === 'All') ? 'Whole School & Academy' : $academicType;
+            if (function_exists('auditLog')) {
+                auditLog('1-Click Monthly Fee Generated', "Generated monthly fee ledgers for $month ($auditType): $generatedCount generated, $skippedCount already billed.");
+            }
+
+            return [
+                'status'          => true,
+                'month'           => $month,
+                'generated_count' => $generatedCount,
+                'skipped_count'   => $skippedCount,
+                'total_billed'    => $totalBilled,
+                'message'         => "1-Click Monthly Fee Generation completed for $month ($auditType): $generatedCount student fee vouchers created, $skippedCount already existed."
+            ];
+
+        } catch (Exception $e) {
+            error_log("generateBulkMonthlyFees exception: " . $e->getMessage());
+            return ['status' => false, 'message' => 'System error: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Automatically check and generate monthly fees on the 1st date of every month for Whole School & Academy
+     */
+    public function checkAndRunAutoFee(bool $forceRun = false, ?string $targetMonth = null): array {
+        $db = Database::getConnection();
+
+        self::ensureFeeSettingsSchema();
+
+        $settings = [];
+        try {
+            $settings = $db->query("SELECT * FROM fee_settings WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {}
+
+        $enabled    = (bool)($settings['auto_fee_enabled'] ?? 1);
+        $autoDay    = (int)($settings['auto_fee_day'] ?? 1);
+        $lastRunKey = $settings['last_auto_fee_run'] ?? '';
+
+        if (!$enabled && !$forceRun) {
+            return ['status' => false, 'message' => 'Automatic 1st date monthly fee generation is currently disabled.'];
+        }
+
+        $currentDay = (int)date('j');
+        $month      = $targetMonth ?: date('F Y');
+        $runKey     = date('Y-m');
+
+        if (!$forceRun && $currentDay < $autoDay) {
+            return [
+                'status'  => false,
+                'message' => "Automatic fee generation is scheduled for day $autoDay of the month. Today is day $currentDay."
+            ];
+        }
+
+        if (!$forceRun && $lastRunKey === $runKey) {
+            return [
+                'status'      => true,
+                'already_run' => true,
+                'message'     => "Monthly fee for $month has already been generated automatically on the 1st."
+            ];
+        }
+
+        // Execute bulk generation for ALL (Whole School & Academy)
+        $res = $this->generateBulkMonthlyFees($month, 'All', null, date('Y-m-15'));
+
+        if (!empty($res['status'])) {
+            $upRun = $db->prepare("UPDATE fee_settings SET last_auto_fee_run = ? WHERE id = 1");
+            $upRun->execute([$runKey]);
+        }
+
+        return $res;
+    }
+
+    /**
+     * Ensure database columns exist in fee_settings
+     */
+    private static function ensureFeeSettingsSchema(): void {
+        $db = Database::getConnection();
+        $queries = [
+            "ALTER TABLE fee_settings ADD COLUMN auto_fee_enabled TINYINT(1) NOT NULL DEFAULT 1",
+            "ALTER TABLE fee_settings ADD COLUMN auto_fee_day INT NOT NULL DEFAULT 1",
+            "ALTER TABLE fee_settings ADD COLUMN last_auto_fee_run VARCHAR(20) DEFAULT NULL"
+        ];
+        foreach ($queries as $q) {
+            try { $db->exec($q); } catch (Exception $e) {}
+        }
+    }
 }

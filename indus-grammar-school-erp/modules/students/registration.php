@@ -75,6 +75,16 @@ try {
 // Standard class list
 $classList = ['Prep', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
+// Fetch all registered students for quick edit lookup dropdown
+$allStudentsList = [];
+try {
+    $allStudentsList = $db->query("
+        SELECT id, admission_no, first_name, last_name, school_class, school_section 
+        FROM students 
+        ORDER BY first_name ASC
+    ")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
+
 // Function to normalize class value for compatibility with existing records
 function isClassSelected($currentVal, $targetVal) {
     if ($currentVal === $targetVal) return true;
@@ -422,8 +432,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // 2. Load layout headers AFTER redirect processing has concluded
-$pageTitle = 'Student Registration';
-$breadcrumbActive = 'Student Registration';
+if ($studentId > 0 && !empty($student)) {
+    $pageTitle = 'Edit Student Details - ' . sanitize(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? ''));
+    $breadcrumbActive = 'Edit Student Profile';
+} else {
+    $pageTitle = 'Student Registration';
+    $breadcrumbActive = 'Student Registration';
+}
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
@@ -696,7 +711,7 @@ include_once __DIR__ . '/../../includes/header.php';
         <ol class="breadcrumb mb-2">
             <li class="breadcrumb-item"><a href="<?php echo APP_URL; ?>/dashboard.php"><i class="fa-solid fa-house me-1"></i>Dashboard</a></li>
             <li class="breadcrumb-item"><a href="list.php">Student Management</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Student Registration</li>
+            <li class="breadcrumb-item active" aria-current="page"><?php echo ($studentId > 0 && !empty($student)) ? 'Edit Student Details' : 'Student Registration'; ?></li>
         </ol>
     </nav>
 
@@ -705,28 +720,61 @@ include_once __DIR__ . '/../../includes/header.php';
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
             <div class="d-flex align-items-center gap-3">
                 <div class="hero-icon-box">
-                    <i class="fa-solid fa-graduation-cap"></i>
+                    <i class="fa-solid <?php echo ($studentId > 0) ? 'fa-user-pen' : 'fa-graduation-cap'; ?>"></i>
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <h3 class="fw-bold mb-0 text-white fs-3">Student Registration</h3>
-                        <span class="badge bg-white text-primary px-3 py-1 rounded-pill small fw-semibold">Admissions Workspace</span>
+                        <h3 class="fw-bold mb-0 text-white fs-3"><?php echo ($studentId > 0 && !empty($student)) ? 'Edit Student Profile' : 'Student Registration'; ?></h3>
+                        <span class="badge <?php echo ($studentId > 0) ? 'bg-warning text-dark' : 'bg-white text-primary'; ?> px-3 py-1 rounded-pill small fw-semibold">
+                            <?php echo ($studentId > 0 && !empty($student)) ? 'Editing Record #' . sanitize($student['admission_no'] ?? '') : 'Admissions Workspace'; ?>
+                        </span>
                     </div>
-                    <p class="text-white-50 small mb-0 fs-6">Create and manage student records with confidence for Indus Grammar School.</p>
+                    <p class="text-white-50 small mb-0 fs-6">
+                        <?php echo ($studentId > 0 && !empty($student)) ? 'Update personal details, academic placement, guardian contact info, and fee structure for ' . sanitize(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')) . '.' : 'Create and manage student records with confidence for Indus Grammar School.'; ?>
+                    </p>
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <?php if (!empty($currStudentId) && $currStudentId > 0): ?>
+                    <a href="profile_report.php?id=<?php echo $currStudentId; ?>" class="btn btn-sm btn-info text-white rounded-2 px-3 py-2 fw-bold shadow-sm">
+                        <i class="fa-solid fa-address-card me-1"></i>View Profile
+                    </a>
                     <a href="../../templates/registration_form.php?id=<?php echo $currStudentId; ?>" target="_blank" class="btn btn-sm btn-warning text-dark rounded-2 px-3 py-2 fw-bold shadow-sm">
                         <i class="fa-solid fa-print me-1"></i>Print A4 Form
                     </a>
                 <?php else: ?>
                     <a href="../../templates/registration_form.php" target="_blank" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold">
-                        <i class="fa-solid fa-file-lines me-1"></i>Blank A4 Admission Form
+                        <i class="fa-solid fa-file-lines me-1"></i>Blank A4 Form
                     </a>
                 <?php endif; ?>
                 <a href="registration.php" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm"><i class="fa-solid fa-plus me-1"></i>New Registration</a>
-                <a href="list.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i>Back to Directory</a>
+                <a href="list.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i>Student Directory</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Search & Select Student to Edit -->
+    <div class="card border-0 shadow-sm bg-white mb-4 rounded-3 p-3">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="fa-solid fa-magnifying-glass text-primary fs-5"></i>
+                <div>
+                    <strong class="text-dark small d-block"><i class="fa-solid fa-pen-to-square me-1 text-warning"></i>Search & Select Registered Student to Edit</strong>
+                    <span class="text-muted small" style="font-size: 0.78rem;">Choose any existing student from the database below to instantly edit their details</span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-grow-1 flex-md-grow-0" style="min-width: 340px;">
+                <select class="form-select form-select-sm border-primary" id="quickEditSelect" onchange="if(this.value) window.location.href='registration.php?id=' + this.value;">
+                    <option value="">— Select Student to Edit Details —</option>
+                    <?php foreach ($allStudentsList as $stItem): ?>
+                        <option value="<?php echo $stItem['id']; ?>" <?php echo ($studentId == $stItem['id']) ? 'selected' : ''; ?>>
+                            <?php echo sanitize($stItem['first_name'] . ' ' . $stItem['last_name'] . ' (' . $stItem['admission_no'] . ' - Class ' . ($stItem['school_class'] ?: '-') . ')'); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+                <?php if ($studentId > 0): ?>
+                    <a href="registration.php" class="btn btn-sm btn-outline-primary text-nowrap" title="Register New Student"><i class="fa-solid fa-plus me-1"></i>New</a>
+                <?php endif; ?>
             </div>
         </div>
     </div>

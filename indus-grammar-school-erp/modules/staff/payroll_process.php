@@ -18,6 +18,10 @@ if (!in_array($userRole, [ROLE_SUPER_ADMIN, ROLE_SCHOOL_ADMIN, 'accountant'])) {
 
 $db = Database::getConnection();
 
+// Include PayrollService & trigger 10th date automatic salary issuance check
+require_once __DIR__ . '/../../services/PayrollService.php';
+PayrollService::checkAndRunAutoPayroll();
+
 // Default target filters
 $selectedMonth = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('m');
 $selectedYear  = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');

@@ -55,10 +55,51 @@ try {
                     <input type="hidden" name="csrf_token" value="<?php echo csrfToken(); ?>">
                     <input type="hidden" name="action" value="save_payroll_settings">
 
+                    <!-- Automatic Monthly Salary Issuance Section -->
+                    <h6 class="fw-bold text-success mb-3 border-bottom pb-1">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2 text-success"></i>Automatic Monthly Salary Issuance (10th of Month)
+                    </h6>
+                    <div class="card bg-light border-0 p-3 mb-4 rounded-3">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" role="switch" id="auto_issue_enabled" name="auto_issue_enabled" value="1" <?php echo !empty($settings['auto_issue_enabled']) ? 'checked' : ''; ?>>
+                            <label class="form-check-label fw-bold text-dark" for="auto_issue_enabled">
+                                Enable Automatic Monthly Salary Issuance
+                            </label>
+                            <div class="text-muted small">When enabled, the system automatically generates and issues monthly staff salaries for all active staff on the scheduled date.</div>
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Scheduled Monthly Issue Day</label>
+                                <select class="form-select" name="auto_issue_day" id="auto_issue_day">
+                                    <?php for($d=1; $d<=28; $d++): ?>
+                                        <option value="<?php echo $d; ?>" <?php echo (int)($settings['auto_issue_day'] ?? 10) === $d ? 'selected' : ''; ?>>Every Month <?php echo $d; ?>th Date</option>
+                                    <?php endfor; ?>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold text-muted">Initial Payment Status</label>
+                                <select class="form-select" name="auto_issue_status" id="auto_issue_status">
+                                    <option value="Pending" <?php echo ($settings['auto_issue_status'] ?? 'Pending') === 'Pending' ? 'selected' : ''; ?>>Pending (Generate Ledger Records)</option>
+                                    <option value="Paid" <?php echo ($settings['auto_issue_status'] ?? '') === 'Paid' ? 'selected' : ''; ?>>Paid (Mark Issued Salaries as Paid)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-2 border-top d-flex align-items-center justify-content-between">
+                            <span class="text-muted small">
+                                Last Automatic Run: <strong><?php echo !empty($settings['last_auto_issue_run']) ? htmlspecialchars($settings['last_auto_issue_run']) : 'Not executed yet'; ?></strong>
+                            </span>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" id="btnTriggerAutoNow">
+                                <i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Working Cycle Configuration -->
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold text-muted">Default Payment Date (Day of Month)</label>
+                            <label class="form-label small fw-semibold text-muted">Default Salary Payment Date</label>
                             <select class="form-select" name="salary_payment_date" id="salary_payment_date" required>
                                 <?php for($d=1; $d<=28; $d++): ?>
                                     <option value="<?php echo $d; ?>" <?php echo (int)($settings['salary_payment_date'] ?? 10) === $d ? 'selected' : ''; ?>><?php echo $d; ?>th of Month</option>
@@ -144,10 +185,11 @@ try {
     </div>
 </div>
 
-<?php $extraJS = '<script>
+<script>
 function showToast(msg, ok) {
     const t = document.getElementById("settingsToast");
     const m = document.getElementById("settingsToastMsg");
+    if (!t || !m) return;
     t.classList.remove("bg-success","bg-danger");
     t.classList.add(ok ? "bg-success" : "bg-danger");
     m.textContent = msg;
@@ -161,17 +203,50 @@ document.addEventListener("DOMContentLoaded", function() {
         form.addEventListener("submit", function(e) {
             e.preventDefault();
             const btn = document.getElementById("btnSave");
-            btn.disabled = true; btn.innerHTML = "Saving...";
+            btn.disabled = true; 
+            btn.innerHTML = 'Saving...';
 
             fetch("../../ajax/payroll.php", { method: "POST", body: new FormData(form) })
                 .then(r => r.json())
                 .then(data => {
                     showToast(data.message, data.success);
-                    btn.disabled = false; btn.innerHTML = \'<i class=\"fa-solid fa-circle-check me-2\"></i>Save Settings\';
+                    btn.disabled = false; 
+                    btn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i>Save Settings';
                 })
                 .catch(() => {
                     showToast("Failed to save operational settings due to server issue.", false);
-                    btn.disabled = false; btn.innerHTML = \'<i class=\"fa-solid fa-circle-check me-2\"></i>Save Settings\';
+                    btn.disabled = false; 
+                    btn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i>Save Settings';
+                });
+        });
+    }
+
+    // Trigger Auto Payroll Now Button Listener
+    const btnAutoNow = document.getElementById("btnTriggerAutoNow");
+    if (btnAutoNow) {
+        btnAutoNow.addEventListener("click", function() {
+            if (!confirm("Are you sure you want to run automatic monthly salary issuance now for all active staff?")) return;
+            btnAutoNow.disabled = true;
+            btnAutoNow.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Processing...';
+            
+            const fd = new FormData();
+            fd.append("action", "trigger_auto_payroll");
+            fd.append("csrf_token", "<?php echo csrfToken(); ?>");
+
+            fetch("../../ajax/payroll.php", { method: "POST", body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    showToast(data.message, data.success);
+                    btnAutoNow.disabled = false;
+                    btnAutoNow.innerHTML = '<i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now';
+                    if (data.success) {
+                        setTimeout(() => location.reload(), 1500);
+                    }
+                })
+                .catch(() => {
+                    showToast("Error executing automatic salary issuance.", false);
+                    btnAutoNow.disabled = false;
+                    btnAutoNow.innerHTML = '<i class="fa-solid fa-play me-1"></i>Issue Salary Auto Now';
                 });
         });
     }
@@ -182,6 +257,10 @@ document.addEventListener("DOMContentLoaded", function() {
         btnReset.addEventListener("click", function() {
             if(!confirm("Are you sure you want to reset settings to default ratios? This will populate standard ERP settings (e.g. 10th of month, 26 work days, 0.25/0.50/1.00 fine rules).")) return;
             
+            const elAuto = document.getElementById("auto_issue_enabled");
+            if (elAuto) elAuto.checked = true;
+            document.getElementById("auto_issue_day").value = "10";
+            document.getElementById("auto_issue_status").value = "Pending";
             document.getElementById("salary_payment_date").value = "10";
             document.getElementById("working_days_per_month").value = "26";
             document.getElementById("absent_deduction_rule").value = "1.00";
@@ -195,5 +274,6 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 });
-</script>';
-include_once __DIR__ . '/../../includes/footer.php'; ?>
+</script>
+
+<?php include_once __DIR__ . '/../../includes/footer.php'; ?>
