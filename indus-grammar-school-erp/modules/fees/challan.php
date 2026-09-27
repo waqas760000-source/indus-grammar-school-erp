@@ -9,6 +9,11 @@ $breadcrumbActive = 'Fee Ledger Sheets';
 include_once __DIR__ . '/../../includes/header.php';
 AuthMiddleware::requirePermission('fee_view');
 
+// 1st Date Automatic Fee Check
+require_once __DIR__ . '/../../services/FeeService.php';
+$feeService = new FeeService();
+$feeService->checkAndRunAutoFee();
+
 // Fetch classes for dropdown filters
 $classes = SchoolClass::all();
 

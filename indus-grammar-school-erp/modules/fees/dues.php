@@ -16,6 +16,11 @@ require_once __DIR__ . '/../../includes/header.php';
 require_once __DIR__ . '/../../includes/sidebar.php';
 require_once __DIR__ . '/../../includes/navbar.php';
 
+// 1st Date Automatic Fee Check
+require_once __DIR__ . '/../../services/FeeService.php';
+$feeService = new FeeService();
+$feeService->checkAndRunAutoFee();
+
 // Fetch outstanding defaulters
 $defaulters = [];
 $classes = [];

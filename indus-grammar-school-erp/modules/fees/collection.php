@@ -1253,6 +1253,55 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     });
 
+    // 1-Click Bulk Monthly Fee Generation Handler
+    const btnBulkGenerate = document.getElementById("btnGenerateBulkFees1Click");
+    if (btnBulkGenerate) {
+        btnBulkGenerate.addEventListener("click", function() {
+            const currentMonthStr = "<?php echo date('F Y'); ?>";
+            if (!confirm(`Are you sure you want to generate 1-Click Monthly Fees for ALL Active School & Academy Students for ${currentMonthStr}?`)) {
+                return;
+            }
+
+            btnBulkGenerate.disabled = true;
+            btnBulkGenerate.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>Generating Fees...`;
+
+            const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || "<?php echo csrfToken(); ?>";
+
+            fetch("<?php echo APP_URL; ?>/ajax/fees.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: new URLSearchParams({
+                    action: "generate_bulk_monthly_fees",
+                    month: currentMonthStr,
+                    academic_type: "All",
+                    csrf_token: csrfToken
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                btnBulkGenerate.disabled = false;
+                btnBulkGenerate.innerHTML = `<i class="fa-solid fa-bolt me-1"></i>Generate Fee 1-Click (${currentMonthStr})`;
+
+                if (data.new_csrf_token) {
+                    document.querySelectorAll('input[name="csrf_token"]').forEach(el => el.value = data.new_csrf_token);
+                }
+
+                if (data.success) {
+                    alert(data.message);
+                    window.location.reload();
+                } else {
+                    alert(data.message || "Failed to generate monthly fees.");
+                }
+            })
+            .catch(err => {
+                btnBulkGenerate.disabled = false;
+                btnBulkGenerate.innerHTML = `<i class="fa-solid fa-bolt me-1"></i>Generate Fee 1-Click (${currentMonthStr})`;
+                console.error("Bulk fee error:", err);
+                alert("An error occurred while generating monthly fees.");
+            });
+        });
+    }
+
     // Auto-load student if passed via GET parameter
     <?php if ($initialStudentId > 0): ?>
         selectStudent(<?php echo $initialStudentId; ?>);
