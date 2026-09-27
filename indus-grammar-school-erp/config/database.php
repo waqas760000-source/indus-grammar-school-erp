@@ -31,14 +31,27 @@ class Database {
                     PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES " . DB_CHARSET
                 ];
 
-                self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
+                try {
+                    self::$instance = new PDO($dsn, DB_USER, DB_PASS, $options);
+                } catch (PDOException $ePass) {
+                    // Try fallback to empty password for default XAMPP setups on other computers
+                    if (DB_PASS !== '') {
+                        try {
+                            self::$instance = new PDO($dsn, DB_USER, '', $options);
+                        } catch (PDOException $eEmpty) {
+                            throw $ePass;
+                        }
+                    } else {
+                        throw $ePass;
+                    }
+                }
             } catch (PDOException $e) {
                 // Log error or display message
                 error_log("Database connection failed: " . $e->getMessage());
                 if (APP_ENV === 'development') {
-                    throw new PDOException("Database connection failed: " . $e->getMessage(), (int)$e->getCode());
+                    throw new PDOException("Database connection failed: " . $e->getMessage() . ". Ensure XAMPP MySQL is running and 'indus_grammar_school' database is imported in phpMyAdmin.", (int)$e->getCode());
                 } else {
-                    die("A database connection error occurred. Please contact the administrator.");
+                    die("A database connection error occurred. Please ensure MySQL is running and database is imported.");
                 }
             }
         }
