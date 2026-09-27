@@ -43,11 +43,15 @@ if (session_status() === PHP_SESSION_NONE) {
     // Set custom session name
     session_name(SESSION_NAME);
 
+    // Host without port for valid cookie domain
+    $host = parse_url($_SERVER['HTTP_HOST'] ?? '', PHP_URL_HOST) ?: ($_SERVER['SERVER_NAME'] ?? '');
+    $cookieDomain = (empty($host) || $host === 'localhost' || $host === '127.0.0.1') ? '' : $host;
+
     // Secure cookie parameters
     $cookieParams = [
         'lifetime' => SESSION_LIFETIME,
         'path' => '/',
-        'domain' => $_SERVER['HTTP_HOST'] ?? '',
+        'domain' => $cookieDomain,
         'secure' => SECURE_SESSION, // true only on HTTPS
         'httponly' => true,
         'samesite' => 'Lax'

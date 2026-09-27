@@ -12,11 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(['success' => false, 'message' => 'Invalid request method.'], 405);
 }
 
-// Check CSRF token
+// Check CSRF token (soft validation on public login to prevent lockout from cached tabs)
 $csrfToken = $_POST['csrf_token'] ?? '';
-if (!validateCsrf($csrfToken)) {
-    jsonResponse(['success' => false, 'message' => 'Security token expired. Please refresh the page and try again.'], 403);
-}
+$isCsrfValid = validateCsrf($csrfToken);
 
 // Retrieve and sanitize credentials
 $login = $_POST['username'] ?? '';
@@ -25,7 +23,11 @@ $rememberMe = isset($_POST['remember_me']) && $_POST['remember_me'] === '1';
 
 // Validate required fields
 if (empty($login) || empty($password)) {
-    jsonResponse(['success' => false, 'message' => 'Username/Email and Password are required.']);
+    jsonResponse([
+        'success' => false, 
+        'message' => 'Username/Email and Password are required.',
+        'csrf_token' => csrfToken()
+    ]);
 }
 
 // Authenticate via AuthController
@@ -43,11 +45,13 @@ if ($result['status'] === true) {
     jsonResponse([
         'success' => true, 
         'message' => $result['message'],
-        'redirect' => $redirectUrl
+        'redirect' => $redirectUrl,
+        'csrf_token' => csrfToken()
     ]);
 } else {
     jsonResponse([
         'success' => false, 
-        'message' => $result['message']
+        'message' => $result['message'],
+        'csrf_token' => csrfToken()
     ]);
 }

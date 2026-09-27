@@ -151,13 +151,16 @@ AuthMiddleware::requireGuest();
                     body: formData
                 })
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
+                    return response.json().then(data => ({ status: response.status, ok: response.ok, data }));
                 })
-                .then(data => {
-                    if (data.success) {
+                .then(({ status, ok, data }) => {
+                    // Update CSRF token if returned by server
+                    if (data && data.csrf_token) {
+                        const csrfInput = loginForm.querySelector('input[name="csrf_token"]');
+                        if (csrfInput) csrfInput.value = data.csrf_token;
+                    }
+
+                    if (ok && data.success) {
                         alertContainer.classList.remove('d-none');
                         alertContainer.classList.add('alert-success');
                         alertContainer.textContent = data.message;
@@ -167,10 +170,10 @@ AuthMiddleware::requireGuest();
                             window.location.href = data.redirect;
                         }, 800);
                     } else {
-                        // Show Error
+                        // Show Error from backend
                         alertContainer.classList.remove('d-none');
                         alertContainer.classList.add('alert-danger');
-                        alertContainer.textContent = data.message;
+                        alertContainer.textContent = data.message || 'Invalid username or password.';
                         
                         // Disable Loading State
                         submitBtn.disabled = false;

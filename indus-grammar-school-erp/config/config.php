@@ -5,10 +5,10 @@
  */
 
 // Application
-define('APP_NAME', 'Indus Grammar School ERP');
-define('APP_ENV', 'development');
-define('APP_URL', 'http://localhost/indus-grammar-school-erp/indus-grammar-school-erp');
-define('APP_TIMEZONE', 'Asia/Karachi');
+define('APP_NAME', getenv('APP_NAME') ?: 'Indus Grammar School ERP');
+define('APP_ENV', getenv('APP_ENV') ?: 'development');
+define('APP_URL', getenv('APP_URL') ?: 'http://localhost:8080');
+define('APP_TIMEZONE', getenv('APP_TIMEZONE') ?: 'Asia/Karachi');
 
 date_default_timezone_set(APP_TIMEZONE);
 
@@ -26,12 +26,12 @@ define('DIR_LOGS', DIR_STORAGE . '/logs');
 
 
 // Database
-define('DB_HOST', 'localhost');
-define('DB_PORT', '3306');
-define('DB_NAME', 'indus_grammar_school');
-define('DB_USER', 'root');
-define('DB_PASS', 'rH36@u2t');
-define('DB_CHARSET', 'utf8mb4');
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
+define('DB_NAME', getenv('DB_NAME') ?: 'indus_grammar_school');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASS', getenv('DB_PASS') !== false ? getenv('DB_PASS') : 'rH36@u2t');
+define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 
 // Security settings
 define('SECURE_SESSION', false); 

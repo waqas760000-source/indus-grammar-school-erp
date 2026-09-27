@@ -1,0 +1,35 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: igs_erp_db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rH36@u2t
+      MYSQL_DATABASE: indus_grammar_school
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./indus-grammar-school-erp/database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./indus-grammar-school-erp/database/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql
+
+  web:
+    build: .
+    container_name: igs_erp_web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: indus_grammar_school
+      DB_USER: root
+      DB_PASS: rH36@u2t
+      APP_URL: http://localhost:8080
+    volumes:
+      - ./indus-grammar-school-erp:/var/www/html
+    depends_on:
+      - db
+
+volumes:
+  db_data:

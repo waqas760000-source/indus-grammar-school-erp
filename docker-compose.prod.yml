@@ -1,0 +1,59 @@
+# ==============================================================================
+# INDUS GRAMMAR SCHOOL ERP - PRODUCTION DOCKER COMPOSE CONFIGURATION
+# ==============================================================================
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: igs_erp_db_prod
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASS:-rH36@u2t}
+      MYSQL_DATABASE: ${DB_NAME:-indus_grammar_school}
+    volumes:
+      - db_prod_data:/var/lib/mysql
+      - ./indus-grammar-school-erp/storage/backups/indus_grammar_school_backup_20260919_103218.sql:/docker-entrypoint-initdb.d/01_full_database.sql:ro
+    networks:
+      - igs_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASS:-rH36@u2t}"]
+      timeout: 10s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: igs_erp_web_prod
+    restart: always
+    ports:
+      # Bound to localhost so all public traffic routes through Nginx with SSL
+      - "127.0.0.1:8080:80"
+    environment:
+      APP_ENV: production
+      APP_NAME: "Indus Grammar School ERP"
+      APP_URL: ${APP_URL:-https://localhost}
+      APP_TIMEZONE: Asia/Karachi
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-indus_grammar_school}
+      DB_USER: ${DB_USER:-root}
+      DB_PASS: ${DB_PASS:-rH36@u2t}
+      SECURE_SESSION: "true"
+    volumes:
+      - ./indus-grammar-school-erp:/var/www/html
+      - ./indus-grammar-school-erp/storage/logs:/var/www/html/storage/logs
+      - ./indus-grammar-school-erp/uploads:/var/www/html/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - igs_network
+
+networks:
+  igs_network:
+    driver: bridge
+
+volumes:
+  db_prod_data:
