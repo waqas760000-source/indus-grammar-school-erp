@@ -418,11 +418,24 @@ body {
 
     <!-- 4. Fee Ledger Records Table -->
     <div class="panel-card">
-        <div class="panel-card-header no-print">
-            <h3 class="panel-card-title">
-                <i class="fa-solid fa-receipt text-primary"></i> Student Ledger Statements
-            </h3>
-            <span class="text-muted small">Showing <?php echo count($ledgerEntries); ?> of <?php echo $totalEntries; ?> records</span>
+        <div class="panel-card-header no-print d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h3 class="panel-card-title mb-0">
+                    <i class="fa-solid fa-receipt text-primary me-2"></i>Student Ledger Statements
+                </h3>
+                <span class="text-muted small">Showing <?php echo count($ledgerEntries); ?> of <?php echo $totalEntries; ?> records</span>
+            </div>
+            <div>
+                <?php 
+                $batchUrl = "../../templates/challan.php";
+                if (!empty($filters['class_id']) || !empty($filters['month'])) {
+                    $batchUrl .= "?class_id=" . (int)$filters['class_id'] . "&month=" . urlencode($filters['month']);
+                }
+                ?>
+                <a href="<?php echo $batchUrl; ?>" target="_blank" class="btn btn-warning text-dark fw-bold px-3 py-2 shadow-sm rounded-3">
+                    <i class="fa-solid fa-print me-1.5"></i> Print 3-Copy A4 Challans
+                </a>
+            </div>
         </div>
         <div class="panel-card-body p-0">
             <div class="table-responsive">

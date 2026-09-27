@@ -26,9 +26,12 @@ $campusesList = ['Main Campus', 'City Campus', 'Boys Campus'];
 
 $academicSessions = [];
 try {
-    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY is_active DESC, session_name DESC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
-    $academicSessions = ['2026-2027', '2025-2026'];
+    $academicSessions = [];
+}
+if (empty($academicSessions)) {
+    $academicSessions = ['2026-2027', '2025-2026', '2024-2025'];
 }
 
 $classesList = [];
@@ -501,8 +504,14 @@ include_once __DIR__ . '/../../includes/header.php';
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
+                <?php 
+                $dailyAttPrintUrl = "../../templates/daily_attendance.php?date=" . urlencode($filter_date) . "&academic_session=" . urlencode($filter_session) . "&campus=" . urlencode($filter_campus) . "&academic_type=" . urlencode($filter_academic_type) . "&class=" . urlencode($filter_class) . "&section=" . urlencode($filter_section) . "&status=" . urlencode($filter_status) . "&search=" . urlencode($filter_search);
+                ?>
+                <a href="<?php echo $dailyAttPrintUrl; ?>" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold rounded-2 px-3 py-2 shadow-sm">
+                    <i class="fa-solid fa-print me-1"></i>Print A4 Sheet
+                </a>
                 <a href="student.php" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm"><i class="fa-solid fa-clipboard-check me-1"></i>Mark Attendance</a>
-                <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Print Report</button>
+                <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Quick Print</button>
                 <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="exportCSV()"><i class="fa-solid fa-file-excel me-1"></i>Export CSV</button>
             </div>
         </div>

@@ -716,6 +716,15 @@ include_once __DIR__ . '/../../includes/header.php';
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
+                <?php if (!empty($currStudentId) && $currStudentId > 0): ?>
+                    <a href="../../templates/registration_form.php?id=<?php echo $currStudentId; ?>" target="_blank" class="btn btn-sm btn-warning text-dark rounded-2 px-3 py-2 fw-bold shadow-sm">
+                        <i class="fa-solid fa-print me-1"></i>Print A4 Form
+                    </a>
+                <?php else: ?>
+                    <a href="../../templates/registration_form.php" target="_blank" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold">
+                        <i class="fa-solid fa-file-lines me-1"></i>Blank A4 Admission Form
+                    </a>
+                <?php endif; ?>
                 <a href="registration.php" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm"><i class="fa-solid fa-plus me-1"></i>New Registration</a>
                 <a href="list.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-arrow-left me-1"></i>Back to Directory</a>
             </div>

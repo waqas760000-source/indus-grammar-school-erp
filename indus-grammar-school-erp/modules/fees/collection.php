@@ -69,7 +69,7 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
     --secondary-blue: #2563EB;
     --hover-blue: #1E40AF;
     --light-blue: #EFF6FF;
-    --page-background: #F1F5F9;
+    --page-background: #F8FAFC;
     --card-white: #FFFFFF;
     --border-color: #E2E8F0;
     --main-text: #1E293B;
@@ -87,7 +87,7 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
 /* Page Canvas Wrapper */
 .cashier-desk-wrapper {
     background-color: var(--page-background);
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 1.5rem;
     min-height: calc(100vh - 90px);
 }
@@ -95,7 +95,7 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
 /* Hero Banner */
 .adv-hero-banner {
     background: linear-gradient(135deg, var(--primary-navy) 0%, #1e3a8a 55%, var(--secondary-blue) 100%);
-    border-radius: 16px;
+    border-radius: 18px;
     color: #ffffff;
     padding: 1.75rem 2rem;
     box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
@@ -158,7 +158,7 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
 /* Standard Styled Cards */
 .card-custom {
     border: 1px solid var(--border-color);
-    border-radius: 16px;
+    border-radius: 18px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
     background: var(--card-white);
     transition: all 0.25s ease-in-out;
@@ -204,40 +204,170 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Student Avatar */
+/* Student Profile Executive Card */
+.student-profile-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
 .student-avatar-lg {
-    width: 86px;
-    height: 86px;
-    border-radius: 50%;
+    width: 80px;
+    height: 80px;
+    border-radius: 18px;
     object-fit: cover;
-    border: 3px solid var(--secondary-blue);
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
+    border: 2px solid #ffffff;
 }
 
 .student-avatar-placeholder-lg {
-    width: 86px;
-    height: 86px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--primary-navy), var(--secondary-blue));
+    width: 80px;
+    height: 80px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
     color: #ffffff;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-size: 1.8rem;
     font-weight: 700;
-    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.2);
 }
 
-/* Mini KPI Card Accents */
-.kpi-mini-box {
-    border-radius: 14px;
-    padding: 1.15rem 1.25rem;
+/* Executive Financial KPI Cards */
+.fee-kpi-card {
     background: #ffffff;
-    border: 1px solid var(--border-color);
-    transition: transform 0.2s ease;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.1rem 1.25rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s ease;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 }
-.kpi-mini-box:hover {
+
+.fee-kpi-card:hover {
     transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+.fee-kpi-card .kpi-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #64748b;
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fee-kpi-card .kpi-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.2;
+    word-break: break-word;
+}
+
+/* Color variations for KPI cards */
+.fee-kpi-tuition { border-top: 4px solid #3b82f6; }
+.fee-kpi-tuition .kpi-value { color: #1e293b; }
+
+.fee-kpi-arrears { border-top: 4px solid #f59e0b; background: #fffbeb; }
+.fee-kpi-arrears .kpi-value { color: #d97706; }
+
+.fee-kpi-fines { border-top: 4px solid #ef4444; background: #fef2f2; }
+.fee-kpi-fines .kpi-value { color: #dc2626; }
+
+.fee-kpi-discount { border-top: 4px solid #10b981; background: #ecfdf5; }
+.fee-kpi-discount .kpi-value { color: #059669; }
+
+.fee-kpi-due { border-top: 4px solid #6366f1; background: #eff6ff; }
+.fee-kpi-due .kpi-label { color: #2563eb; }
+.fee-kpi-due .kpi-value { color: #1d4ed8; font-size: 1.3rem; }
+
+.fee-kpi-paid { border-top: 4px solid #16a34a; background: #f0fdf4; }
+.fee-kpi-paid .kpi-label { color: #16a34a; }
+.fee-kpi-paid .kpi-value { color: #15803d; font-size: 1.3rem; }
+
+/* Payment Form Card Header & Controls */
+.payment-form-card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 18px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+}
+
+.payment-form-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 1.1rem 1.5rem;
+    color: #ffffff;
+}
+
+.payment-form-card .form-label {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 6px;
+}
+
+.payment-form-card .form-control,
+.payment-form-card .form-select {
+    border-radius: 10px;
+    border: 1px solid #cbd5e1;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.9rem;
+    color: #0f172a;
+    transition: all 0.2s ease;
+}
+
+.payment-form-card .form-control:focus,
+.payment-form-card .form-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.amount-input-group .input-group-text {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    font-weight: 800;
+    color: #475569;
+    border-radius: 10px 0 0 10px;
+}
+
+.amount-input-group .form-control {
+    border-radius: 0 10px 10px 0;
+    font-weight: 800;
+    font-size: 1.35rem;
+    color: #16a34a;
+}
+
+.btn-process-payment {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border: none;
+    color: #ffffff;
+    font-weight: 700;
+    padding: 0.75rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+    transition: all 0.25s ease;
+}
+
+.btn-process-payment:hover {
+    background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 25px rgba(37, 99, 235, 0.45);
+    color: #ffffff;
 }
 
 /* Autocomplete Search Dropdown */
@@ -411,23 +541,33 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
             <div id="studentDetailsContainer" class="d-none">
                 
                 <!-- Student Profile Header Card -->
-                <div class="card card-custom mb-4 border-start border-primary border-4">
-                    <div class="card-body p-4">
-                        <div class="d-flex flex-column flex-sm-row align-items-center align-items-sm-start gap-4">
-                            <div id="studentPhotoWrapper">
-                                <div class="student-avatar-placeholder-lg" id="studentAvatarText">ST</div>
+                <div class="student-profile-card mb-4">
+                    <div class="d-flex flex-column flex-sm-row align-items-center align-items-sm-start gap-4">
+                        <div id="studentPhotoWrapper">
+                            <div class="student-avatar-placeholder-lg" id="studentAvatarText">ST</div>
+                        </div>
+                        <div class="flex-grow-1 text-center text-sm-start">
+                            <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-sm-start gap-2 mb-3">
+                                <h4 class="fw-bold text-dark mb-0" id="stName">Student Name</h4>
+                                <span class="badge bg-primary-subtle text-primary px-3 py-1 rounded-pill small fw-semibold" id="stAcademicType">School</span>
+                                <span class="badge bg-success-subtle text-success px-3 py-1 rounded-pill small fw-semibold" id="stStatus">Active</span>
                             </div>
-                            <div class="flex-grow-1 text-center text-sm-start">
-                                <div class="d-flex flex-wrap align-items-center justify-content-center justify-content-sm-start gap-2 mb-2">
-                                    <h4 class="fw-bold text-dark mb-0" id="stName">Student Name</h4>
-                                    <span class="badge bg-primary-subtle text-primary px-3 py-1 rounded-pill small fw-semibold" id="stAcademicType">School</span>
-                                    <span class="badge bg-success-subtle text-success px-3 py-1 rounded-pill small fw-semibold" id="stStatus">Active</span>
+                            <div class="row g-3 text-muted small">
+                                <div class="col-6 col-md-3">
+                                    <div class="text-uppercase text-muted" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;">Admission No</div>
+                                    <div id="stAdmissionNo" class="text-dark fw-bold fs-6">—</div>
                                 </div>
-                                <div class="row g-2 text-muted small mt-1">
-                                    <div class="col-6 col-md-3"><strong>Admission No:</strong> <span id="stAdmissionNo" class="text-dark fw-bold">—</span></div>
-                                    <div class="col-6 col-md-3"><strong>Roll No:</strong> <span id="stRollNo" class="text-dark fw-bold">—</span></div>
-                                    <div class="col-6 col-md-3"><strong>Father Name:</strong> <span id="stFatherName" class="text-dark fw-bold">—</span></div>
-                                    <div class="col-6 col-md-3"><strong>Class / Section:</strong> <span id="stClassSection" class="text-dark fw-bold">—</span></div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-uppercase text-muted" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;">Roll No</div>
+                                    <div id="stRollNo" class="text-dark fw-bold fs-6">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-uppercase text-muted" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;">Father Name</div>
+                                    <div id="stFatherName" class="text-dark fw-bold fs-6">—</div>
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <div class="text-uppercase text-muted" style="font-size: 0.7rem; font-weight: 700; letter-spacing: 0.3px;">Class / Section</div>
+                                    <div id="stClassSection" class="text-dark fw-bold fs-6">—</div>
                                 </div>
                             </div>
                         </div>
@@ -437,50 +577,50 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
                 <!-- Financial Summary KPI Mini Cards -->
                 <div class="row g-3 mb-4">
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-primary border-4">
-                            <div class="text-muted small fw-semibold text-uppercase">Monthly Tuition Fee</div>
-                            <div class="fs-5 fw-bold text-dark mt-1" id="kpiTuition">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-tuition">
+                            <div class="kpi-label">Monthly Tuition Fee</div>
+                            <div class="kpi-value" id="kpiTuition">Rs. 0.00</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-warning border-4">
-                            <div class="text-muted small fw-semibold text-uppercase">Previous Arrears</div>
-                            <div class="fs-5 fw-bold text-warning mt-1" id="kpiPrevBalance">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-arrears">
+                            <div class="kpi-label">Previous Arrears</div>
+                            <div class="kpi-value" id="kpiPrevBalance">Rs. 0.00</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-danger border-4">
-                            <div class="text-muted small fw-semibold text-uppercase">Late Fines</div>
-                            <div class="fs-5 fw-bold text-danger mt-1" id="kpiFines">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-fines">
+                            <div class="kpi-label">Late Fines</div>
+                            <div class="kpi-value" id="kpiFines">Rs. 0.00</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-success border-4">
-                            <div class="text-muted small fw-semibold text-uppercase">Concessions / Discount</div>
-                            <div class="fs-5 fw-bold text-success mt-1" id="kpiDiscount">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-discount">
+                            <div class="kpi-label">Concessions / Discount</div>
+                            <div class="kpi-value" id="kpiDiscount">Rs. 0.00</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-primary border-4 bg-primary-subtle">
-                            <div class="text-primary small fw-semibold text-uppercase">Total Outstanding Due</div>
-                            <div class="fs-4 fw-bold text-primary mt-1" id="kpiTotalPayable">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-due">
+                            <div class="kpi-label">Total Outstanding Due</div>
+                            <div class="kpi-value" id="kpiTotalPayable">Rs. 0.00</div>
                         </div>
                     </div>
                     <div class="col-6 col-md-4">
-                        <div class="kpi-mini-box border-start border-success border-4 bg-success-subtle">
-                            <div class="text-success small fw-semibold text-uppercase">Total Settled / Paid</div>
-                            <div class="fs-4 fw-bold text-success mt-1" id="kpiPaid">Rs. 0.00</div>
+                        <div class="fee-kpi-card fee-kpi-paid">
+                            <div class="kpi-label">Total Settled / Paid</div>
+                            <div class="kpi-value" id="kpiPaid">Rs. 0.00</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- STEP 3: Payment Entry Form Card -->
-                <div class="card card-custom mb-4 border-2 border-primary shadow">
-                    <div class="card-header-custom text-white rounded-top-3 d-flex align-items-center justify-content-between py-3" style="background: linear-gradient(135deg, var(--primary-navy) 0%, #1e3a8a 100%);">
+                <div class="payment-form-card mb-4">
+                    <div class="payment-form-header d-flex align-items-center justify-content-between">
                         <h5 class="fw-bold mb-0 text-white d-flex align-items-center">
                             <span class="step-counter-white">2</span> Collect Fee Payment
                         </h5>
-                        <span class="badge bg-white text-primary fw-bold px-3 py-1 rounded-pill">Secure Transaction</span>
+                        <span class="badge bg-white-subtle text-white border border-white-subtle fw-semibold px-3 py-1 rounded-pill small">Secure Transaction</span>
                     </div>
                     <div class="card-body p-4">
                         <form id="paymentCollectionForm">
@@ -491,8 +631,8 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
                             <div class="row g-3">
                                 <!-- Select Fee Month / Ledger Record -->
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold text-dark small">Select Fee Month / Challan <span class="text-danger">*</span></label>
-                                    <select id="challanSelect" name="challan_id" class="form-select form-select-lg fw-semibold" required>
+                                    <label class="form-label">Select Fee Month / Challan <span class="text-danger">*</span></label>
+                                    <select id="challanSelect" name="challan_id" class="form-select fw-semibold" required>
                                         <option value="">-- Select Pending Month --</option>
                                     </select>
                                 </div>
@@ -500,24 +640,24 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
                                 <!-- Payment Amount -->
                                 <div class="col-md-6">
                                     <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <label class="form-label fw-bold text-dark small mb-0">Amount Received (Rs.) <span class="text-danger">*</span></label>
-                                        <button type="button" id="btnFillExact" class="btn btn-sm btn-link text-primary p-0 text-decoration-none small fw-semibold"><i class="fa-solid fa-bolt me-1"></i>Pay Month Balance</button>
+                                        <label class="form-label mb-0">Amount Received (Rs.) <span class="text-danger">*</span></label>
+                                        <button type="button" id="btnFillExact" class="btn btn-sm btn-link text-primary p-0 text-decoration-none small fw-bold"><i class="fa-solid fa-bolt me-1"></i>Pay Month Balance</button>
                                     </div>
-                                    <div class="input-group input-group-lg">
-                                        <span class="input-group-text fw-bold text-muted bg-light">Rs.</span>
-                                        <input type="number" step="0.01" min="1" id="amountPaidInput" name="amount_paid" class="form-control fw-bold fs-4 text-success" placeholder="0.00" required>
+                                    <div class="input-group amount-input-group">
+                                        <span class="input-group-text">Rs.</span>
+                                        <input type="number" step="0.01" min="1" id="amountPaidInput" name="amount_paid" class="form-control" placeholder="0.00" required>
                                     </div>
                                 </div>
 
                                 <!-- Payment Date -->
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold text-dark small">Payment Date <span class="text-danger">*</span></label>
+                                    <label class="form-label">Payment Date <span class="text-danger">*</span></label>
                                     <input type="date" name="payment_date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
 
                                 <!-- Payment Method -->
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold text-dark small">Payment Method <span class="text-danger">*</span></label>
+                                    <label class="form-label">Payment Method <span class="text-danger">*</span></label>
                                     <select name="payment_method" class="form-select fw-semibold" required>
                                         <option value="Cash" selected>Cash Desk 💵</option>
                                         <option value="Bank Transfer">Bank Transfer 🏦</option>
@@ -528,26 +668,27 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
 
                                 <!-- Reference Number -->
                                 <div class="col-md-4">
-                                    <label class="form-label fw-bold text-dark small">Reference / Cheque No</label>
+                                    <label class="form-label">Reference / Cheque No</label>
                                     <input type="text" name="reference_number" class="form-control" placeholder="Transaction ref or cheque #">
                                 </div>
 
                                 <!-- Remarks -->
                                 <div class="col-12">
-                                    <label class="form-label fw-bold text-dark small">Remarks / Collector Notes</label>
+                                    <label class="form-label">Remarks / Collector Notes</label>
                                     <input type="text" name="remarks" class="form-control" placeholder="e.g. Received via Cashier Desk">
                                 </div>
                             </div>
 
                             <div class="d-flex justify-content-end align-items-center gap-2 mt-4 pt-3 border-top">
-                                <button type="button" id="btnResetForm" class="btn btn-outline-secondary px-4 fw-semibold">Reset</button>
-                                <button type="submit" id="btnSubmitPayment" class="btn btn-primary px-5 py-2.5 fw-bold shadow rounded-3">
-                                    <i class="fa-solid fa-check-circle me-2"></i>Process Payment & Issue Receipt
+                                <button type="button" id="btnResetForm" class="btn btn-outline-secondary px-4 fw-semibold rounded-3">Reset</button>
+                                <button type="submit" id="btnSubmitPayment" class="btn btn-process-payment">
+                                    <i class="fa-solid fa-circle-check me-2"></i>Process Payment & Issue Receipt
                                 </button>
                             </div>
                         </form>
                     </div>
                 </div>
+
 
                 <!-- Month Breakdown Ledger Table (Pending Dues) -->
                 <div class="card card-custom mb-4">

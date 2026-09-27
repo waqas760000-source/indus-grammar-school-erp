@@ -405,8 +405,8 @@ if (!$settings) {
                                 <input type="email" class="form-control" name="email" value="<?php echo htmlspecialchars($settings['email']); ?>" required>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label small fw-bold text-dark">Primary Telephone Number <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" name="phone_number" value="<?php echo htmlspecialchars($settings['phone_number']); ?>" required>
+                                <label class="form-label small fw-bold text-dark">Primary Telephone Number</label>
+                                <input type="text" class="form-control" name="phone_number" value="<?php echo htmlspecialchars($settings['phone_number'] ?? ''); ?>" placeholder="e.g. +92 300 0000000">
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold text-dark">Official WhatsApp Helpline</label>
@@ -486,6 +486,33 @@ if (!$settings) {
                                         <i class="fa-solid fa-image fs-3 d-block mb-1 text-muted"></i> No Logo Uploaded
                                     </div>
                                 <?php endif; ?>
+                            </div>
+                        </div>
+
+                        <!-- Section 5: Bank Accounts & Mobile Cash Portals -->
+                        <div class="section-label-header">
+                            <i class="fa-solid fa-building-columns me-1.5"></i> 5. Bank Accounts & Mobile Cash Portals
+                        </div>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-dark">Bank Name</label>
+                                <input type="text" class="form-control" name="bank_name" value="<?php echo htmlspecialchars($settings['bank_name'] ?? 'Meezan Bank Ltd'); ?>" placeholder="e.g. Meezan Bank Ltd">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-dark">Bank Account Title</label>
+                                <input type="text" class="form-control" name="bank_account_title" value="<?php echo htmlspecialchars($settings['bank_account_title'] ?? 'Indus Grammar School'); ?>" placeholder="Account Title">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold text-dark">Account Number / IBAN</label>
+                                <input type="text" class="form-control" name="bank_account_no" value="<?php echo htmlspecialchars($settings['bank_account_no'] ?? 'PK64 MEZN 0001 0203 0405 0607'); ?>" placeholder="Account / IBAN Number">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-dark">JazzCash Account Title</label>
+                                <input type="text" class="form-control" name="jazzcash_title" value="<?php echo htmlspecialchars($settings['jazzcash_title'] ?? 'Indus Grammar School'); ?>">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-dark">JazzCash Number</label>
+                                <input type="text" class="form-control fw-bold text-success" name="jazzcash_number" value="<?php echo htmlspecialchars($settings['jazzcash_number'] ?? '03066544806'); ?>" placeholder="e.g. 03066544806">
                             </div>
                         </div>
 

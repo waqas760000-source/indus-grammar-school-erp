@@ -249,33 +249,23 @@ try {
             // Resolve email addresses
             switch ($recType) {
                 case 'Student':
-                    $stId = (int)($_POST['student_id'] ?? 0);
-                    // Since students don't have separate email in students table directly, we send to guardian email
-                    $p = $db->query("SELECT guardian_email, first_name, last_name FROM students WHERE id = $stId")->fetch(PDO::FETCH_ASSOC);
-                    if ($p && $p['guardian_email']) {
-                        $emails[$p['guardian_email']] = $p['first_name'] . ' ' . $p['last_name'];
-                    }
-                    break;
-
                 case 'Parent':
                     $stId = (int)($_POST['student_id'] ?? 0);
-                    $p = $db->query("SELECT guardian_email, guardian_name FROM students WHERE id = $stId")->fetch(PDO::FETCH_ASSOC);
-                    if ($p && $p['guardian_email']) {
-                        $emails[$p['guardian_email']] = $p['guardian_name'];
+                    $stmtSt = $db->prepare("SELECT guardian_email, guardian_name, first_name, last_name FROM students WHERE id = :id LIMIT 1");
+                    $stmtSt->execute(['id' => $stId]);
+                    $p = $stmtSt->fetch(PDO::FETCH_ASSOC);
+                    if ($p && !empty($p['guardian_email'])) {
+                        $name = $recType === 'Parent' ? $p['guardian_name'] : ($p['first_name'] . ' ' . $p['last_name']);
+                        $emails[$p['guardian_email']] = $name;
                     }
                     break;
 
                 case 'Teacher':
-                    $tId = (int)($_POST['staff_id'] ?? 0);
-                    $p = $db->query("SELECT email, first_name, last_name FROM staff WHERE id = $tId")->fetch(PDO::FETCH_ASSOC);
-                    if ($p && $p['email']) {
-                        $emails[$p['email']] = $p['first_name'] . ' ' . $p['last_name'];
-                    }
-                    break;
-
                 case 'Staff':
                     $tId = (int)($_POST['staff_id'] ?? 0);
-                    $p = $db->query("SELECT email, first_name, last_name FROM staff WHERE id = $tId")->fetch(PDO::FETCH_ASSOC);
+                    $stmtSt = $db->prepare("SELECT email, first_name, last_name FROM staff WHERE id = :id LIMIT 1");
+                    $stmtSt->execute(['id' => $tId]);
+                    $p = $stmtSt->fetch(PDO::FETCH_ASSOC);
                     if ($p && $p['email']) {
                         $emails[$p['email']] = $p['first_name'] . ' ' . $p['last_name'];
                     }
@@ -283,9 +273,11 @@ try {
 
                 case 'Entire Class':
                     $classId = (int)($_POST['class_id'] ?? 0);
-                    $list = $db->query("SELECT guardian_email, first_name, last_name FROM students WHERE class_id = $classId AND status = 'Active'")->fetchAll(PDO::FETCH_ASSOC);
+                    $stmtCls = $db->prepare("SELECT guardian_email, first_name, last_name FROM students WHERE class_id = :cid AND status = 'Active'");
+                    $stmtCls->execute(['cid' => $classId]);
+                    $list = $stmtCls->fetchAll(PDO::FETCH_ASSOC);
                     foreach ($list as $p) {
-                        if ($p['guardian_email']) $emails[$p['guardian_email']] = $p['first_name'] . ' ' . $p['last_name'];
+                        if (!empty($p['guardian_email'])) $emails[$p['guardian_email']] = $p['first_name'] . ' ' . $p['last_name'];
                     }
                     break;
 

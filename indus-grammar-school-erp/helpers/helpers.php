@@ -187,3 +187,27 @@ function currentUser(): ?array {
 function displayValue($val, string $default = '—'): string {
     return (!isset($val) || trim((string)$val) === '') ? htmlspecialchars($default) : htmlspecialchars((string)$val);
 }
+
+/**
+ * Get School Logo URL if present, or return empty string
+ *
+ * @return string
+ */
+if (!function_exists('getSchoolLogoUrl')) {
+    function getSchoolLogoUrl(): string {
+        $baseDir = __DIR__ . '/..';
+        if (file_exists($baseDir . '/assets/images/logo.png')) {
+            return APP_URL . '/assets/images/logo.png';
+        }
+        if (file_exists($baseDir . '/assets/images/logo.svg')) {
+            return APP_URL . '/assets/images/logo.svg';
+        }
+        if (file_exists($baseDir . '/assets/images/logo.jpg')) {
+            return APP_URL . '/assets/images/logo.jpg';
+        }
+        if (file_exists($baseDir . '/uploads/logo.png')) {
+            return APP_URL . '/uploads/logo.png';
+        }
+        return '';
+    }
+}

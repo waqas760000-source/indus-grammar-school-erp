@@ -83,17 +83,38 @@ class GradeSetup {
     }
 
     /**
+     * Match grade in memory from array of scales to avoid DB roundtrips in bulk loops.
+     */
+    public static function matchGrade(float $percentage, array $scales): array {
+        foreach ($scales as $scale) {
+            if ($percentage >= (float)$scale['min_percentage'] && $percentage <= (float)$scale['max_percentage']) {
+                return $scale;
+            }
+        }
+        return ['grade' => 'F', 'grade_point' => 0.00, 'remarks' => 'Fail'];
+    }
+
+    /**
      * Look up Grade scale by numeric percentage.
      */
     public static function getGradeByPercentage(float $percentage): array {
+        static $cachedScales = null;
+        if ($cachedScales === null) {
+            $cachedScales = self::all();
+        }
+        if (!empty($cachedScales)) {
+            return self::matchGrade($percentage, $cachedScales);
+        }
+
         try {
             $db = Database::getConnection();
             $stmt = $db->prepare("
                 SELECT * FROM grade_setup 
-                WHERE :pct >= min_percentage AND :pct <= max_percentage 
+                WHERE :pct1 >= min_percentage AND :pct2 <= max_percentage 
+                ORDER BY min_percentage DESC
                 LIMIT 1
             ");
-            $stmt->execute(['pct' => $percentage]);
+            $stmt->execute(['pct1' => $percentage, 'pct2' => $percentage]);
             $res = $stmt->fetch(PDO::FETCH_ASSOC);
             if ($res) return $res;
         } catch (Exception $e) {

@@ -30,11 +30,17 @@ class Promotion {
     }
 
     /**
-     * Promote a batch of students to a new class.
+     * Promote a batch of students to a new class (Optimized high-performance batch operation).
      */
     public static function promoteStudents(array $studentIds, int $fromClassId, int $toClassId, string $session): array {
         if (empty($studentIds) || $fromClassId <= 0 || $toClassId <= 0) {
             return ['success' => false, 'message' => 'Invalid parameters provided.'];
+        }
+
+        // Clean integer array
+        $studentIds = array_map('intval', array_filter($studentIds));
+        if (empty($studentIds)) {
+            return ['success' => false, 'message' => 'No valid student IDs selected.'];
         }
 
         try {
@@ -42,42 +48,29 @@ class Promotion {
             $db->beginTransaction();
 
             $date = date('Y-m-d');
+            $cleanSession = sanitize($session);
             $successCount = 0;
 
-            // Prepared statements
-            $stmtLog = $db->prepare("
-                INSERT INTO promotions (student_id, from_class_id, to_class_id, academic_session, promotion_date, status)
-                VALUES (:sid, :from, :to, :session, :pdate, 'Promoted')
-            ");
-
-            $stmtUpdateStud = $db->prepare("
-                UPDATE students 
-                SET class_id = :to_class
-                WHERE id = :sid AND class_id = :from_class
-            ");
-
-            foreach ($studentIds as $sid) {
-                $sid = (int)$sid;
-
-                // Log the promotion
-                $stmtLog->execute([
-                    'sid'     => $sid,
-                    'from'    => $fromClassId,
-                    'to'      => $toClassId,
-                    'session' => sanitize($session),
-                    'pdate'   => $date
-                ]);
-
-                // Update class reference in students table
-                $stmtUpdateStud->execute([
-                    'to_class'   => $toClassId,
-                    'sid'        => $sid,
-                    'from_class' => $fromClassId
-                ]);
-
-                if ($stmtUpdateStud->rowCount() > 0) {
-                    $successCount++;
+            // 1. Chunked Bulk Insert for Promotion Audit Log
+            $chunks = array_chunk($studentIds, 250);
+            foreach ($chunks as $chunk) {
+                $placeholders = [];
+                $params = [];
+                foreach ($chunk as $sid) {
+                    $placeholders[] = "(?, ?, ?, ?, ?, 'Promoted')";
+                    array_push($params, $sid, $fromClassId, $toClassId, $cleanSession, $date);
                 }
+                $sqlLog = "INSERT INTO promotions (student_id, from_class_id, to_class_id, academic_session, promotion_date, status) VALUES " . implode(', ', $placeholders);
+                $stmtLog = $db->prepare($sqlLog);
+                $stmtLog->execute($params);
+
+                // 2. Bulk UPDATE class reference in students table for this chunk
+                $inClause = implode(',', array_fill(0, count($chunk), '?'));
+                $sqlUpdate = "UPDATE students SET class_id = ? WHERE class_id = ? AND id IN ($inClause)";
+                $stmtUpdate = $db->prepare($sqlUpdate);
+                $updateParams = array_merge([$toClassId, $fromClassId], $chunk);
+                $stmtUpdate->execute($updateParams);
+                $successCount += $stmtUpdate->rowCount();
             }
 
             $db->commit();

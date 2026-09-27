@@ -358,23 +358,28 @@ switch ($action) {
     // ─────────────────────────────────────────────────────────────────────────
 
     case 'save_school_settings':
-        $schoolName      = sanitize($_POST['school_name'] ?? '');
-        $schoolAddress   = sanitize($_POST['school_address'] ?? '');
-        $city            = sanitize($_POST['city'] ?? '');
-        $phoneNumber     = sanitize($_POST['phone_number'] ?? '');
-        $whatsappNumber  = sanitize($_POST['whatsapp_number'] ?? '');
-        $email           = sanitize($_POST['email'] ?? '');
-        $website         = sanitize($_POST['website'] ?? '');
-        $principalName   = sanitize($_POST['principal_name'] ?? '');
-        $ownerName       = sanitize($_POST['owner_name'] ?? '');
-        $regNumber       = sanitize($_POST['registration_number'] ?? '');
-        $academicSession = sanitize($_POST['current_academic_session'] ?? '2026-2027');
-        $timezone        = sanitize($_POST['timezone'] ?? 'Asia/Karachi');
-        $currency        = sanitize($_POST['currency'] ?? 'PKR');
-        $dateFormat      = sanitize($_POST['date_format'] ?? 'Y-m-d');
+        $schoolName        = sanitize($_POST['school_name'] ?? '');
+        $schoolAddress     = sanitize($_POST['school_address'] ?? '');
+        $city              = sanitize($_POST['city'] ?? '');
+        $phoneNumber       = sanitize($_POST['phone_number'] ?? '');
+        $whatsappNumber    = sanitize($_POST['whatsapp_number'] ?? '');
+        $email             = sanitize($_POST['email'] ?? '');
+        $website           = sanitize($_POST['website'] ?? '');
+        $principalName     = sanitize($_POST['principal_name'] ?? '');
+        $ownerName         = sanitize($_POST['owner_name'] ?? '');
+        $regNumber         = sanitize($_POST['registration_number'] ?? '');
+        $academicSession   = sanitize($_POST['current_academic_session'] ?? '2026-2027');
+        $timezone          = sanitize($_POST['timezone'] ?? 'Asia/Karachi');
+        $currency          = sanitize($_POST['currency'] ?? 'PKR');
+        $dateFormat        = sanitize($_POST['date_format'] ?? 'Y-m-d');
+        $bankName          = sanitize($_POST['bank_name'] ?? 'Meezan Bank Ltd');
+        $bankAccountTitle  = sanitize($_POST['bank_account_title'] ?? 'Indus Grammar School');
+        $bankAccountNo     = sanitize($_POST['bank_account_no'] ?? 'PK64 MEZN 0001 0203 0405 0607');
+        $jazzcashTitle     = sanitize($_POST['jazzcash_title'] ?? 'Indus Grammar School');
+        $jazzcashNumber    = sanitize($_POST['jazzcash_number'] ?? '03066544806');
 
-        if (empty($schoolName) || empty($schoolAddress) || empty($phoneNumber) || empty($email)) {
-            jsonResponse(['success' => false, 'message' => 'School Name, Address, Phone, and Email are required.']);
+        if (empty($schoolName) || empty($schoolAddress) || empty($email)) {
+            jsonResponse(['success' => false, 'message' => 'School Name, Address, and Email are required.']);
         }
 
         // Handle logo upload
@@ -400,24 +405,27 @@ switch ($action) {
                     UPDATE school_settings SET 
                         school_name = ?, school_logo = ?, school_address = ?, city = ?, phone_number = ?, 
                         whatsapp_number = ?, email = ?, website = ?, principal_name = ?, owner_name = ?, 
-                        registration_number = ?, current_academic_session = ?, timezone = ?, currency = ?, date_format = ?
+                        registration_number = ?, current_academic_session = ?, timezone = ?, currency = ?, date_format = ?,
+                        bank_name = ?, bank_account_title = ?, bank_account_no = ?, jazzcash_title = ?, jazzcash_number = ?
                     WHERE id = ?
                 ");
                 $ok = $update->execute([
                     $schoolName, $logoPath, $schoolAddress, $city, $phoneNumber,
                     $whatsappNumber, $email, $website, $principalName, $ownerName,
-                    $regNumber, $academicSession, $timezone, $currency, $dateFormat, $id
+                    $regNumber, $academicSession, $timezone, $currency, $dateFormat,
+                    $bankName, $bankAccountTitle, $bankAccountNo, $jazzcashTitle, $jazzcashNumber, $id
                 ]);
             } else {
                 $insert = $db->prepare("
                     INSERT INTO school_settings 
-                        (school_name, school_logo, school_address, city, phone_number, whatsapp_number, email, website, principal_name, owner_name, registration_number, current_academic_session, timezone, currency, date_format)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        (school_name, school_logo, school_address, city, phone_number, whatsapp_number, email, website, principal_name, owner_name, registration_number, current_academic_session, timezone, currency, date_format, bank_name, bank_account_title, bank_account_no, jazzcash_title, jazzcash_number)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
                 $ok = $insert->execute([
                     $schoolName, $logoPath, $schoolAddress, $city, $phoneNumber,
                     $whatsappNumber, $email, $website, $principalName, $ownerName,
-                    $regNumber, $academicSession, $timezone, $currency, $dateFormat
+                    $regNumber, $academicSession, $timezone, $currency, $dateFormat,
+                    $bankName, $bankAccountTitle, $bankAccountNo, $jazzcashTitle, $jazzcashNumber
                 ]);
             }
 

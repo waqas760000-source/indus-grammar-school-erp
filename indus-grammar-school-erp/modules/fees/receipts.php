@@ -194,14 +194,85 @@ try {
 }
 
 @media print {
-    body { background: #ffffff !important; }
+    @page {
+        size: A4 portrait;
+        margin: 8mm 10mm;
+    }
+    body {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        font-size: 11px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
     .receipts-wrapper { padding: 0 !important; background: transparent !important; }
-    .adv-hero-banner, .top-kpi-card, nav, .search-filter-card, .btn-print-hide, .pagination { display: none !important; }
-    .card-custom { border: none !important; box-shadow: none !important; }
+    .btn-print-hide, nav, #sidebar, .top-navbar, .adv-hero-banner, .top-kpi-card, .search-filter-card, .pagination, footer {
+        display: none !important;
+    }
+    .card-custom { border: none !important; box-shadow: none !important; background: transparent !important; }
+    .table-custom-header th {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        font-size: 0.75rem !important;
+        padding: 8px 10px !important;
+        border: 1px solid #0f172a !important;
+    }
+    .table-custom-body td {
+        padding: 7px 10px !important;
+        border: 1px solid #cbd5e1 !important;
+        font-size: 0.8rem !important;
+    }
+    .print-signature-footer {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 45px;
+        padding-top: 10px;
+    }
+    .print-sig-box {
+        width: 28%;
+        text-align: center;
+        border-top: 1.5px solid #475569;
+        padding-top: 5px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
 }
 </style>
 
 <div class="receipts-wrapper">
+    <!-- Printable Executive Header for Payment Receipts Ledger -->
+    <div class="d-none d-print-block print-ledger-header mb-4">
+        <div class="d-flex align-items-center justify-content-between pb-3 border-bottom border-2 border-dark">
+            <div class="d-flex align-items-center gap-3">
+                <?php $schoolLogoUrl = function_exists('getSchoolLogoUrl') ? getSchoolLogoUrl() : ''; ?>
+                <?php if (!empty($schoolLogoUrl)): ?>
+                    <img src="<?php echo $schoolLogoUrl; ?>" style="max-height: 55px; width: auto;" alt="Logo">
+                <?php else: ?>
+                    <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 48px; height: 48px; font-size: 1rem;">IGS</div>
+                <?php endif; ?>
+                <div>
+                    <h2 class="fw-bold text-dark mb-0" style="letter-spacing: 0.5px;">INDUS GRAMMAR SCHOOL</h2>
+                    <div class="text-uppercase fw-bold text-primary small">Excellence in Education &middot; Official Financial Ledger Report</div>
+                    <div class="text-muted small">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                </div>
+            </div>
+            <div class="text-end">
+                <div class="badge bg-dark text-white text-uppercase px-3 py-1.5 fw-bold mb-1" style="font-size: 0.75rem;">OFFICIAL REPORT</div>
+                <div class="text-muted small">Generated On: <strong><?php echo date('d M Y, h:i A'); ?></strong></div>
+                <div class="text-muted small">Operator: <strong><?php echo htmlspecialchars($_SESSION['username'] ?? 'Accounts Desk'); ?></strong></div>
+            </div>
+        </div>
+
+        <!-- Print Report Metadata Bar -->
+        <div class="row g-2 align-items-center bg-light p-2.5 rounded-3 border mt-3 small">
+            <div class="col-4"><strong>Report Period:</strong> <?php echo date('d M Y', strtotime($filters['from'])); ?> — <?php echo date('d M Y', strtotime($filters['to'])); ?></div>
+            <div class="col-4 text-center"><strong>Payment Method:</strong> <?php echo !empty($filters['payment_method']) ? htmlspecialchars($filters['payment_method']) : 'All Methods'; ?></div>
+            <div class="col-4 text-end"><strong>Total Collection:</strong> <span class="text-success fw-bold">Rs. <?php echo number_format($rangeTotalSum, 2); ?></span></div>
+        </div>
+    </div>
+
     <!-- Breadcrumb Navigation -->
     <nav aria-label="breadcrumb" class="mb-3 btn-print-hide">
         <ol class="breadcrumb mb-0">
@@ -408,8 +479,29 @@ try {
                             </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
+                    <tfoot class="table-light fw-bold border-top border-2 border-dark">
+                        <tr>
+                            <td colspan="6" class="text-end text-uppercase">PERIOD COLLECTION TOTAL:</td>
+                            <td class="text-end text-success fs-6">Rs. <?php echo number_format($rangeTotalSum, 2); ?></td>
+                            <td class="btn-print-hide"></td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
+
+            <!-- Official Print Signature Footer -->
+            <div class="d-none d-print-flex print-signature-footer px-3 pb-3">
+                <div class="print-sig-box">
+                    Prepared By (Cashier)
+                </div>
+                <div class="print-sig-box">
+                    Accounts Verified By
+                </div>
+                <div class="print-sig-box">
+                    Principal / Director Approval
+                </div>
+            </div>
+
 
             <!-- Pagination -->
             <?php if ($totalPages > 1): ?>

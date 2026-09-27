@@ -56,7 +56,7 @@ if (!$student) {
 
 <div class="cert-container">
     <div class="school-title">INDUS GRAMMAR SCHOOL</div>
-    <div class="cert-subtitle">Karachi, Pakistan</div>
+    <div class="cert-subtitle">Lahore, Pakistan</div>
     
     <div class="cert-heading">Certificate of Achievement</div>
     

@@ -12,14 +12,29 @@ AuthMiddleware::requirePermission('fee_view');
 $db = Database::getConnection();
 $classes = SchoolClass::all();
 
-// Academic Sessions List
+// Academic Sessions List (With Auto-Seeding & Fallback Guarantee)
 $academicSessions = [];
 try {
-    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY is_active DESC, session_name DESC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
-    $academicSessions = ['2026-2027', '2025-2026'];
+    $academicSessions = [];
 }
-$activeSession = !empty($academicSessions) ? $academicSessions[0] : (defined('CURRENT_ACADEMIC_YEAR') ? CURRENT_ACADEMIC_YEAR : date('Y'));
+
+if (empty($academicSessions)) {
+    $defaultSessions = ['2026-2027', '2025-2026', '2024-2025', '2027-2028'];
+    try {
+        $stmtInsert = $db->prepare("INSERT IGNORE INTO academic_sessions (session_name, is_active) VALUES (?, ?)");
+        foreach ($defaultSessions as $sess) {
+            $stmtInsert->execute([$sess, ($sess === '2026-2027') ? 1 : 0]);
+        }
+        $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY is_active DESC, session_name DESC")->fetchAll(PDO::FETCH_COLUMN);
+    } catch (Exception $e) {}
+    
+    if (empty($academicSessions)) {
+        $academicSessions = $defaultSessions;
+    }
+}
+$activeSession = !empty($academicSessions) ? $academicSessions[0] : (defined('CURRENT_ACADEMIC_YEAR') ? CURRENT_ACADEMIC_YEAR : '2026-2027');
 
 // Filter values
 $filterType    = sanitize($_GET['filter_type'] ?? '');

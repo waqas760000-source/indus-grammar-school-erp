@@ -111,14 +111,17 @@ CREATE TABLE IF NOT EXISTS `classes` (
 CREATE TABLE IF NOT EXISTS `students` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `admission_no` VARCHAR(30) NOT NULL UNIQUE,
+  `roll_no` VARCHAR(20) NULL DEFAULT NULL,
   `first_name` VARCHAR(50) NOT NULL,
   `last_name` VARCHAR(50) NOT NULL,
   `gender` ENUM('Male', 'Female', 'Other') NOT NULL,
   `date_of_birth` DATE NOT NULL,
+  `cnic_bform` VARCHAR(25) NULL DEFAULT NULL,
   `enrollment_date` DATE NOT NULL,
   `class_id` INT NOT NULL,
   `status` ENUM('Active', 'Inactive', 'Suspended') DEFAULT 'Active',
   `guardian_name` VARCHAR(100) NOT NULL,
+  `guardian_cnic` VARCHAR(25) NULL DEFAULT NULL,
   `guardian_phone` VARCHAR(20) NOT NULL,
   `guardian_email` VARCHAR(100) NULL,
   `address` TEXT NOT NULL,
@@ -130,6 +133,9 @@ CREATE TABLE IF NOT EXISTS `students` (
 CREATE INDEX idx_students_class ON students(class_id);
 CREATE INDEX idx_students_status ON students(status);
 CREATE INDEX idx_students_name ON students(first_name, last_name);
+CREATE INDEX idx_students_roll_no ON students(roll_no);
+CREATE INDEX idx_students_cnic ON students(cnic_bform);
+CREATE INDEX idx_students_guardian_cnic ON students(guardian_cnic);
 
 -- --------------------------------------------------------
 -- Table structure for table `admissions`

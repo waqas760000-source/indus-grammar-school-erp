@@ -142,7 +142,9 @@ switch ($action) {
             ");
             $procStmt->execute(['month' => $month, 'year' => $year]);
 
-            $procId = (int)$db->query("SELECT id FROM salary_processing WHERE month = $month AND year = $year")->fetchColumn();
+            $stmtProcId = $db->prepare("SELECT id FROM salary_processing WHERE month = :m AND year = :y LIMIT 1");
+            $stmtProcId->execute(['m' => $month, 'y' => $year]);
+            $procId = (int)$stmtProcId->fetchColumn();
 
             $detailInsert = $db->prepare("
                 INSERT INTO salary_details 
@@ -364,8 +366,9 @@ switch ($action) {
 
             // 4. Update advance recovery balances if there was a recovery deduction
             $advDeduction = (float)$detail['advance_salary_deduction'];
-            if ($advDeduction > 0) {
-                $adv = $db->query("SELECT * FROM advance_salary WHERE staff_id = $staffId AND status = 'Pending' LIMIT 1")->fetch();
+                $stmtAdv = $db->prepare("SELECT * FROM advance_salary WHERE staff_id = :sid AND status = 'Pending' LIMIT 1");
+                $stmtAdv->execute(['sid' => $staffId]);
+                $adv = $stmtAdv->fetch();
                 if ($adv) {
                     $newPaid = (float)$adv['paid_amount'] + $advDeduction;
                     $newRem  = (float)$adv['remaining_balance'] - $advDeduction;

@@ -247,8 +247,9 @@ switch ($action) {
             ]);
 
             // If Approved, automatically update staff daily attendance records
-            if ($newStatus === 'Approved') {
-                $leave = $db->query("SELECT * FROM staff_leave WHERE id = $id")->fetch();
+                $stmtLvl = $db->prepare("SELECT * FROM staff_leave WHERE id = :id LIMIT 1");
+                $stmtLvl->execute(['id' => $id]);
+                $leave = $stmtLvl->fetch();
                 if ($leave) {
                     $start = new DateTime($leave['leave_from']);
                     $end   = new DateTime($leave['leave_to']);
@@ -343,6 +344,49 @@ switch ($action) {
                 jsonResponse(['success' => true, 'message' => 'Attendance shift configurations saved.']);
             }
             jsonResponse(['success' => false, 'message' => 'Failed to save attendance settings.']);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ── GET STAFF MONTHLY AUDIT LOGS ───────────────────────────
+    case 'get_staff_monthly_audit':
+        $staffId = (int)($_POST['staff_id'] ?? 0);
+        $month   = sanitize($_POST['month'] ?? date('m'));
+        $year    = sanitize($_POST['year'] ?? date('Y'));
+
+        if ($staffId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid Staff ID.'], 400);
+        }
+
+        try {
+            $staffStmt = $db->prepare("SELECT id, employee_no, first_name, last_name, department, designation FROM staff WHERE id = ?");
+            $staffStmt->execute([$staffId]);
+            $staffInfo = $staffStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$staffInfo) {
+                jsonResponse(['success' => false, 'message' => 'Staff record not found.'], 404);
+            }
+
+            $daysInMonth = (int)cal_days_in_month(CAL_GREGORIAN, (int)$month, (int)$year);
+            $startDate   = sprintf('%04d-%02d-01', (int)$year, (int)$month);
+            $endDate     = sprintf('%04d-%02d-%02d', (int)$year, (int)$month, $daysInMonth);
+
+            $stmt = $db->prepare("
+                SELECT date, status, check_in_time, check_out_time, remarks
+                FROM staff_attendance
+                WHERE staff_id = :sid AND date BETWEEN :start AND :end
+                ORDER BY date ASC
+            ");
+            $stmt->execute(['sid' => $staffId, 'start' => $startDate, 'end' => $endDate]);
+            $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            jsonResponse([
+                'success' => true,
+                'staff'   => $staffInfo,
+                'period'  => date('F Y', strtotime($startDate)),
+                'logs'    => $logs
+            ]);
         } catch (Exception $e) {
             jsonResponse(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
         }

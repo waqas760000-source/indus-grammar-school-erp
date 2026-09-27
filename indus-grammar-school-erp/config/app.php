@@ -4,6 +4,15 @@
  * Version 1.0.0
  */
 
+// Enable HTTP GZip compression and output buffering if supported
+if (!ob_get_level()) {
+    if (extension_loaded('zlib') && !headers_sent() && isset($_SERVER['HTTP_ACCEPT_ENCODING']) && str_contains($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) {
+        ob_start("ob_gzhandler");
+    } else {
+        ob_start();
+    }
+}
+
 // Load basic configuration files
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/constants.php';

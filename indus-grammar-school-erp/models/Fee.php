@@ -208,6 +208,90 @@ class Fee {
         }
     }
 
+    public static function syncPendingLedgerDiscounts($studentId) {
+        try {
+            $db = Database::getConnection();
+            $assignment = self::getStudentAssignment($studentId);
+            if (!$assignment) return false;
+
+            $pct = (float)($assignment['discount_percentage'] ?? 0);
+            $flat = (float)($assignment['discount_flat'] ?? 0);
+
+            $stmt = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = :sid AND status IN ('Pending', 'Partial')");
+            $stmt->execute(['sid' => $studentId]);
+            $ledgers = $stmt->fetchAll();
+
+            foreach ($ledgers as $ledger) {
+                $tuition = (float)$ledger['tuition_fee'];
+                $disc = 0.00;
+                if ($pct > 0) {
+                    $disc = ($tuition * $pct) / 100;
+                } elseif ($flat > 0) {
+                    $disc = $flat;
+                }
+
+                $gross = (float)$ledger['tuition_fee'] + (float)$ledger['admission_fee'] + (float)$ledger['computer_fee'] + 
+                         (float)$ledger['exam_fee'] + (float)$ledger['transport_fee'] + (float)$ledger['annual_charges'] + 
+                         (float)$ledger['security_deposit'] + (float)$ledger['other_charges'] + (float)$ledger['fine_amount'];
+                
+                $payable = max(0, $gross - $disc);
+
+                $uStmt = $db->prepare("UPDATE fee_ledger SET discount_amount = :disc, total_payable = :payable WHERE id = :id");
+                $uStmt->execute(['disc' => $disc, 'payable' => $payable, 'id' => $ledger['id']]);
+            }
+            return true;
+        } catch (Exception $e) {
+            error_log("Fee::syncPendingLedgerDiscounts error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    public static function getDiscountedStudents($filters = []) {
+        try {
+            $db = Database::getConnection();
+            $where = "WHERE (sfa.discount_percentage > 0 OR sfa.discount_flat > 0) AND s.status = 'Active'";
+            $params = [];
+
+            if (!empty($filters['class_id'])) {
+                $where .= " AND s.class_id = :class_id";
+                $params['class_id'] = (int)$filters['class_id'];
+            }
+            if (!empty($filters['discount_type'])) {
+                if ($filters['discount_type'] === 'percentage') {
+                    $where .= " AND sfa.discount_percentage > 0";
+                } elseif ($filters['discount_type'] === 'flat') {
+                    $where .= " AND sfa.discount_flat > 0";
+                }
+            }
+            if (!empty($filters['search'])) {
+                $where .= " AND (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3 OR d.roll_no LIKE :q4)";
+                $qVal = '%' . $filters['search'] . '%';
+                $params['q1'] = $qVal;
+                $params['q2'] = $qVal;
+                $params['q3'] = $qVal;
+                $params['q4'] = $qVal;
+            }
+
+            $stmt = $db->prepare("
+                SELECT sfa.*, s.id as student_id, s.first_name, s.last_name, s.admission_no, s.academic_type,
+                       c.class_name, c.section, d.father_name, d.roll_no, d.doc_student_photo,
+                       fs.tuition_fee, fs.admission_fee, fs.computer_fee, fs.exam_fee, fs.transport_fee, fs.annual_charges, fs.other_charges
+                FROM student_fee_assignments sfa
+                JOIN students s ON sfa.student_id = s.id
+                LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
+                LEFT JOIN fee_structure fs ON sfa.fee_structure_id = fs.id
+                $where
+                ORDER BY c.class_name ASC, s.first_name ASC
+            ");
+            $stmt->execute($params);
+            return $stmt->fetchAll();
+        } catch (PDOException $e) {
+            error_log("Fee::getDiscountedStudents error: " . $e->getMessage());
+            return [];
+        }
+    }
+
     // ── Monthly Fee Ledger Operations ──
 
     public static function allChallans($filters = [], $limit = 20, $offset = 0) {
@@ -216,6 +300,10 @@ class Fee {
             $where = "WHERE 1=1";
             $params = [];
 
+            if (!empty($filters['student_id'])) {
+                $where .= " AND fl.student_id = :student_id";
+                $params['student_id'] = (int)$filters['student_id'];
+            }
             if (!empty($filters['status'])) {
                 $where .= " AND fl.status = :status";
                 $params['status'] = $filters['status'];
@@ -269,6 +357,11 @@ class Fee {
             $db = Database::getConnection();
             $where = "WHERE 1=1";
             $params = [];
+
+            if (!empty($filters['student_id'])) {
+                $where .= " AND fl.student_id = :student_id";
+                $params['student_id'] = (int)$filters['student_id'];
+            }
 
             if (!empty($filters['status'])) {
                 $where .= " AND fl.status = :status";

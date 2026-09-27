@@ -328,41 +328,52 @@ $pageRecords = array_slice($allRecords, $offset, $limit);
 
 /* Print Layout */
 @media print {
-    .d-print-none, #sidebar, header, nav, footer, .btn-view-toggle {
+    header, footer, nav, sidebar, .sidebar, .main-header, .navbar, .breadcrumb,
+    .d-print-none, .stat-card-custom, .card-filter, .btn, .no-print,
+    form, #filterForm {
         display: none !important;
     }
-    body {
+    
+    body, html {
         background: #ffffff !important;
-        color: #000000 !important;
-        font-size: 11pt;
-    }
-    .container-fluid {
+        color: #0f172a !important;
+        margin: 0 !important;
         padding: 0 !important;
+        width: 100% !important;
     }
+
+    .main-wrapper, .wrapper, .content-wrapper, .main-content, .container-fluid, .content, .page-wrapper {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        width: 100% !important;
+    }
+
     .print-header {
         display: block !important;
         text-align: center;
-        margin-bottom: 20px;
-        border-bottom: 2px solid #000000;
-        padding-bottom: 10px;
+        margin-bottom: 15px;
+        border-bottom: 2px solid #0f172a;
+        padding-bottom: 8px;
     }
+
     .print-table {
         width: 100% !important;
         border-collapse: collapse !important;
+        margin-top: 10px !important;
     }
+
     .print-table th, .print-table td {
-        border: 1px solid #444444 !important;
+        border: 1px solid #334155 !important;
         padding: 6px 8px !important;
         font-size: 10pt !important;
+        color: #0f172a !important;
     }
+
     .print-table th {
         background-color: #f1f5f9 !important;
-        color: #000000 !important;
-    }
-}
-@media (min-width: 992px) {
-    .print-header {
-        display: none;
+        font-weight: bold !important;
     }
 }
 </style>
@@ -370,9 +381,9 @@ $pageRecords = array_slice($allRecords, $offset, $limit);
 <!-- Printable Only Header -->
 <div class="print-header d-none d-print-block">
     <h2 style="font-weight: 800; margin-bottom: 2px; color: #0f172a;">INDUS GRAMMAR SCHOOL</h2>
-    <h4 style="margin-bottom: 5px; color: #334155;">Family Phone Numbers List</h4>
+    <h4 style="margin-bottom: 5px; color: #1e3a8a;">Family Phone Numbers & Parent Contact Directory</h4>
     <p style="font-size: 9pt; color: #64748b; margin-bottom: 0;">
-        Generated On: <?php echo date('F j, Y - g:i A'); ?> | Total Records: <?php echo $totalStudentsCount; ?>
+        Generated On: <?php echo date('F j, Y - g:i A'); ?> | Total Active Enrolled Students: <?php echo $totalStudentsCount; ?> | Total Families: <?php echo $totalFamiliesCount; ?>
     </p>
 </div>
 
@@ -399,8 +410,14 @@ $pageRecords = array_slice($allRecords, $offset, $limit);
             </button>
         </div>
 
+        <?php 
+        $familyPrintUrl = "../../templates/family_phone_list.php?search_class=" . $search_class . "&search_campus=" . urlencode($search_campus) . "&search_academic_type=" . urlencode($search_academic_type);
+        ?>
+        <a href="<?php echo $familyPrintUrl; ?>" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
+            <i class="fa-solid fa-print me-1"></i> Print A4 Sheet
+        </a>
         <button class="btn btn-sm btn-outline-primary px-3 shadow-sm" onclick="window.print()">
-            <i class="fa-solid fa-print me-1"></i> Print List
+            <i class="fa-solid fa-print me-1"></i> Quick Print
         </button>
         <button class="btn btn-sm btn-outline-success px-3 shadow-sm" onclick="exportFamilyCSV()">
             <i class="fa-solid fa-file-excel me-1"></i> Export CSV

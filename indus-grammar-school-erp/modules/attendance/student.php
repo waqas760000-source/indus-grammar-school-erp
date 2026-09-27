@@ -51,9 +51,12 @@ if (empty($sectionsList)) {
 // Fetch Academic Sessions
 $academicSessions = [];
 try {
-    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY id DESC")->fetchAll(PDO::FETCH_COLUMN);
+    $academicSessions = $db->query("SELECT session_name FROM academic_sessions ORDER BY is_active DESC, session_name DESC")->fetchAll(PDO::FETCH_COLUMN);
 } catch (Exception $e) {
-    $academicSessions = ['2026-2027', '2025-2026'];
+    $academicSessions = [];
+}
+if (empty($academicSessions)) {
+    $academicSessions = ['2026-2027', '2025-2026', '2024-2025'];
 }
 if (empty($selected_session) && !empty($academicSessions)) {
     $selected_session = $academicSessions[0];

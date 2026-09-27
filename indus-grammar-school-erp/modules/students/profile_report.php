@@ -420,8 +420,11 @@ if ($selectedId > 0) {
     </div>
     <?php if ($student): ?>
         <div class="d-flex gap-2">
+            <a href="../../templates/profile_dossier.php?id=<?php echo $selectedId; ?>" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
+                <i class="fa-solid fa-print me-1"></i> Print Formal A4 Dossier
+            </a>
             <button class="btn btn-sm btn-outline-primary px-3 shadow-sm" onclick="window.print()">
-                <i class="fa-solid fa-print me-1"></i> Print Profile
+                <i class="fa-solid fa-file-pdf me-1"></i> Print Quick Sheet
             </button>
             <a href="profile_report.php" class="btn btn-sm btn-light border text-secondary px-3">
                 <i class="fa-solid fa-rotate-left me-1"></i> Clear Search

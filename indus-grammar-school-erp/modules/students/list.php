@@ -173,6 +173,9 @@ if ($totalPages < 1) $totalPages = 1;
                             </td>
                             <td class="text-end d-print-none">
                                 <div class="btn-group">
+                                    <a href="../../templates/registration_form.php?id=<?php echo $student['id']; ?>" target="_blank" class="btn btn-outline-info btn-sm" title="Print A4 Registration Form">
+                                        <i class="fa-solid fa-file-invoice"></i>
+                                    </a>
                                     <a href="profile_report.php?id=<?php echo $student['id']; ?>" class="btn btn-outline-secondary btn-sm" title="View Profile">
                                         <i class="fa-regular fa-user"></i>
                                     </a>

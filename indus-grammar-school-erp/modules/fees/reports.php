@@ -287,13 +287,19 @@ $currentReportTitle = $reportTitles[$reportType] ?? 'Fee Financial Report';
 }
 
 @media print {
-    .d-print-none, .top-navbar, .sidebar, .breadcrumb-card, .filter-section, .btn-print, .btn-export {
+    @page {
+        size: A4 portrait;
+        margin: 8mm 10mm;
+    }
+    .d-print-none, .top-navbar, .sidebar, .breadcrumb-card, .filter-section, .btn-print, .btn-export, footer {
         display: none !important;
     }
     body {
         background: #ffffff !important;
-        color: #000000 !important;
-        font-size: 12px !important;
+        color: #0f172a !important;
+        font-size: 11px !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
     .container-fluid, .main-content {
         padding: 0 !important;
@@ -304,30 +310,71 @@ $currentReportTitle = $reportTitles[$reportType] ?? 'Fee Financial Report';
         border: none !important;
         box-shadow: none !important;
     }
-    .table {
-        width: 100% !important;
-        border-collapse: collapse !important;
+    .custom-table-container thead th {
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        font-size: 0.75rem !important;
+        padding: 8px 10px !important;
+        border: 1px solid #0f172a !important;
     }
-    .table th, .table td {
+    .custom-table-container tbody td {
+        padding: 7px 10px !important;
         border: 1px solid #cbd5e1 !important;
-        padding: 6px 10px !important;
+        font-size: 0.8rem !important;
     }
     .print-header {
         display: block !important;
+    }
+    .print-signature-footer {
+        display: flex !important;
+        justify-content: space-between;
+        align-items: flex-end;
+        margin-top: 45px;
+        padding-top: 10px;
+    }
+    .print-sig-box {
+        width: 28%;
+        text-align: center;
+        border-top: 1.5px solid #475569;
+        padding-top: 5px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #1e293b;
     }
 }
 </style>
 
 <!-- Printable Header for Hardcopy Reports -->
-<div class="d-none print-header text-center mb-4 pt-2">
-    <h2 class="fw-bold text-dark mb-0">INDUS GRAMMAR SCHOOL</h2>
-    <h5 class="fw-semibold text-secondary mb-1"><?php echo htmlspecialchars($currentReportTitle); ?></h5>
-    <p class="text-muted small">
-        Period: <strong><?php echo date('d M Y', strtotime($dateFrom)); ?></strong> to <strong><?php echo date('d M Y', strtotime($dateTo)); ?></strong> | 
-        Generated: <?php echo date('d-M-Y H:i A'); ?>
-    </p>
-    <hr style="border-top: 2px solid #000;">
+<div class="d-none print-header mb-4 pt-2">
+    <div class="d-flex align-items-center justify-content-between pb-3 border-bottom border-2 border-dark">
+        <div class="d-flex align-items-center gap-3">
+            <?php $schoolLogoUrl = function_exists('getSchoolLogoUrl') ? getSchoolLogoUrl() : ''; ?>
+            <?php if (!empty($schoolLogoUrl)): ?>
+                <img src="<?php echo $schoolLogoUrl; ?>" style="max-height: 55px; width: auto;" alt="Logo">
+            <?php else: ?>
+                <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 48px; height: 48px; font-size: 1rem;">IGS</div>
+            <?php endif; ?>
+            <div>
+                <h2 class="fw-bold text-dark mb-0" style="letter-spacing: 0.5px;">INDUS GRAMMAR SCHOOL</h2>
+                <div class="text-uppercase fw-bold text-primary small">Excellence in Education &middot; Revenue Analytics & Fee Audit</div>
+                <div class="text-muted small">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+            </div>
+        </div>
+        <div class="text-end">
+            <div class="badge bg-dark text-white text-uppercase px-3 py-1.5 fw-bold mb-1" style="font-size: 0.75rem;">FINANCIAL REPORT</div>
+            <div class="text-muted small">Report: <strong><?php echo htmlspecialchars($currentReportTitle); ?></strong></div>
+            <div class="text-muted small">Generated: <strong><?php echo date('d M Y, h:i A'); ?></strong></div>
+        </div>
+    </div>
+
+    <!-- Print Report Metadata Bar -->
+    <div class="row g-2 align-items-center bg-light p-2.5 rounded-3 border mt-3 small">
+        <div class="col-4"><strong>Report Period:</strong> <?php echo date('d M Y', strtotime($dateFrom)); ?> — <?php echo date('d M Y', strtotime($dateTo)); ?></div>
+        <div class="col-4 text-center"><strong>Academic Type:</strong> <?php echo !empty($academType) ? htmlspecialchars($academType) : 'All Academic Types'; ?></div>
+        <div class="col-4 text-end"><strong>Today's Collection:</strong> <span class="text-success fw-bold">Rs. <?php echo number_format($summary['today_collection'], 0); ?></span></div>
+    </div>
 </div>
+
 
 <!-- Hero Banner Header -->
 <div class="hero-report-banner text-white p-4 p-lg-5 mb-4 shadow-sm d-print-none">
@@ -721,6 +768,19 @@ $currentReportTitle = $reportTitles[$reportType] ?? 'Fee Financial Report';
                 </tbody>
             <?php endif; ?>
         </table>
+    </div>
+</div>
+
+<!-- Official Print Signature Footer -->
+<div class="d-none d-print-flex print-signature-footer mt-5 pt-3">
+    <div class="print-sig-box">
+        Prepared By (Data Entry)
+    </div>
+    <div class="print-sig-box">
+        Accounts Verified By
+    </div>
+    <div class="print-sig-box">
+        Principal / Director Approval
     </div>
 </div>
 

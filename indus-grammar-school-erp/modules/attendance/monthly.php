@@ -582,7 +582,10 @@ include_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="button" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Print Report</button>
+            <a href="<?php echo APP_URL; ?>/templates/monthly_attendance.php?month=<?php echo $selectedMonth; ?>&year=<?php echo $selectedYear; ?>&session=<?php echo urlencode($filter_session); ?>&campus=<?php echo urlencode($filter_campus); ?>&academic_type=<?php echo urlencode($filter_academic_type); ?>&class=<?php echo urlencode($filter_class); ?>&section=<?php echo urlencode($filter_section); ?>&student_status=<?php echo urlencode($filter_status); ?>&search=<?php echo urlencode($filter_search); ?>" target="_blank" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm">
+                <i class="fa-solid fa-print me-1"></i>Print A4 Sheet
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Quick Print</button>
             <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="exportCSV()"><i class="fa-solid fa-file-excel me-1"></i>Export CSV</button>
         </div>
     </div>

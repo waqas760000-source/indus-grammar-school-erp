@@ -171,7 +171,7 @@ $breadcrumbActive = 'Student Summary Report';
 include_once __DIR__ . '/../../includes/header.php';
 ?>
 
-<!-- Premium Design System Tokens -->
+<!-- Premium Design System Tokens & Bespoke Roster Styling -->
 <style>
 :root {
     --igs-navy: #0F172A;
@@ -194,20 +194,34 @@ body {
 .page-header-banner {
     background: linear-gradient(135deg, #0F172A 0%, #1D4ED8 60%, #2563EB 100%);
     color: #ffffff;
-    border-radius: 12px;
-    padding: 24px 28px;
-    box-shadow: 0 4px 15px rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    padding: 26px 30px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25);
     margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Metric Cards */
+.page-header-banner::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* Executive Metric Cards */
 .metric-card {
     background: #ffffff;
     border: 1px solid var(--igs-border);
-    border-radius: 12px;
-    padding: 18px 20px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     height: 100%;
     display: flex;
     align-items: center;
@@ -215,44 +229,45 @@ body {
 }
 
 .metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+    border-color: #CBD5E1;
 }
 
 .metric-icon-wrap {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
+    width: 52px;
+    height: 52px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     flex-shrink: 0;
 }
 
 .metric-details .lbl {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     color: var(--igs-muted);
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.4px;
+    letter-spacing: 0.5px;
     margin-bottom: 2px;
 }
 
 .metric-details .val {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 800;
-    line-height: 1.2;
+    line-height: 1.1;
     color: var(--igs-text);
 }
 
-/* Panel Containers */
+/* Executive Panel Containers */
 .panel-card {
     background: #ffffff;
     border: 1px solid var(--igs-border);
-    border-radius: 12px;
-    padding: 22px;
-    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
 }
 
 .info-bar-pill {
@@ -261,50 +276,105 @@ body {
     color: var(--igs-muted);
     font-size: 0.78rem;
     font-weight: 600;
-    padding: 4px 12px;
+    padding: 5px 14px;
     border-radius: 50px;
     display: inline-flex;
     align-items: center;
     gap: 6px;
 }
 
-/* Dedicated Print Stylesheet */
+/* Breakdown Table Custom Styling */
+.custom-table th {
+    background-color: #0F172A !important;
+    color: #ffffff !important;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 12px 14px;
+}
+
+.custom-table td {
+    padding: 11px 14px;
+    font-size: 0.88rem;
+}
+
+/* Dedicated Print Stylesheet for Browser Print */
 @media print {
-    body > *:not(#printReportSection),
-    .d-print-none,
-    .page-header-banner,
-    .panel-card,
-    header, footer, nav, sidebar, .sidebar, .main-header, .breadcrumb {
+    header, footer, nav, sidebar, .sidebar, .main-header, .navbar, .breadcrumb,
+    .page-header-banner, .d-print-none, .metric-card, .panel-card, .btn, .no-print,
+    form, #filterForm {
         display: none !important;
     }
     
-    #printReportSection, #printReportSection * {
-        display: block !important;
-    }
-    
-    #printReportSection {
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 100%;
+    body, html {
         background: #ffffff !important;
-        padding: 20px !important;
+        color: #0f172a !important;
         margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
     }
-    
+
+    .main-wrapper, .wrapper, .content-wrapper, .main-content, .container-fluid, .content, .page-wrapper {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+        width: 100% !important;
+    }
+
+    #printReportSection {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 15px !important;
+    }
+
+    #printReportSection * {
+        visibility: visible !important;
+    }
+
     .print-table {
         width: 100% !important;
         border-collapse: collapse !important;
+        margin-top: 15px !important;
+        border: 1.5px solid #0f172a !important;
     }
-    
+
     .print-table th, .print-table td {
         border: 1px solid #cbd5e1 !important;
-        padding: 8px 10px !important;
-        font-size: 11px !important;
+        padding: 6px 10px !important;
+        font-size: 9.5pt !important;
+        color: #0f172a !important;
     }
 
     .print-table th {
-        background-color: #f1f5f9 !important;
+        background-color: #0f172a !important;
+        color: #ffffff !important;
+        font-weight: bold !important;
+        text-transform: uppercase !important;
+        font-size: 8.5pt !important;
+    }
+
+    .print-sig-row {
+        display: flex !important;
+        justify-content: space-between !important;
+        align-items: flex-end !important;
+        margin-top: 40px !important;
+        padding: 0 10px !important;
+    }
+
+    .print-sig-block {
+        text-align: center !important;
+        width: 28% !important;
+        border-top: 1.5px solid #0f172a !important;
+        padding-top: 4px !important;
+        font-size: 8.5pt !important;
+        font-weight: bold !important;
         color: #0f172a !important;
     }
 }
@@ -320,12 +390,18 @@ body {
             <h2 class="fw-bold mb-1 text-white"><i class="fa-solid fa-chart-pie me-2"></i>Student Summary Report</h2>
             <p class="mb-0 text-white-50" style="font-size: 0.95rem;">View student enrollment information, academic distribution, and summary statistics.</p>
         </div>
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <?php 
+            $printUrl = "../../templates/summary_report.php?search_campus=" . urlencode($search_campus) . "&search_academic_type=" . urlencode($search_academic_type) . "&search_session=" . urlencode($search_session) . "&search_class=" . $search_class . "&search_section=" . urlencode($search_section) . "&search_status=" . urlencode($search_status);
+            ?>
+            <a href="<?php echo $printUrl; ?>" target="_blank" class="btn btn-warning text-dark fw-bold px-3 rounded-pill">
+                <i class="fa-solid fa-print me-1.5"></i>Print A4 Sheet
+            </a>
             <button type="button" class="btn btn-light text-primary fw-bold px-3 rounded-pill" onclick="window.print()">
-                <i class="fa-solid fa-print me-2"></i>Print Report
+                <i class="fa-solid fa-print me-1.5"></i>Quick Print
             </button>
             <button type="button" class="btn btn-outline-light fw-bold px-3 rounded-pill" onclick="exportSummaryCSV()">
-                <i class="fa-solid fa-file-csv me-2"></i>Export CSV
+                <i class="fa-solid fa-file-csv me-1.5"></i>Export CSV
             </button>
         </div>
     </div>
@@ -614,23 +690,32 @@ body {
 
 <!-- Isolated Print Section for Browser Print Preview -->
 <div id="printReportSection">
-    <div style="text-align: center; border-bottom: 2px solid #0F172A; padding-bottom: 12px; margin-bottom: 20px;">
-        <h2 style="margin: 0; font-weight: 800; color: #0F172A;">INDUS GRAMMAR SCHOOL & ACADEMY</h2>
-        <h4 style="margin: 4px 0 0 0; color: #1D4ED8;">Student Summary Report</h4>
-        <p style="margin: 4px 0 0 0; font-size: 11px; color: #64748B;">
-            Campus: <?php echo htmlspecialchars($search_campus ?: 'All'); ?> | 
-            Type: <?php echo htmlspecialchars($search_academic_type ?: 'All'); ?> | 
-            Session: <?php echo htmlspecialchars($search_session ?: 'All'); ?> | 
-            Generated On: <?php echo date('d-M-Y H:i'); ?>
-        </p>
+    <?php $printLogoUrl = function_exists('getSchoolLogoUrl') ? getSchoolLogoUrl() : ''; ?>
+    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2.5px solid #0F172A; padding-bottom: 10px; margin-bottom: 15px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <?php if (!empty($printLogoUrl)): ?>
+                <img src="<?php echo $printLogoUrl; ?>" alt="School Logo" style="max-height: 50px; max-width: 60px; object-fit: contain;">
+            <?php else: ?>
+                <div style="width: 45px; height: 45px; background: #0f172a; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; border-radius: 50%;">IGS</div>
+            <?php endif; ?>
+            <div>
+                <h2 style="margin: 0; font-weight: 800; color: #0F172A; font-size: 18pt; letter-spacing: 0.5px;">INDUS GRAMMAR SCHOOL & ACADEMY</h2>
+                <h4 style="margin: 2px 0 0 0; color: #1D4ED8; font-size: 11pt; text-transform: uppercase; letter-spacing: 0.5px;">Student Enrollment Summary Worksheet</h4>
+            </div>
+        </div>
+        <div style="text-align: right; font-size: 8.5pt; color: #475569;">
+            <div><strong>Generated:</strong> <?php echo date('d-M-Y h:i A'); ?></div>
+            <div><strong>Campus:</strong> <?php echo htmlspecialchars($search_campus ?: 'All Campuses'); ?></div>
+            <div><strong>Session:</strong> <?php echo htmlspecialchars($search_session ?: 'All Sessions'); ?></div>
+        </div>
     </div>
 
     <!-- Print Summary Metrics Bar -->
-    <div style="display: flex; justify-content: space-around; background: #f8fafc; border: 1px solid #cbd5e1; padding: 10px; margin-bottom: 20px; text-align: center; font-size: 12px;">
+    <div style="display: flex; justify-content: space-around; background: #f8fafc; border: 1.5px solid #0f172a; padding: 8px 12px; margin-bottom: 15px; border-radius: 4px; font-size: 9pt;">
         <div><strong>Total Strength:</strong> <?php echo number_format($totalStudents); ?></div>
         <div><strong>Active Enrolled:</strong> <?php echo number_format($totalActive); ?></div>
-        <div><strong>Boys:</strong> <?php echo number_format($totalBoys); ?></div>
-        <div><strong>Girls:</strong> <?php echo number_format($totalGirls); ?></div>
+        <div><strong>Boys (M):</strong> <?php echo number_format($totalBoys); ?></div>
+        <div><strong>Girls (F):</strong> <?php echo number_format($totalGirls); ?></div>
         <div><strong>School:</strong> <?php echo number_format($totalSchool); ?></div>
         <div><strong>Academy:</strong> <?php echo number_format($totalAcademy); ?></div>
     </div>
@@ -638,15 +723,15 @@ body {
     <table class="print-table">
         <thead>
             <tr>
-                <th>#</th>
+                <th width="35">#</th>
                 <th>Class Name</th>
-                <th>Section</th>
+                <th width="65" style="text-align: center;">Section</th>
                 <th>Campus</th>
-                <th>Academic Type</th>
-                <th style="text-align: center;">Boys (M)</th>
-                <th style="text-align: center;">Girls (F)</th>
-                <th style="text-align: center;">Active</th>
-                <th style="text-align: center;">Total Strength</th>
+                <th width="110">Academic Type</th>
+                <th width="85" style="text-align: center;">Boys (M)</th>
+                <th width="85" style="text-align: center;">Girls (F)</th>
+                <th width="95" style="text-align: center;">Active</th>
+                <th width="100" style="text-align: center;">Total Strength</th>
             </tr>
         </thead>
         <tbody>
@@ -660,26 +745,39 @@ body {
                     $pSumTotal += (int)$pr['total_students'];
             ?>
                 <tr>
-                    <td><?php echo $psr++; ?></td>
+                    <td style="text-align: center;"><?php echo $psr++; ?></td>
                     <td><strong><?php echo htmlspecialchars($pr['class_name']); ?></strong></td>
-                    <td><?php echo htmlspecialchars($pr['section_name']); ?></td>
+                    <td style="text-align: center;"><?php echo htmlspecialchars($pr['section_name']); ?></td>
                     <td><?php echo htmlspecialchars($pr['campus_name']); ?></td>
                     <td><?php echo htmlspecialchars($pr['academic_type']); ?></td>
                     <td style="text-align: center;"><?php echo number_format((int)$pr['boys_count']); ?></td>
                     <td style="text-align: center;"><?php echo number_format((int)$pr['girls_count']); ?></td>
                     <td style="text-align: center;"><?php echo number_format((int)$pr['active_count']); ?></td>
-                    <td style="text-align: center; font-weight: bold;"><?php echo number_format((int)$pr['total_students']); ?></td>
+                    <td style="text-align: center; font-weight: bold; background-color: #f8fafc;"><?php echo number_format((int)$pr['total_students']); ?></td>
                 </tr>
             <?php endforeach; ?>
-            <tr style="font-weight: bold; background-color: #e2e8f0;">
+            <tr style="font-weight: bold; background-color: #f1f5f9; border-top: 2px solid #0f172a;">
                 <td colspan="5" style="text-transform: uppercase;">Grand Total:</td>
                 <td style="text-align: center;"><?php echo number_format($pSumBoys); ?></td>
                 <td style="text-align: center;"><?php echo number_format($pSumGirls); ?></td>
                 <td style="text-align: center;"><?php echo number_format($pSumActive); ?></td>
-                <td style="text-align: center; font-size: 13px;"><?php echo number_format($pSumTotal); ?></td>
+                <td style="text-align: center; font-size: 10pt; background-color: #e2e8f0;"><?php echo number_format($pSumTotal); ?></td>
             </tr>
         </tbody>
     </table>
+
+    <!-- Official Printable Signature Footer -->
+    <div class="print-sig-row">
+        <div class="print-sig-block">
+            Prepared By (Incharge)
+        </div>
+        <div class="print-sig-block">
+            Data Analyst / Accounts
+        </div>
+        <div class="print-sig-block">
+            Principal Signature & Stamp
+        </div>
+    </div>
 </div>
 
 <!-- Chart.js Libraries -->

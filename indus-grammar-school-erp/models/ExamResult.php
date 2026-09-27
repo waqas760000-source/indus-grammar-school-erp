@@ -22,7 +22,7 @@ class ExamResult {
         try {
             $db = Database::getConnection();
             $stmt = $db->prepare("
-                SELECT er.*, st.first_name, st.last_name, st.admission_no
+                SELECT er.*, st.first_name, st.last_name, st.admission_no, st.roll_no, st.cnic_bform, st.guardian_cnic
                 FROM exam_results er
                 JOIN students st ON er.student_id = st.id
                 WHERE er.exam_type_id = :etid AND er.class_id = :cid
@@ -37,7 +37,7 @@ class ExamResult {
     }
 
     /**
-     * Compute and save results for all active students in a class.
+     * Compute and save results for all active students in a class (High-performance batch processing).
      */
     public static function generateClassResults(int $examTypeId, int $classId): array {
         try {
@@ -61,37 +61,38 @@ class ExamResult {
 
             if (empty($subjects)) return ['success' => false, 'message' => 'No active subjects assigned to this class.'];
 
-            $subjectCount = count($subjects);
-            $db->beginTransaction();
+            // 4. Batch fetch ALL student marks for this class & exam type in ONE single query
+            $stmtAllMarks = $db->prepare("
+                SELECT sm.student_id, sm.subject_id, sm.marks_obtained, sm.status 
+                FROM student_marks sm
+                JOIN students st ON sm.student_id = st.id
+                WHERE sm.exam_type_id = :etid AND st.class_id = :cid AND st.status = 'Active'
+            ");
+            $stmtAllMarks->execute(['etid' => $examTypeId, 'cid' => $classId]);
+            $allMarks = $stmtAllMarks->fetchAll(PDO::FETCH_ASSOC);
+
+            $studentMarksMap = [];
+            foreach ($allMarks as $m) {
+                $studentMarksMap[(int)$m['student_id']][(int)$m['subject_id']] = $m;
+            }
+
+            // 5. Load Grade Setup scale index once in memory
+            $gradeScales = GradeSetup::all();
 
             $resultsToRank = [];
 
             foreach ($students as $student) {
-                $studentId = $student['id'];
-                
-                // Fetch student marks for this exam type and these subjects
-                $stmtMarks = $db->prepare("
-                    SELECT subject_id, marks_obtained, status 
-                    FROM student_marks 
-                    WHERE exam_type_id = :etid AND student_id = :sid
-                ");
-                $stmtMarks->execute(['etid' => $examTypeId, 'sid' => $studentId]);
-                $marks = $stmtMarks->fetchAll(PDO::FETCH_ASSOC);
+                $studentId = (int)$student['id'];
+                $markMap = $studentMarksMap[$studentId] ?? [];
 
                 $obtTotal = 0.00;
                 $maxTotal = 0.00;
                 $failedAny = false;
                 $presentCount = 0;
 
-                // Create a subject map to easily find mark entries
-                $markMap = [];
-                foreach ($marks as $m) {
-                    $markMap[$m['subject_id']] = $m;
-                }
-
                 foreach ($subjects as $sub) {
-                    $subId = $sub['id'];
-                    $maxTotal += $sub['total_marks'];
+                    $subId = (int)$sub['id'];
+                    $maxTotal += (float)$sub['total_marks'];
 
                     if (isset($markMap[$subId])) {
                         $m = $markMap[$subId];
@@ -102,24 +103,19 @@ class ExamResult {
                                 $failedAny = true;
                             }
                         } else if ($m['status'] === 'Absent') {
-                            $failedAny = true; // Absent is failing by default
-                        } else if ($m['status'] === 'Leave' || $m['status'] === 'Exempt') {
-                            // Leave/Exempt means we skip this subject from max calculations if desired, 
-                            // but in most ERPs we still keep it or treat as 0. Let's add marks_obtained as 0.
+                            $failedAny = true;
                         }
                     } else {
-                        // Mark is not entered yet for this subject
                         $failedAny = true; 
                     }
                 }
 
                 $percentage = $maxTotal > 0 ? ($obtTotal / $maxTotal) * 100 : 0.00;
                 
-                // Automatically lookup Grade scale
-                $gradeInfo = GradeSetup::getGradeByPercentage($percentage);
+                // Match grade using fast in-memory scanner
+                $gradeInfo = GradeSetup::matchGrade($percentage, $gradeScales);
                 $grade = $gradeInfo['grade'];
                 
-                // If overall percentage is below passing percentage, or student failed any individual compulsory subject, overall status is Fail
                 $passStatus = 'Pass';
                 if ($percentage < (float)$exam['passing_percentage'] || $failedAny) {
                     $passStatus = 'Fail';
@@ -135,7 +131,7 @@ class ExamResult {
                 ];
             }
 
-            // 4. Rank/Sort students by percentage (and obtained marks as tie breaker) descending
+            // 6. Sort students by percentage & obtained marks descending
             usort($resultsToRank, function($a, $b) {
                 if ($b['percentage'] == $a['percentage']) {
                     return $b['obtained_marks'] <=> $a['obtained_marks'];
@@ -143,58 +139,57 @@ class ExamResult {
                 return $b['percentage'] <=> $a['percentage'];
             });
 
-            // 5. Save results to database and update cache
-            $pos = 1;
-            foreach ($resultsToRank as $res) {
-                $studentId = $res['student_id'];
+            // Assign numerical position rankings
+            foreach ($resultsToRank as $idx => &$resItem) {
+                $resItem['position'] = $idx + 1;
+            }
+            unset($resItem);
+
+            // 7. Save results and position rankings in database transaction using bulk chunks
+            $db->beginTransaction();
+
+            // Bulk save exam_results (chunks of 200)
+            $chunks = array_chunk($resultsToRank, 200);
+            
+            foreach ($chunks as $chunk) {
+                $placeholdersRes = [];
+                $paramsRes = [];
                 
-                // Insert/Update exam_results
-                $stmtSave = $db->prepare("
-                    INSERT INTO exam_results (exam_type_id, student_id, class_id, total_marks, obtained_marks, percentage, grade, position, status)
-                    VALUES (:etid, :sid, :cid, :total, :obt, :pct, :grade, :pos, :status)
-                    ON DUPLICATE KEY UPDATE total_marks = :total2, obtained_marks = :obt2, percentage = :pct2, grade = :grade2, position = :pos2, status = :status2
-                ");
-                $stmtSave->execute([
-                    'etid'    => $examTypeId,
-                    'sid'     => $studentId,
-                    'cid'     => $classId,
-                    'total'   => $res['total_marks'],
-                    'obt'     => $res['obtained_marks'],
-                    'pct'     => $res['percentage'],
-                    'grade'   => $res['grade'],
-                    'pos'     => $pos,
-                    'status'  => $res['status'],
-                    
-                    'total2'  => $res['total_marks'],
-                    'obt2'    => $res['obtained_marks'],
-                    'pct2'    => $res['percentage'],
-                    'grade2'  => $res['grade'],
-                    'pos2'    => $pos,
-                    'status2' => $res['status']
-                ]);
+                $placeholdersPos = [];
+                $paramsPos = [];
 
-                // Insert/Update positions
-                $stmtPos = $db->prepare("
-                    INSERT INTO positions (exam_type_id, class_id, student_id, percentage, grade, position_no, status)
-                    VALUES (:etid, :cid, :sid, :pct, :grade, :pos, :status)
-                    ON DUPLICATE KEY UPDATE percentage = :pct2, grade = :grade2, position_no = :pos2, status = :status2
-                ");
-                $stmtPos->execute([
-                    'etid'    => $examTypeId,
-                    'cid'     => $classId,
-                    'sid'     => $studentId,
-                    'pct'     => $res['percentage'],
-                    'grade'   => $res['grade'],
-                    'pos'     => $pos,
-                    'status'  => $res['status'],
-                    
-                    'pct2'    => $res['percentage'],
-                    'grade2'  => $res['grade'],
-                    'pos2'    => $pos,
-                    'status2' => $res['status']
-                ]);
+                foreach ($chunk as $res) {
+                    // exam_results values
+                    $placeholdersRes[] = "(?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    array_push($paramsRes, 
+                        $examTypeId, $res['student_id'], $classId, 
+                        $res['total_marks'], $res['obtained_marks'], $res['percentage'], 
+                        $res['grade'], $res['position'], $res['status']
+                    );
 
-                $pos++;
+                    // positions values
+                    $placeholdersPos[] = "(?, ?, ?, ?, ?, ?, ?)";
+                    array_push($paramsPos,
+                        $examTypeId, $classId, $res['student_id'],
+                        $res['percentage'], $res['grade'], $res['position'], $res['status']
+                    );
+                }
+
+                // Execute Bulk Insert for exam_results
+                $sqlRes = "INSERT INTO exam_results (exam_type_id, student_id, class_id, total_marks, obtained_marks, percentage, grade, position, status)
+                           VALUES " . implode(', ', $placeholdersRes) . "
+                           ON DUPLICATE KEY UPDATE total_marks=VALUES(total_marks), obtained_marks=VALUES(obtained_marks), 
+                           percentage=VALUES(percentage), grade=VALUES(grade), position=VALUES(position), status=VALUES(status)";
+                $stmtBulkRes = $db->prepare($sqlRes);
+                $stmtBulkRes->execute($paramsRes);
+
+                // Execute Bulk Insert for positions
+                $sqlPos = "INSERT INTO positions (exam_type_id, class_id, student_id, percentage, grade, position_no, status)
+                           VALUES " . implode(', ', $placeholdersPos) . "
+                           ON DUPLICATE KEY UPDATE percentage=VALUES(percentage), grade=VALUES(grade), 
+                           position_no=VALUES(position_no), status=VALUES(status)";
+                $stmtBulkPos = $db->prepare($sqlPos);
+                $stmtBulkPos->execute($paramsPos);
             }
 
             $db->commit();

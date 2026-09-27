@@ -49,6 +49,9 @@ class Student {
                 $sql .= " AND (s.first_name LIKE :search 
                                OR s.last_name LIKE :search 
                                OR s.admission_no LIKE :search 
+                               OR s.roll_no LIKE :search 
+                               OR s.cnic_bform LIKE :search 
+                               OR s.guardian_cnic LIKE :search 
                                OR s.academic_type LIKE :search
                                OR s.school_class LIKE :search
                                OR s.guardian_name LIKE :search)";
@@ -111,6 +114,9 @@ class Student {
                 $sql .= " AND (s.first_name LIKE :search 
                                OR s.last_name LIKE :search 
                                OR s.admission_no LIKE :search 
+                               OR s.roll_no LIKE :search 
+                               OR s.cnic_bform LIKE :search 
+                               OR s.guardian_cnic LIKE :search 
                                OR s.academic_type LIKE :search
                                OR s.school_class LIKE :search
                                OR s.guardian_name LIKE :search)";
@@ -136,13 +142,15 @@ class Student {
         try {
             $db = Database::getConnection();
             $stmt = $db->prepare("
-                SELECT s.*, c.class_name, c.section 
+                SELECT s.*, c.class_name, c.section, 
+                       d.doc_student_photo, d.mother_name, d.father_name, d.roll_no as reg_roll_no
                 FROM students s
                 LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
                 WHERE s.id = :id
             ");
             $stmt->execute(['id' => $id]);
-            return $stmt->fetch();
+            return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             error_log("Student::findById error: " . $e->getMessage());
             return false;
@@ -159,13 +167,13 @@ class Student {
         try {
             $db = Database::getConnection();
             $sql = "INSERT INTO students (
-                        admission_no, first_name, last_name, gender, date_of_birth, 
-                        enrollment_date, class_id, status, guardian_name, 
+                        admission_no, roll_no, first_name, last_name, gender, date_of_birth, cnic_bform,
+                        enrollment_date, class_id, status, guardian_name, guardian_cnic,
                         guardian_phone, guardian_email, address,
                         academic_type, school_class, school_section
                     ) VALUES (
-                        :admission_no, :first_name, :last_name, :gender, :date_of_birth, 
-                        :enrollment_date, :class_id, :status, :guardian_name, 
+                        :admission_no, :roll_no, :first_name, :last_name, :gender, :date_of_birth, :cnic_bform,
+                        :enrollment_date, :class_id, :status, :guardian_name, :guardian_cnic,
                         :guardian_phone, :guardian_email, :address,
                         :academic_type, :school_class, :school_section
                     )";
@@ -173,14 +181,17 @@ class Student {
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 'admission_no' => $data['admission_no'],
+                'roll_no' => !empty($data['roll_no']) ? $data['roll_no'] : null,
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'gender' => $data['gender'],
                 'date_of_birth' => $data['date_of_birth'],
+                'cnic_bform' => !empty($data['cnic_bform']) ? $data['cnic_bform'] : null,
                 'enrollment_date' => $data['enrollment_date'],
                 'class_id' => !empty($data['class_id']) ? $data['class_id'] : null,
                 'status' => $data['status'] ?? 'Active',
                 'guardian_name' => $data['guardian_name'],
+                'guardian_cnic' => !empty($data['guardian_cnic']) ? $data['guardian_cnic'] : null,
                 'guardian_phone' => $data['guardian_phone'],
                 'guardian_email' => $data['guardian_email'] ?? null,
                 'address' => $data['address'],
@@ -207,14 +218,17 @@ class Student {
         try {
             $db = Database::getConnection();
             $sql = "UPDATE students SET 
+                        roll_no = :roll_no,
                         first_name = :first_name, 
                         last_name = :last_name, 
                         gender = :gender, 
-                        date_of_birth = :date_of_birth, 
+                        date_of_birth = :date_of_birth,
+                        cnic_bform = :cnic_bform, 
                         enrollment_date = :enrollment_date,
                         class_id = :class_id, 
                         status = :status, 
                         guardian_name = :guardian_name, 
+                        guardian_cnic = :guardian_cnic,
                         guardian_phone = :guardian_phone, 
                         guardian_email = :guardian_email, 
                         address = :address,
@@ -226,14 +240,17 @@ class Student {
             $stmt = $db->prepare($sql);
             return $stmt->execute([
                 'id' => $id,
+                'roll_no' => !empty($data['roll_no']) ? $data['roll_no'] : null,
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
                 'gender' => $data['gender'],
                 'date_of_birth' => $data['date_of_birth'],
+                'cnic_bform' => !empty($data['cnic_bform']) ? $data['cnic_bform'] : null,
                 'enrollment_date' => $data['enrollment_date'],
                 'class_id' => !empty($data['class_id']) ? $data['class_id'] : null,
                 'status' => $data['status'],
                 'guardian_name' => $data['guardian_name'],
+                'guardian_cnic' => !empty($data['guardian_cnic']) ? $data['guardian_cnic'] : null,
                 'guardian_phone' => $data['guardian_phone'],
                 'guardian_email' => $data['guardian_email'] ?? null,
                 'address' => $data['address'],

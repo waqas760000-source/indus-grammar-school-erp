@@ -570,7 +570,10 @@ include_once __DIR__ . '/../../includes/header.php';
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2 align-items-center">
-            <button type="button" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Print Register</button>
+            <a href="<?php echo APP_URL; ?>/templates/attendance_register.php?from_date=<?php echo urlencode($from_date); ?>&to_date=<?php echo urlencode($to_date); ?>&search_admission=<?php echo urlencode($search_admission); ?>&search_name=<?php echo urlencode($search_name); ?>&session=<?php echo urlencode($filter_session); ?>&campus=<?php echo urlencode($filter_campus); ?>&search_academic_type=<?php echo urlencode($search_academic_type); ?>&search_class=<?php echo urlencode($search_class); ?>&search_section=<?php echo urlencode($search_section); ?>&status=<?php echo urlencode($filter_status); ?>&search=<?php echo urlencode($filter_search); ?>&view_student_id=<?php echo $view_student_id; ?>" target="_blank" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm">
+                <i class="fa-solid fa-print me-1"></i>Print A4 Sheet
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="window.print()"><i class="fa-solid fa-print me-1"></i>Quick Print</button>
             <button type="button" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold" onclick="exportCSV()"><i class="fa-solid fa-file-excel me-1"></i>Export CSV</button>
         </div>
     </div>
@@ -1124,14 +1127,17 @@ function exportCSV() {
         $cName  = str_replace('"', '""', $row['class_name'] ?: ($row['school_class'] ?: '—'));
         $sName  = str_replace('"', '""', $row['section'] ?: ($row['school_section'] ?: '—'));
         $cmpName = str_replace('"', '""', $row['campus_name']);
-        $rem = str_replace('"', '""', $row['remarks'] ?: '');
+        $remarksClean = str_replace('"', '""', $row['remarks'] ?: '');
     ?>
-        csv += '"<?php echo $row['admission_no']; ?>","<?php echo $row['roll_no']; ?>","<?php echo $stName; ?>","<?php echo $fName; ?>","<?php echo $cName; ?>","<?php echo $sName; ?>","<?php echo $cmpName; ?>","<?php echo $row['date']; ?>","<?php echo $row['status']; ?>","<?php echo $rem; ?>"\n';
-    <?php endforeach; endif; ?>
+        csv += '"<?php echo $row['admission_no']; ?>","<?php echo $row['roll_no']; ?>","<?php echo $stName; ?>","<?php echo $fName; ?>","<?php echo $cName; ?>","<?php echo $sName; ?>","<?php echo $cmpName; ?>","<?php echo $row['date']; ?>","<?php echo $row['status']; ?>","<?php echo $remarksClean; ?>"\n';
+    <?php 
+        endforeach; 
+    endif; 
+    ?>
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    const fileName = "attendance_register_" + "<?php echo $from_date; ?>_to_<?php echo $to_date; ?>" + ".csv";
+    const fileName = "attendance_register_report_" + "<?php echo $from_date; ?>" + "_to_" + "<?php echo $to_date; ?>" + ".csv";
     link.href = URL.createObjectURL(blob);
     link.setAttribute("download", fileName);
     document.body.appendChild(link);

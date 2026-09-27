@@ -66,6 +66,9 @@ switch ($action) {
     case 'apply_discount':
         AuthMiddleware::requirePermission('fee_manage');
         $studentId = (int)($_POST['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Please select a valid student.']);
+        }
         
         // Ensure assignment exists
         Fee::ensureStudentAssignment($studentId);
@@ -74,39 +77,204 @@ switch ($action) {
             jsonResponse(['success' => false, 'message' => 'No active fee configuration assigned to this student.']);
         }
         
+        $syncLedgers = (int)($_POST['sync_ledgers'] ?? 0);
+        $pct = (float)($_POST['percentage'] ?? 0);
+        $flat = (float)($_POST['flat_amount'] ?? 0);
+        $reason = sanitize($_POST['reason'] ?? '');
+
         $ok = Fee::assignFeeToStudent([
             'student_id'          => $studentId,
             'fee_structure_id'    => (int)$assignment['fee_structure_id'],
-            'discount_percentage' => (float)($_POST['percentage'] ?? 0),
-            'discount_flat'       => (float)($_POST['flat_amount'] ?? 0),
-            'discount_reason'     => sanitize($_POST['reason'] ?? ''),
+            'discount_percentage' => $pct,
+            'discount_flat'       => $flat,
+            'discount_reason'     => $reason,
             'status'              => 'Active'
         ]);
-        jsonResponse(['success' => $ok, 'message' => $ok ? 'Discount settings saved.' : 'Failed to save discount.']);
+
+        if ($ok && $syncLedgers === 1) {
+            Fee::syncPendingLedgerDiscounts($studentId);
+        }
+
+        if ($ok) {
+            auditLog('Discount Applied', "Discount applied to student ID $studentId ($pct%, Rs. $flat, Reason: $reason)");
+        }
+
+        jsonResponse(['success' => $ok, 'message' => $ok ? 'Student discount settings saved successfully.' : 'Failed to save discount.']);
+        break;
+
+    // ── Bulk Apply Discount for Class / Students ──
+    case 'bulk_apply_discount':
+        AuthMiddleware::requirePermission('fee_manage');
+        $classId = (int)($_POST['class_id'] ?? 0);
+        $pct = (float)($_POST['percentage'] ?? 0);
+        $flat = (float)($_POST['flat_amount'] ?? 0);
+        $reason = sanitize($_POST['reason'] ?? '');
+        $syncLedgers = (int)($_POST['sync_ledgers'] ?? 1);
+        $studentIds = $_POST['student_ids'] ?? [];
+
+        if ($classId <= 0 && empty($studentIds)) {
+            jsonResponse(['success' => false, 'message' => 'Please select a class or target students.']);
+        }
+
+        try {
+            $db = Database::getConnection();
+            if (empty($studentIds) && $classId > 0) {
+                $stStmt = $db->prepare("SELECT id FROM students WHERE class_id = :cid AND status = 'Active'");
+                $stStmt->execute(['cid' => $classId]);
+                $studentIds = $stStmt->fetchAll(PDO::FETCH_COLUMN);
+            }
+
+            if (empty($studentIds)) {
+                jsonResponse(['success' => false, 'message' => 'No active students found for bulk discount application.']);
+            }
+
+            $count = 0;
+            foreach ($studentIds as $sid) {
+                $sid = (int)$sid;
+                if ($sid <= 0) continue;
+                Fee::ensureStudentAssignment($sid);
+                $asgn = Fee::getStudentAssignment($sid);
+                if ($asgn) {
+                    $saved = Fee::assignFeeToStudent([
+                        'student_id'          => $sid,
+                        'fee_structure_id'    => (int)$asgn['fee_structure_id'],
+                        'discount_percentage' => $pct,
+                        'discount_flat'       => $flat,
+                        'discount_reason'     => $reason,
+                        'status'              => 'Active'
+                    ]);
+                    if ($saved) {
+                        $count++;
+                        if ($syncLedgers === 1) {
+                            Fee::syncPendingLedgerDiscounts($sid);
+                        }
+                    }
+                }
+            }
+
+            auditLog('Bulk Discount Applied', "Discount applied to $count students (Reason: $reason)");
+            jsonResponse(['success' => true, 'message' => "Discount successfully applied to $count student(s)."]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => 'Bulk discount failed: ' . $e->getMessage()]);
+        }
+        break;
+
+    // ── Update Direct Ledger Discount ──
+    case 'update_ledger_discount':
+        AuthMiddleware::requirePermission('fee_manage');
+        $ledgerId = (int)($_POST['ledger_id'] ?? 0);
+        $discountAmt = max(0, (float)($_POST['discount_amount'] ?? 0));
+        if ($ledgerId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid fee ledger ID.']);
+        }
+
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("SELECT * FROM fee_ledger WHERE id = :id");
+            $stmt->execute(['id' => $ledgerId]);
+            $ledger = $stmt->fetch();
+
+            if (!$ledger) {
+                jsonResponse(['success' => false, 'message' => 'Ledger record not found.']);
+            }
+            if ($ledger['status'] === 'Paid') {
+                jsonResponse(['success' => false, 'message' => 'Cannot modify discount on a fully paid fee ledger.']);
+            }
+
+            $gross = (float)$ledger['tuition_fee'] + (float)$ledger['admission_fee'] + (float)$ledger['computer_fee'] + 
+                     (float)$ledger['exam_fee'] + (float)$ledger['transport_fee'] + (float)$ledger['annual_charges'] + 
+                     (float)$ledger['security_deposit'] + (float)$ledger['other_charges'] + (float)$ledger['fine_amount'];
+            
+            $payable = max(0, $gross - $discountAmt);
+
+            $uStmt = $db->prepare("UPDATE fee_ledger SET discount_amount = :disc, total_payable = :payable WHERE id = :id");
+            $ok = $uStmt->execute(['disc' => $discountAmt, 'payable' => $payable, 'id' => $ledgerId]);
+
+            if ($ok) {
+                auditLog('Ledger Discount Updated', "Discount of Rs. $discountAmt updated on ledger ID $ledgerId.");
+            }
+
+            jsonResponse(['success' => $ok, 'message' => $ok ? 'Ledger discount updated successfully.' : 'Failed to update ledger discount.']);
+        } catch (Exception $ex) {
+            jsonResponse(['success' => false, 'message' => $ex->getMessage()]);
+        }
+        break;
+
+    // ── Get Student Discount Info ──
+    case 'get_student_discount_info':
+        AuthMiddleware::requirePermission('fee_view');
+        $studentId = (int)($_POST['student_id'] ?? 0);
+        if ($studentId <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Invalid student ID.']);
+        }
+
+        try {
+            $db = Database::getConnection();
+            Fee::ensureStudentAssignment($studentId);
+
+            $stmt = $db->prepare("
+                SELECT s.id, s.first_name, s.last_name, s.admission_no, s.academic_type,
+                       c.class_name, c.section, d.father_name, d.roll_no, d.doc_student_photo,
+                       sfa.id as assignment_id, sfa.discount_percentage, sfa.discount_flat, sfa.discount_reason,
+                       fs.tuition_fee, fs.admission_fee, fs.computer_fee, fs.exam_fee, fs.transport_fee, fs.annual_charges, fs.other_charges
+                FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                LEFT JOIN student_registration_details d ON s.id = d.student_id
+                LEFT JOIN student_fee_assignments sfa ON sfa.student_id = s.id
+                LEFT JOIN fee_structure fs ON sfa.fee_structure_id = fs.id
+                WHERE s.id = :sid
+            ");
+            $stmt->execute(['sid' => $studentId]);
+            $info = $stmt->fetch();
+
+            if (!$info) {
+                jsonResponse(['success' => false, 'message' => 'Student record not found.']);
+            }
+
+            // Fetch pending ledgers
+            $lStmt = $db->prepare("SELECT * FROM fee_ledger WHERE student_id = :sid ORDER BY id DESC LIMIT 12");
+            $lStmt->execute(['sid' => $studentId]);
+            $ledgers = $lStmt->fetchAll();
+
+            jsonResponse(['success' => true, 'student' => $info, 'ledgers' => $ledgers]);
+        } catch (Exception $e) {
+            jsonResponse(['success' => false, 'message' => $e->getMessage()]);
+        }
         break;
 
     // ── Delete Discount ──
     case 'delete_discount':
         AuthMiddleware::requirePermission('fee_manage');
         $id = (int)($_POST['id'] ?? 0);
+        $syncLedgers = (int)($_POST['sync_ledgers'] ?? 1);
         if ($id <= 0) {
             jsonResponse(['success' => false, 'message' => 'Invalid assignment ID.']);
         }
         try {
             $db = Database::getConnection();
+            $getSid = $db->prepare("SELECT student_id FROM student_fee_assignments WHERE id = :id");
+            $getSid->execute(['id' => $id]);
+            $studentId = (int)$getSid->fetchColumn();
+
             $ok = $db->prepare("
                 UPDATE student_fee_assignments 
                 SET discount_percentage = 0.00, discount_flat = 0.00, discount_reason = '' 
                 WHERE id = :id
             ")->execute(['id' => $id]);
+
+            if ($ok && $studentId > 0 && $syncLedgers === 1) {
+                Fee::syncPendingLedgerDiscounts($studentId);
+            }
+
             if ($ok) {
-                auditLog('Discount Deleted', "Discount cleared on assignment $id");
+                auditLog('Discount Deleted', "Discount cleared on assignment $id for student ID $studentId");
             }
             jsonResponse(['success' => $ok, 'message' => $ok ? 'Discount cleared successfully.' : 'Clear failed.']);
         } catch (Exception $ex) {
             jsonResponse(['success' => false, 'message' => $ex->getMessage()]);
         }
         break;
+
 
     // ── Generate Single Month Student Ledger Entry ──
     case 'generate_ledger_entry':

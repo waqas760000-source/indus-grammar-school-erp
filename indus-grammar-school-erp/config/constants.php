@@ -9,8 +9,15 @@ define('SCHOOL_NAME', 'Indus Grammar School');
 define('SCHOOL_OWNER', 'Saeed');
 define('SCHOOL_SHORT_NAME', 'IGS');
 define('SCHOOL_EMAIL', 'info@indus.edu.pk');
-define('SCHOOL_PHONE', '+92 300 1234567');
-define('SCHOOL_ADDRESS', 'Main Campus, Karachi, Pakistan');
+define('SCHOOL_PHONE', '');
+define('SCHOOL_ADDRESS', 'Main Campus, Lahore, Pakistan');
+
+// Payment & Account Metadata
+define('SCHOOL_BANK_NAME', 'Meezan Bank Ltd');
+define('SCHOOL_BANK_TITLE', 'Indus Grammar School');
+define('SCHOOL_BANK_ACCOUNT', 'PK64 MEZN 0001 0203 0405 0607');
+define('SCHOOL_JAZZCASH_TITLE', 'Indus Grammar School');
+define('SCHOOL_JAZZCASH_NUMBER', '03066544806');
 
 // Auto-generated numbers prefixes & settings
 define('PREFIX_STUDENT_ID', 'STU');
