@@ -50,5 +50,5 @@ jobs:
             
             echo "=========================================================="
             echo "✅ Deployment & Migrations Completed Successfully!"
-            echo "   Live at: https://indusschoolacademy.space"
+            echo "   Live at: https://indusschoolacadmy.space"
             echo "=========================================================="
