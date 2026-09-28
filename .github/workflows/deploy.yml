@@ -1,0 +1,54 @@
+name: Production CI/CD Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Production Ubuntu VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Execute Remote SSH Deployment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || 'root' }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            echo "=========================================================="
+            echo "🚀 Starting Automated Production Deployment on VPS..."
+            echo "=========================================================="
+            
+            cd /var/www/indus-grammar-school-erp
+            
+            # 1. Fetch and pull latest changes from main
+            echo "[+] Pulling latest code from origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # 2. Restart web container to reload PHP files and clear cache
+            echo "[+] Reloading web container..."
+            docker compose -f docker-compose.prod.yml restart web
+            
+            # 3. Run pending database migrations
+            echo "[+] Executing database migrations..."
+            docker exec igs_erp_web_prod php database/migrate.php
+            
+            # 4. Ensure storage & upload permissions
+            echo "[+] Ensuring directory permissions..."
+            chmod -R 775 ./indus-grammar-school-erp/storage
+            chmod -R 775 ./indus-grammar-school-erp/uploads
+            
+            echo "=========================================================="
+            echo "✅ Deployment & Migrations Completed Successfully!"
+            echo "   Live at: https://indusschoolacademy.space"
+            echo "=========================================================="
