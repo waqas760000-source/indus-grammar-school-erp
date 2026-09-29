@@ -2,7 +2,7 @@
 /**
  * Indus Grammar School ERP - Formal Printable Student Registration & Admission Form
  * High-Precision Single-Page A4 Printable Document
- * Version 4.5.0
+ * Version 5.0.0
  */
 
 require_once __DIR__ . '/../config/app.php';
@@ -43,20 +43,22 @@ if ($student && !empty($student['doc_student_photo'])) {
         $studentPhotoUrl = APP_URL . '/' . $cleanPath;
     }
 }
+
+$currentDateFormatted = strtoupper(date('d-M-Y'));
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student Registration & Admission Form - Indus Grammar School</title>
+    <title>Student Registration Form - Indus Grammar School</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Outfit:wght@400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap');
 
         @page {
             size: A4 portrait;
-            margin: 4mm 6mm;
+            margin: 5mm;
         }
 
         body {
@@ -83,13 +85,13 @@ if ($student && !empty($student['doc_student_photo'])) {
 
         .form-page {
             width: 200mm;
-            min-height: 284mm;
+            min-height: 282mm;
             margin: 0 auto;
             background: #ffffff;
-            padding: 5mm 6mm;
+            padding: 7mm 8mm;
             box-shadow: 0 6px 25px rgba(0,0,0,0.1);
-            border: 2.5px double #0f172a;
-            border-radius: 4px;
+            border: 2px solid #1d4ed8;
+            border-radius: 12px;
             box-sizing: border-box;
             position: relative;
             display: flex;
@@ -97,170 +99,215 @@ if ($student && !empty($student['doc_student_photo'])) {
             justify-content: space-between;
         }
 
-        /* Header Table */
-        .form-header-table {
+        /* Top Header */
+        .header-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e2e8f0;
+            margin-bottom: 12px;
+        }
+
+        .brand-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .school-logo-box {
+            width: 62px;
+            height: 62px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 24px;
+            box-shadow: 0 3px 8px rgba(30, 58, 138, 0.25);
+            flex-shrink: 0;
+        }
+
+        .school-logo-box img {
             width: 100%;
-            border-bottom: 2.5px solid #0f172a;
-            padding-bottom: 6px;
-            margin-bottom: 8px;
-        }
-
-        .school-logo-img {
-            max-height: 55px;
-            max-width: 65px;
+            height: 100%;
             object-fit: contain;
+            border-radius: 50%;
         }
 
-        .school-main-name {
+        .school-title {
             font-family: 'Cinzel', serif;
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #881337;
-            margin: 0;
-            line-height: 1.1;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-
-        .form-sub-title {
-            font-size: 0.8rem;
+            font-size: 1.45rem;
             font-weight: 800;
             color: #1e3a8a;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-top: 2px;
+            margin: 0 0 4px 0;
+            letter-spacing: 0.5px;
+            line-height: 1;
         }
 
-        .school-sub-contact {
-            font-size: 0.65rem;
+        .registration-badge {
+            display: inline-block;
+            background: #1e3a8a;
+            color: #ffffff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .school-contact-info {
+            font-size: 0.68rem;
             color: #475569;
             font-weight: 600;
+            margin-top: 5px;
         }
 
-        /* Photo Box Frame */
-        .photo-holder-box {
-            width: 32mm;
-            height: 38mm;
-            border: 1.5px solid #0f172a;
+        /* Passport Photo Frame */
+        .photo-box {
+            width: 34mm;
+            height: 40mm;
+            border: 2px solid #1e3a8a;
+            border-radius: 8px;
             background: #f8fafc;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
-            padding: 2px;
+            padding: 4px;
             box-sizing: border-box;
-            float: right;
         }
 
-        .photo-holder-box img {
+        .photo-box img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            border-radius: 4px;
         }
 
-        .photo-placeholder-text {
-            font-size: 0.58rem;
-            color: #64748b;
+        .photo-box-text {
+            font-size: 0.6rem;
+            color: #475569;
             font-weight: 700;
             line-height: 1.2;
+            margin-top: 4px;
         }
 
         /* Section Banners */
-        .section-banner {
-            background: #0f172a;
+        .section-header {
+            background: #2563eb;
             color: #ffffff;
-            font-size: 0.68rem;
+            font-size: 0.75rem;
             font-weight: 800;
-            padding: 3px 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-            margin-top: 6px;
-            margin-bottom: 5px;
-            border-radius: 2px;
+            margin-top: 10px;
+            margin-bottom: 6px;
             display: flex;
             align-items: center;
             justify-content: space-between;
         }
 
-        /* Form Fields Grid Table */
-        .grid-data-table {
+        /* Form Grid Tables */
+        .info-table {
             width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #1e293b;
-            margin-bottom: 4px;
-        }
-
-        .grid-data-table td {
+            border-collapse: separate;
+            border-spacing: 0;
             border: 1px solid #cbd5e1;
-            padding: 3px 6px;
-            font-size: 0.72rem;
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .info-table td {
+            border-bottom: 1px solid #e2e8f0;
+            border-right: 1px solid #e2e8f0;
+            padding: 7px 10px;
+            font-size: 0.74rem;
             vertical-align: middle;
         }
 
-        .grid-data-table td.lbl {
+        .info-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .info-table td:last-child {
+            border-right: none;
+        }
+
+        .info-table td.lbl {
+            background: #ffffff;
+            color: #1e3a8a;
             font-weight: 700;
+            width: 24%;
+            white-space: nowrap;
+        }
+
+        .info-table td.val {
             color: #0f172a;
-            background: #f1f5f9;
-            width: 18%;
-        }
-
-        .grid-data-table td.val {
             font-weight: 600;
-            color: #1e293b;
         }
 
-        .blank-field-line {
-            display: inline-block;
-            width: 100%;
-            min-height: 14px;
-            border-bottom: 1px dotted #64748b;
+        .dashed-line {
+            color: #2563eb;
+            font-weight: 700;
+            letter-spacing: 1px;
         }
 
-        /* Checkbox Box */
-        .chk-box {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border: 1.5px solid #0f172a;
-            margin-right: 4px;
-            vertical-align: middle;
-            text-align: center;
-            line-height: 10px;
-            font-size: 0.6rem;
-            font-weight: 800;
-        }
-
-        /* Declaration & Signature Box */
-        .declaration-text {
-            font-size: 0.65rem;
-            line-height: 1.3;
-            color: #334155;
-            background: #fffdf5;
-            border: 1px solid #e2e8f0;
-            padding: 5px 8px;
-            margin: 6px 0;
-            border-left: 3px solid #0f172a;
-        }
-
-        .sig-row-table {
-            width: 100%;
+        /* Declaration Box */
+        .declaration-box {
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-left: 5px solid #2563eb;
+            border-radius: 8px;
+            padding: 10px 14px;
             margin-top: 15px;
+            font-size: 0.72rem;
+            line-height: 1.5;
+            color: #334155;
         }
 
-        .sig-row-table td {
+        .declaration-title {
+            color: #1e3a8a;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            font-size: 0.75rem;
+        }
+
+        /* Signatures */
+        .signatures-table {
+            width: 100%;
+            margin-top: 50px;
+            margin-bottom: 15px;
+        }
+
+        .signatures-table td {
             width: 33.33%;
             text-align: center;
             vertical-align: bottom;
-            padding: 0 10px;
+            padding: 0 15px;
         }
 
-        .sig-line-mark {
-            border-top: 1.5px solid #0f172a;
-            padding-top: 3px;
-            font-size: 0.65rem;
+        .signature-line {
+            border-top: 2px solid #0f172a;
+            padding-top: 5px;
+            font-size: 0.75rem;
             font-weight: 700;
             color: #0f172a;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.65rem;
+            color: #64748b;
+            margin-top: 10px;
+            font-weight: 500;
         }
 
         @media print {
@@ -277,10 +324,12 @@ if ($student && !empty($student['doc_student_photo'])) {
             .form-page {
                 box-shadow: none;
                 margin: 0;
-                padding: 4mm 6mm;
+                padding: 10mm;
                 width: 100%;
-                height: 100vh;
+                min-height: 275mm; /* A4 height approx minus margins */
+                border: 2px solid #1d4ed8;
                 page-break-after: always;
+                border-radius: 0; /* Printers usually do better with square borders */
             }
         }
     </style>
@@ -307,244 +356,158 @@ if ($student && !empty($student['doc_student_photo'])) {
 <div class="form-page">
     <div>
         <!-- Top Header Block -->
-        <table class="form-header-table">
-            <tr>
-                <td width="65" vertical-align="middle">
+        <div class="header-container">
+            <div class="brand-left">
+                <div class="school-logo-box">
                     <?php if (!empty($schoolLogoUrl)): ?>
-                        <img src="<?php echo $schoolLogoUrl; ?>" alt="School Logo" class="school-logo-img">
+                        <img src="<?php echo $schoolLogoUrl; ?>" alt="School Logo">
                     <?php else: ?>
-                        <div class="rounded-circle bg-dark text-white d-flex align-items-center justify-content-center fw-bold" style="width: 45px; height: 45px; font-size: 0.8rem;">IGS</div>
+                        <i class="fa-solid fa-graduation-cap"></i>
                     <?php endif; ?>
-                </td>
-                <td vertical-align="middle" class="ps-2">
-                    <h1 class="school-main-name">INDUS GRAMMAR SCHOOL</h1>
-                    <div class="form-sub-title">STUDENT REGISTRATION & ADMISSION FORM</div>
-                    <div class="school-sub-contact">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
-                </td>
-                <td width="130" text-align="right" class="text-end" vertical-align="top">
-                    <div class="photo-holder-box">
-                        <?php if (!empty($studentPhotoUrl)): ?>
-                            <img src="<?php echo $studentPhotoUrl; ?>" alt="Student Photo">
-                        <?php else: ?>
-                            <i class="fa-solid fa-camera text-secondary mb-1" style="font-size: 1.1rem;"></i>
-                            <span class="photo-placeholder-text">Affix Passport Size Photo</span>
-                        <?php endif; ?>
+                </div>
+                <div>
+                    <h1 class="school-title">INDUS GRAMMAR SCHOOL</h1>
+                    <div class="registration-badge">
+                        <i class="fa-solid fa-id-card me-1"></i> STUDENT REGISTRATION FORM
                     </div>
-                </td>
-            </tr>
-        </table>
-
-        <!-- Section 1: Academic & Registration Category -->
-        <div class="section-banner">
-            <span><i class="fa-solid fa-graduation-cap me-1.5"></i> 1. Enrollment & Academic Details</span>
-            <span>Session: <?php echo htmlspecialchars($student['academic_session'] ?? '2026 – 2027'); ?></span>
+                    <div class="school-contact-info">
+                        <i class="fa-solid fa-location-dot me-1 text-primary"></i> Main Campus, Lahore &bull; <i class="fa-solid fa-phone me-1 text-primary"></i> +92 306 6544806
+                    </div>
+                </div>
+            </div>
+            <div class="photo-box">
+                <?php if (!empty($studentPhotoUrl)): ?>
+                    <img src="<?php echo $studentPhotoUrl; ?>" alt="Student Photo">
+                <?php else: ?>
+                    <i class="fa-solid fa-camera text-secondary mb-1" style="font-size: 1.4rem;"></i>
+                    <span class="photo-box-text">Affix Student<br>Passport Photo</span>
+                <?php endif; ?>
+            </div>
         </div>
-        <table class="grid-data-table">
+
+        <!-- Section 1: Student Information -->
+        <div class="section-header">
+            <span><i class="fa-solid fa-graduation-cap me-1.5"></i> 1. STUDENT INFORMATION</span>
+            <span>DATE: <?php echo $currentDateFormatted; ?></span>
+        </div>
+
+        <table class="info-table">
             <tr>
-                <td class="lbl">Registration / Form No :</td>
-                <td class="val font-monospace fw-bold text-primary" width="32%">
+                <td class="lbl"><i class="fa-solid fa-id-card me-1"></i> Student ID (Reg No) :</td>
+                <td class="val fw-bold text-primary" width="30%">
                     <?php echo htmlspecialchars($student['admission_no'] ?? 'IGS-REG-2026-____'); ?>
                 </td>
-                <td class="lbl">Date of Admission :</td>
-                <td class="val">
-                    <?php echo !empty($student['admission_date']) ? date('d-M-Y', strtotime($student['admission_date'])) : date('d-M-Y'); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">Academic Type :</td>
-                <td class="val fw-bold">
-                    <?php echo htmlspecialchars($student['academic_type'] ?? 'School'); ?>
-                </td>
-                <td class="lbl">Class & Section :</td>
-                <td class="val fw-bold text-dark">
+                <td class="lbl"><i class="fa-solid fa-hashtag me-1"></i> Roll Number :</td>
+                <td class="val font-monospace">
                     <?php 
-                        $clsName = $student['class_name'] ?? ($student['school_class'] ?? '________');
-                        $secName = $student['section'] ?? ($student['school_section'] ?? 'A');
-                        echo htmlspecialchars($clsName . ' - ' . $secName);
+                        $roll = $student['roll_no'] ?? ($student['reg_roll_no'] ?? '');
+                        echo !empty($roll) ? htmlspecialchars($roll) : '<span class="dashed-line">---------------------</span>'; 
                     ?>
                 </td>
             </tr>
             <tr>
-                <td class="lbl">Roll Number :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['roll_no'] ?? $student['reg_roll_no'] ?? '__________'); ?>
-                </td>
-                <td class="lbl">Campus Name :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['campus'] ?? 'Main Campus, Lahore'); ?>
-                </td>
-            </tr>
-        </table>
-
-        <!-- Section 2: Student Personal Information -->
-        <div class="section-banner">
-            <span><i class="fa-solid fa-user me-1.5"></i> 2. Student Personal Profile</span>
-        </div>
-        <table class="grid-data-table">
-            <tr>
-                <td class="lbl">Student Full Name :</td>
+                <td class="lbl"><i class="fa-solid fa-user me-1"></i> Student Full Name :</td>
                 <td class="val text-uppercase fw-bold" colspan="3">
-                    <?php echo htmlspecialchars(($student ? ($student['first_name'] . ' ' . $student['last_name']) : '')); ?>
+                    <?php 
+                        $name = trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? ''));
+                        echo !empty($name) ? htmlspecialchars($name) : '<span class="dashed-line">--------------------------------------------------</span>'; 
+                    ?>
                 </td>
             </tr>
             <tr>
-                <td class="lbl">Gender / Sex :</td>
-                <td class="val" width="32%">
-                    <?php echo htmlspecialchars($student['gender'] ?? 'Male / Female'); ?>
+                <td class="lbl"><i class="fa-solid fa-building-columns me-1"></i> Class :</td>
+                <td class="val fw-bold" width="30%">
+                    <?php 
+                        $cls = $student['class_name'] ?? ($student['school_class'] ?? '');
+                        echo !empty($cls) ? htmlspecialchars($cls) : '<span class="dashed-line">--------</span>'; 
+                    ?>
                 </td>
-                <td class="lbl">Date of Birth :</td>
-                <td class="val">
-                    <?php echo !empty($student['date_of_birth']) ? date('d-M-Y', strtotime($student['date_of_birth'])) : '____ / ____ / ________'; ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">B-Form / CNIC No :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['cnic_bform'] ?? $student['cnic_no'] ?? '_____-_______-_'); ?>
-                </td>
-                <td class="lbl">Religion / Faith :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['religion'] ?? 'Islam'); ?>
+                <td class="lbl"><i class="fa-solid fa-layer-group me-1"></i> Section :</td>
+                <td class="val fw-bold text-dark">
+                    <?php 
+                        $sec = $student['section'] ?? ($student['school_section'] ?? 'A');
+                        echo htmlspecialchars($sec); 
+                    ?>
                 </td>
             </tr>
             <tr>
-                <td class="lbl">Blood Group :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['blood_group'] ?? '____'); ?>
-                </td>
-                <td class="lbl">Nationality :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['nationality'] ?? 'Pakistani'); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">Student Phone :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['student_mobile'] ?? '03XX-XXXXXXX'); ?>
-                </td>
-                <td class="lbl">Student Email :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['student_email'] ?? '____________________'); ?>
+                <td class="lbl"><i class="fa-solid fa-address-card me-1"></i> Student B-Form / CNIC :</td>
+                <td class="val font-monospace" colspan="3">
+                    <?php 
+                        $bform = $student['cnic_bform'] ?? ($student['cnic_no'] ?? '');
+                        echo !empty($bform) ? htmlspecialchars($bform) : '<span class="dashed-line">_____-_______-_</span>'; 
+                    ?>
                 </td>
             </tr>
         </table>
 
-        <!-- Section 3: Parent & Guardian Details -->
-        <div class="section-banner">
-            <span><i class="fa-solid fa-users me-1.5"></i> 3. Parent / Guardian Information</span>
+        <!-- Section 2: Father & Contact Details -->
+        <div class="section-header">
+            <span><i class="fa-solid fa-users me-1.5"></i> 2. FATHER & CONTACT DETAILS</span>
         </div>
-        <table class="grid-data-table">
+
+        <table class="info-table">
             <tr>
-                <td class="lbl">Father's Name :</td>
-                <td class="val text-uppercase fw-bold" width="32%">
-                    <?php echo htmlspecialchars($student['father_name'] ?? $student['guardian_name'] ?? ''); ?>
-                </td>
-                <td class="lbl">Father's CNIC No :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['father_cnic'] ?? $student['guardian_cnic'] ?? '_____-_______-_'); ?>
+                <td class="lbl"><i class="fa-solid fa-user-tie me-1"></i> Father Name :</td>
+                <td class="val text-uppercase fw-bold" colspan="3">
+                    <?php 
+                        $father = $student['father_name'] ?? ($student['guardian_name'] ?? '');
+                        echo !empty($father) ? htmlspecialchars($father) : '<span class="dashed-line">--------------------------------------------------</span>'; 
+                    ?>
                 </td>
             </tr>
             <tr>
-                <td class="lbl">Father's Cell / WhatsApp :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['father_mobile'] ?? $student['guardian_phone'] ?? '03XX-XXXXXXX'); ?>
+                <td class="lbl"><i class="fa-solid fa-id-card me-1"></i> Father CNIC No :</td>
+                <td class="val font-monospace" width="30%">
+                    <?php 
+                        $fcnic = $student['father_cnic'] ?? ($student['guardian_cnic'] ?? '');
+                        echo !empty($fcnic) ? htmlspecialchars($fcnic) : '<span class="dashed-line">_____-_______-_</span>'; 
+                    ?>
                 </td>
-                <td class="lbl">Father Occupation :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['father_occupation'] ?? '____________________'); ?>
+                <td class="lbl"><i class="fa-solid fa-phone me-1"></i> Phone Number :</td>
+                <td class="val font-monospace">
+                    <?php 
+                        $phone = $student['father_mobile'] ?? ($student['guardian_phone'] ?? '');
+                        echo !empty($phone) ? htmlspecialchars($phone) : '<span class="dashed-line">03XX-XXXXXXX</span>'; 
+                    ?>
                 </td>
             </tr>
             <tr>
-                <td class="lbl">Mother's Name :</td>
-                <td class="val text-uppercase">
-                    <?php echo htmlspecialchars($student['mother_name'] ?? ''); ?>
-                </td>
-                <td class="lbl">Mother's CNIC No :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['mother_cnic'] ?? '_____-_______-_'); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">Guardian (If Any) :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['guardian_name'] ?? ''); ?> (<?php echo htmlspecialchars($student['guardian_relationship'] ?? 'Guardian'); ?>)
-                </td>
-                <td class="lbl">Emergency Contact :</td>
-                <td class="val font-monospace">
-                    <?php echo htmlspecialchars($student['emergency_contact'] ?? $student['guardian_phone'] ?? '03XX-XXXXXXX'); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">Current Address :</td>
+                <td class="lbl"><i class="fa-solid fa-location-dot me-1"></i> Residential Address :</td>
                 <td class="val" colspan="3">
-                    <?php echo htmlspecialchars($student['address'] ?? $student['current_address'] ?? '____________________________________________________________________________________'); ?>
+                    <?php 
+                        echo "Thokar Niaz Baig"; 
+                    ?>
                 </td>
             </tr>
         </table>
 
-        <!-- Section 4: Academic Background & Previous School -->
-        <div class="section-banner">
-            <span><i class="fa-solid fa-school me-1.5"></i> 4. Academic History & Documents</span>
-        </div>
-        <table class="grid-data-table">
-            <tr>
-                <td class="lbl">Previous School :</td>
-                <td class="val" width="40%">
-                    <?php echo htmlspecialchars($student['prev_school'] ?? '________________________________'); ?>
-                </td>
-                <td class="lbl">Class Passed :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['prev_class'] ?? '________'); ?>
-                </td>
-            </tr>
-            <tr>
-                <td class="lbl">Leaving Cert (SLC) :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['leaving_cert_no'] ?? 'Attached / Pending'); ?>
-                </td>
-                <td class="lbl">Test Marks / Grade :</td>
-                <td class="val">
-                    <?php echo htmlspecialchars($student['test_marks'] ?? 'Pass'); ?>
-                </td>
-            </tr>
-        </table>
-
-        <!-- Attached Documents Checklist -->
-        <div style="font-size: 0.68rem; font-weight: 700; color: #0f172a; margin: 4px 0 2px 0;">
-            <i class="fa-solid fa-paperclip me-1 text-primary"></i> Required Documents Attached Checklist:
-        </div>
-        <div class="d-flex flex-wrap justify-content-between p-2 border bg-light rounded mb-2" style="font-size: 0.65rem;">
-            <div><span class="chk-box"><?php echo (!empty($student['doc_bform']) || !empty($student['cnic_bform'])) ? '✓' : ''; ?></span> Student B-Form / Birth Cert</div>
-            <div><span class="chk-box"><?php echo (!empty($student['doc_father_cnic']) || !empty($student['father_cnic'])) ? '✓' : ''; ?></span> Father CNIC Copy</div>
-            <div><span class="chk-box"><?php echo (!empty($student['doc_mother_cnic']) || !empty($student['mother_cnic'])) ? '✓' : ''; ?></span> Mother CNIC Copy</div>
-            <div><span class="chk-box"><?php echo (!empty($student['doc_student_photo'])) ? '✓' : ''; ?></span> 4 Passport Photographs</div>
-            <div><span class="chk-box"><?php echo (!empty($student['doc_leaving_cert'])) ? '✓' : ''; ?></span> School Leaving Certificate (SLC)</div>
-        </div>
-
-        <!-- Declaration Text -->
-        <div class="declaration-text">
-            <strong><i class="fa-solid fa-file-contract me-1"></i> PARENT / GUARDIAN UNDERTAKING & DECLARATION:</strong><br>
-            I hereby solemnly declare that the information provided above is complete, true, and correct to the best of my knowledge. I promise to strictly abide by all rules, discipline, code of conduct, and fee regulations of Indus Grammar School. I understand that admission may be cancelled if any information is found incorrect.
+        <!-- Parent Undertaking Declaration -->
+        <div class="declaration-box">
+            <div class="declaration-title">
+                <i class="fa-solid fa-file-contract me-1"></i> PARENT / GUARDIAN UNDERTAKING & DECLARATION:
+            </div>
+            I hereby solemnly declare that the information provided above is complete, true, and correct to the best of my knowledge. I promise to strictly abide by all rules, discipline, code of conduct, and fee regulations of Indus Grammar School.
         </div>
     </div>
 
-    <!-- Official Signatures Row -->
+    <!-- Signatures & Footer -->
     <div>
-        <table class="sig-row-table">
+        <table class="signatures-table">
             <tr>
                 <td>
-                    <div class="sig-line-mark">Parent / Guardian Signature</div>
+                    <div class="signature-line">Parent / Guardian Signature</div>
                 </td>
                 <td>
-                    <div class="sig-line-mark">Admission Incharge Signature</div>
+                    <div class="signature-line">Admission Incharge Signature</div>
                 </td>
                 <td>
-                    <div class="sig-line-mark">Principal Signature & Stamp</div>
+                    <div class="signature-line">Principal Signature & Stamp</div>
                 </td>
             </tr>
         </table>
-        <div class="text-center text-muted mt-2" style="font-size: 0.58rem;">
-            Official Record Sheet &middot; Computerized ERP Document &middot; Indus Grammar School
+        <div class="footer-note">
+            Official Record Sheet &bull; Computerized ERP System &bull; Indus Grammar School
         </div>
     </div>
 </div>

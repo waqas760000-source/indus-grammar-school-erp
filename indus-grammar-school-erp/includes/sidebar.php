@@ -9,8 +9,14 @@ $userInitials = strtoupper(substr($userFullName, 0, 1));
 <nav id="sidebar">
     <!-- Sidebar Header / Brand Logo -->
     <div class="sidebar-header">
-        <div class="sidebar-brand-icon-wrapper">
-            <i class="fa-solid fa-graduation-cap"></i>
+        <div class="sidebar-brand-icon-wrapper" style="background: white; overflow: hidden; padding: 2px;">
+            <?php $logoUrl = getSchoolLogoUrl(); if (!empty($logoUrl)): ?>
+                <img src="<?php echo $logoUrl; ?>" alt="Logo" style="width: 100%; height: 100%; object-fit: contain;">
+            <?php else: ?>
+                <div style="background: linear-gradient(135deg, #1e3a8a, #2563eb); width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; color: white;">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+            <?php endif; ?>
         </div>
         <div class="sidebar-brand-info">
             <div class="d-flex align-items-center gap-2">

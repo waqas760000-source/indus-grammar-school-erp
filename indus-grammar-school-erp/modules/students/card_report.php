@@ -32,11 +32,11 @@ if (!function_exists('getSchoolLogoUrl')) {
         if (file_exists($pngPath)) {
             return APP_URL . '/assets/images/logo.png';
         }
-        $svgPath = __DIR__ . '/../../assets/images/logo.svg';
+        $svgPath = __DIR__ . '/../../assets/images/logo.png';
         if (file_exists($svgPath)) {
-            return APP_URL . '/assets/images/logo.svg';
+            return APP_URL . '/assets/images/logo.png';
         }
-        return APP_URL . '/assets/images/logo.svg';
+        return APP_URL . '/assets/images/logo.png';
     }
 }
 
@@ -731,7 +731,7 @@ body {
                         <!-- Front Card Preview -->
                         <div class="pvc-card-side pvc-card-front" id="front_<?php echo $st['id']; ?>">
                             <div class="header-band">
-                                <img src="<?php echo $logoUrl; ?>" class="school-logo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/logo.svg';">
+                                <img src="<?php echo $logoUrl; ?>" class="school-logo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/logo.png';">
                                 <h6>INDUS GRAMMAR SCHOOL</h6>
                                 <p class="subtitle">Student Identification Card</p>
                             </div>
@@ -888,7 +888,7 @@ body {
                 <!-- Front Side -->
                 <div class="pvc-card-side pvc-card-front" id="batch_front_<?php echo $row['id']; ?>">
                     <div class="header-band">
-                        <img src="<?php echo $logoUrl; ?>" class="school-logo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/logo.svg';">
+                        <img src="<?php echo $logoUrl; ?>" class="school-logo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/logo.png';">
                         <h6>INDUS GRAMMAR SCHOOL</h6>
                         <p class="subtitle">Student Identification Card</p>
                     </div>

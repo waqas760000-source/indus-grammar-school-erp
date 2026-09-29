@@ -61,7 +61,7 @@ $schoolPhone   = !empty($schoolInfo['phone_number']) ? $schoolInfo['phone_number
 $schoolEmail   = !empty($schoolInfo['email']) ? $schoolInfo['email'] : 'info@indusgrammarschool.edu.pk';
 $schoolLogoUrl = getSchoolLogoUrl();
 if (empty($schoolLogoUrl)) {
-    $schoolLogoUrl = APP_URL . '/assets/images/logo.svg';
+    $schoolLogoUrl = APP_URL . '/assets/images/logo.png';
 }
 
 $monthText = date('F Y', mktime(0, 0, 0, $slip['month'], 1, $slip['year']));

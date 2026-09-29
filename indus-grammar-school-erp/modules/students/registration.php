@@ -139,34 +139,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $db->beginTransaction();
             
-            // 1. Campus selection check (Mandatory)
-            $campus = sanitize($_POST['campus'] ?? '');
-            $allowedCampuses = ['Main Campus', 'Boys Campus', 'Junior Campus'];
-            if (!$campus || !in_array($campus, $allowedCampuses)) {
-                throw new Exception("Please select a valid Campus (Main Campus, Boys Campus, or Junior Campus).");
-            }
+            // 1. Campus selection (Defaulting to Main Campus)
+            $campus = sanitize($_POST['campus'] ?? 'Main Campus');
 
             // Basic required fields verification
             $first_name = sanitize($_POST['first_name'] ?? '');
             $last_name = sanitize($_POST['last_name'] ?? '');
             $gender = sanitize($_POST['gender'] ?? 'Male');
-            $dob = sanitize($_POST['date_of_birth'] ?? '');
-            $guardian_name = sanitize($_POST['guardian_name'] ?? '');
-            $guardian_phone = sanitize($_POST['guardian_phone'] ?? '');
+            $dob = sanitize($_POST['date_of_birth'] ?? '2010-01-01');
+            $guardian_name = sanitize($_POST['father_name'] ?? '');
+            $guardian_phone = sanitize($_POST['father_mobile'] ?? '');
             $status = sanitize($_POST['status'] ?? 'Active');
             
-            if (!$first_name || !$last_name || !$dob || !$guardian_name || !$guardian_phone) {
-                throw new Exception("Please fill in all required basic student fields.");
+            if (!$first_name || !$guardian_name || !$guardian_phone) {
+                throw new Exception("Please fill in Student Name, Father's Name, and Father's Mobile.");
             }
             
             // Academic Fields
             $academic_type = sanitize($_POST['academic_type'] ?? 'School');
             $school_class = sanitize($_POST['school_class'] ?? '');
             $school_section = sanitize($_POST['school_section'] ?? '');
-            $academic_session = sanitize($_POST['academic_session'] ?? '');
+            $academic_session = sanitize($_POST['academic_session'] ?? '2026-2027');
             
-            if (!$school_class || !$school_section || !$academic_session) {
-                throw new Exception("Academic Session, Class, and Section are required fields.");
+            if (!$school_class || !$school_section) {
+                throw new Exception("Class and Section are required fields.");
             }
             
             // Dynamic Lookup/Insert of selected class and section combination
@@ -253,7 +249,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'gname' => $guardian_name,
                     'gphone' => $guardian_phone,
                     'gemail' => $guardian_email,
-                    'addr' => sanitize($_POST['current_address'] ?? ''),
+                    'addr' => 'Thokar Niaz Baig',
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
                     'school_section' => $school_section
@@ -303,7 +299,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'gname' => $guardian_name,
                     'gphone' => $guardian_phone,
                     'gemail' => $guardian_email,
-                    'addr' => sanitize($_POST['current_address'] ?? ''),
+                    'addr' => 'Thokar Niaz Baig',
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
                     'school_section' => $school_section
@@ -362,9 +358,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'fmob' => sanitize($_POST['father_mobile'] ?? ''),
                 'grel' => sanitize($_POST['relationship'] ?? ''),
                 'gcnic' => sanitize($_POST['guardian_cnic'] ?? ''),
-                'gaddr' => sanitize($_POST['guardian_address'] ?? ''),
-                'curr_addr' => sanitize($_POST['current_address'] ?? ''),
-                'perm_addr' => sanitize($_POST['permanent_address'] ?? ''),
+                'gaddr' => 'Thokar Niaz Baig',
+                'curr_addr' => 'Thokar Niaz Baig',
+                'perm_addr' => 'Thokar Niaz Baig',
                 'fplan' => sanitize($_POST['fee_plan'] ?? 'Regular Plan'),
                 'fadm' => (float)($_POST['fee_admission'] ?? 5000.00),
                 'fmonth' => (float)($_POST['fee_monthly'] ?? 3000.00),
@@ -779,400 +775,138 @@ include_once __DIR__ . '/../../includes/header.php';
         </div>
     </div>
 
-    <!-- Quick Overview Panel -->
-    <div class="row g-3 mb-4">
-        <div class="col-6 col-md-3">
-            <div class="summary-mini-card">
-                <div class="summary-mini-icon"><i class="fa-solid fa-id-badge"></i></div>
-                <div>
-                    <div class="fw-bold text-dark small">Identification</div>
-                    <div class="text-muted small" style="font-size: 0.75rem;">Campus & ID</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-mini-card">
-                <div class="summary-mini-icon"><i class="fa-solid fa-user"></i></div>
-                <div>
-                    <div class="fw-bold text-dark small">Personal Details</div>
-                    <div class="text-muted small" style="font-size: 0.75rem;">Basic Information</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-mini-card">
-                <div class="summary-mini-icon"><i class="fa-solid fa-graduation-cap"></i></div>
-                <div>
-                    <div class="fw-bold text-dark small">Academic Info</div>
-                    <div class="text-muted small" style="font-size: 0.75rem;">Class & Session</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-3">
-            <div class="summary-mini-card">
-                <div class="summary-mini-icon"><i class="fa-solid fa-receipt"></i></div>
-                <div>
-                    <div class="fw-bold text-dark small">Photo & Fee</div>
-                    <div class="text-muted small" style="font-size: 0.75rem;">Upload & Billing</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Two-Column Workspace Layout -->
-    <div class="row g-4">
+    <!-- New Single-Column Minimal Registration Form matching PDF layout -->
+    <form id="registrationForm" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
+        <input type="hidden" name="action" id="formAction" value="<?php echo ($studentId > 0) ? 'update' : 'save'; ?>">
+        <input type="hidden" name="student_id" value="<?php echo $studentId; ?>">
         
-        <!-- LEFT COLUMN: Navigation Sidebar & Guidelines -->
-        <div class="col-lg-3">
-            <!-- Navigation Links Panel -->
-            <div class="adv-nav-card p-3 mb-4">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
-                    <i class="fa-solid fa-bars-staggered text-primary fs-5"></i>
-                    <span class="fw-bold text-dark small text-uppercase" style="letter-spacing: 0.5px;">Registration Sections</span>
-                </div>
-                <nav class="nav flex-column">
-                    <a href="#section-id" class="nav-section-link"><i class="fa-solid fa-id-badge me-2"></i>1. Identification & Campus</a>
-                    <a href="#section-personal" class="nav-section-link"><i class="fa-solid fa-user me-2"></i>2. Personal Details</a>
-                    <a href="#section-parent" class="nav-section-link"><i class="fa-solid fa-users-between-lines me-2"></i>3. Parents & Guardian</a>
-                    <a href="#section-address" class="nav-section-link"><i class="fa-solid fa-location-dot me-2"></i>4. Address Details</a>
-                    <a href="#section-photo-fee" class="nav-section-link"><i class="fa-solid fa-camera-retro me-2"></i>5. Photo & Fee Setup</a>
-                </nav>
-            </div>
-
-            <!-- Guidelines Card -->
-            <div class="card border-0 shadow-sm bg-white p-3 rounded-3">
-                <div class="fw-bold text-dark small mb-2 d-flex align-items-center">
-                    <i class="fa-solid fa-circle-check text-success me-2"></i>Registration Checklist
-                </div>
-                <ul class="list-unstyled small text-muted mb-0" style="font-size: 0.78rem;">
-                    <li class="mb-1"><i class="fa-solid fa-check text-primary me-1"></i>Select valid <strong>Campus</strong> option</li>
-                    <li class="mb-1"><i class="fa-solid fa-check text-primary me-1"></i>Verify Student <strong>First & Last Name</strong></li>
-                    <li class="mb-1"><i class="fa-solid fa-check text-primary me-1"></i>Provide B-Form / CNIC number</li>
-                    <li class="mb-1"><i class="fa-solid fa-check text-primary me-1"></i>Specify Father / Guardian Mobile</li>
-                    <li class="mb-0"><i class="fa-solid fa-check text-primary me-1"></i>Upload JPG/PNG photo under 5MB</li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- RIGHT COLUMN: Registration Form Workspace -->
-        <div class="col-lg-9">
-            
-            <!-- Mode Status Banner -->
-            <div class="card border-0 shadow-sm bg-white mb-4 rounded-3">
-                <div class="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge <?php echo ($studentId > 0) ? 'bg-warning text-dark' : 'bg-primary'; ?> px-3 py-2 rounded-pill fw-semibold">
-                            <i class="fa-solid <?php echo ($studentId > 0) ? 'fa-pen-to-square' : 'fa-user-plus'; ?> me-1"></i>
-                            <?php echo ($studentId > 0) ? 'Mode: Editing Student File' : 'Mode: New Student Registration'; ?>
-                        </span>
-                        <?php if ($studentId > 0): ?>
-                            <span class="text-muted small">System Record ID: <strong>#<?php echo $studentId; ?></strong></span>
+        <div class="card border-0 shadow rounded-4 mb-4 overflow-hidden" style="border: 2px solid #1e3a8a !important; max-width: 900px; margin: 0 auto;">
+            <!-- PDF-Style Header -->
+            <div class="d-flex align-items-center justify-content-between p-4 border-bottom" style="background: #ffffff;">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="school-logo-box shadow-sm" style="width: 70px; height: 70px; border-radius: 50%; background: linear-gradient(135deg, #1e3a8a, #2563eb); display: flex; align-items: center; justify-content: center; color: white; font-size: 28px; overflow: hidden;">
+                        <?php $logoUrl = getSchoolLogoUrl(); if (!empty($logoUrl)): ?>
+                            <img src="<?php echo $logoUrl; ?>" alt="School Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 50%; padding: 2px; background: white;">
+                        <?php else: ?>
+                            <i class="fa-solid fa-graduation-cap"></i>
                         <?php endif; ?>
                     </div>
-                    <div class="text-muted small">
-                        <i class="fa-solid fa-asterisk text-danger me-1"></i>Fields marked with <span class="adv-required">*</span> are mandatory.
+                    <div>
+                        <h3 class="mb-0 fw-bold" style="color: #1e3a8a; font-family: 'Cinzel', serif; letter-spacing: 0.5px;">INDUS GRAMMAR SCHOOL</h3>
+                        <div class="badge bg-primary text-uppercase mt-2 px-3 py-2 rounded-pill shadow-sm"><i class="fa-solid fa-id-card me-2"></i> <?php echo ($studentId > 0) ? 'EDIT STUDENT REGISTRATION' : 'STUDENT REGISTRATION FORM'; ?></div>
+                    </div>
+                </div>
+                <!-- Photo Upload Box -->
+                <div class="text-center">
+                    <div style="width: 100px; height: 120px; border: 2px dashed #cbd5e1; border-radius: 8px; margin: 0 auto; overflow: hidden; position: relative; background: #f8fafc; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s;" onclick="document.getElementById('photoInput').click()" onmouseover="this.style.borderColor='#2563eb';" onmouseout="this.style.borderColor='#cbd5e1';">
+                        <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? APP_URL . '/' . $details['doc_student_photo'] : ''; ?>" style="width: 100%; height: 100%; object-fit: cover; <?php echo empty($details['doc_student_photo']) ? 'display:none;' : ''; ?>">
+                        <div id="photoPlaceholder" style="<?php echo !empty($details['doc_student_photo']) ? 'display:none;' : ''; ?>">
+                            <i class="fa-solid fa-camera text-secondary fs-3 mb-1"></i>
+                            <div class="small fw-bold text-muted" style="font-size: 0.7rem; line-height: 1.2;">Affix Student<br>Photo</div>
+                        </div>
+                    </div>
+                    <input type="file" name="doc_student_photo" id="photoInput" class="d-none" accept="image/jpeg,image/png" onchange="previewStudentImage(this)">
+                </div>
+            </div>
+
+            <!-- 1. STUDENT INFORMATION -->
+            <div class="p-0">
+                <div class="d-flex justify-content-between align-items-center px-4 py-2" style="background: #2563eb; color: white; font-weight: 700; text-transform: uppercase; font-size: 0.9rem;">
+                    <span><i class="fa-solid fa-user-graduate me-2"></i>1. Student Information</span>
+                </div>
+                <div class="row g-0">
+                    <!-- Row 1 -->
+                    <div class="col-md-6 border-bottom border-end p-3 d-flex align-items-center bg-light">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-id-card me-2 text-primary"></i> Student ID:</label>
+                        <input type="text" class="form-control border-0 bg-transparent fw-bold text-primary fs-5 p-0" name="admission_no" value="<?php echo sanitize($nextAdmissionNo); ?>" readonly required>
+                    </div>
+                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center bg-light">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-hashtag me-2 text-primary"></i> Roll Number:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold" style="border-color: #000 !important; background: transparent;" name="roll_no" value="<?php echo sanitize($nextRollNo); ?>">
+                    </div>
+                    <!-- Row 2 -->
+                    <div class="col-12 border-bottom p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-user me-2 text-primary"></i> Student Name:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold text-uppercase fs-5" style="border-color: #2563eb !important; border-style: dashed !important; color: #0f172a;" name="first_name" value="<?php echo sanitize($student['first_name'] ?? ''); ?>" required placeholder="e.g. MUHAMMAD ALI">
+                    </div>
+                    <!-- Row 3 -->
+                    <div class="col-md-6 border-bottom border-end p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-building-columns me-2 text-primary"></i> Class:</label>
+                        <select class="form-select border-0 border-bottom rounded-0 px-2 fw-bold" style="border-color: #000 !important;" name="school_class" required>
+                            <option value="">— Select —</option>
+                            <?php foreach ($classList as $cls): ?>
+                                <option value="<?php echo $cls; ?>" <?php echo isClassSelected($student['school_class'] ?? '', $cls) ? 'selected' : ''; ?>><?php echo ($cls === 'Prep' ? 'Prep' : 'Class ' . $cls); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-layer-group me-2 text-primary"></i> Section:</label>
+                        <select class="form-select border-0 border-bottom rounded-0 px-2 fw-bold" style="border-color: #000 !important;" name="school_section" required>
+                            <option value="">— Select —</option>
+                            <?php foreach ($sections as $sec): ?>
+                                <option value="<?php echo $sec; ?>" <?php echo (($student['school_section'] ?? '') === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <!-- Row 4 -->
+                    <div class="col-md-6 border-bottom border-end p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-address-card me-2 text-primary"></i> B-Form / CNIC:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" id="cnicInput" name="cnic_no" value="<?php echo sanitize($details['cnic_no'] ?? ''); ?>" placeholder="XXXXX-XXXXXXX-X">
+                    </div>
+                    <!-- Row 5 (Student Mobile) -->
+                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-mobile-screen me-2 text-primary"></i> Student Mobile:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" name="student_mobile" value="<?php echo sanitize($details['student_mobile'] ?? ''); ?>" placeholder="03XX-XXXXXXX">
                     </div>
                 </div>
             </div>
 
-            <!-- Registration Form -->
-            <form id="registrationForm" method="POST" enctype="multipart/form-data" class="needs-validation" novalidate>
-                <input type="hidden" name="action" id="formAction" value="<?php echo ($studentId > 0) ? 'update' : 'save'; ?>">
-                <input type="hidden" name="student_id" value="<?php echo $studentId; ?>">
-
-                <div class="d-flex flex-column gap-4">
-                    
-                    <!-- SECTION 1: Student Identification & Academic Placement -->
-                    <div class="card adv-section-card" id="section-id">
-                        <div class="adv-card-header">
-                            <h5 class="adv-card-title"><i class="fa-solid fa-id-badge"></i>1. Student Identification & Academic Placement</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <!-- Highlighted Student ID Banner Area -->
-                            <div class="highlight-id-box mb-4">
-                                <div class="row align-items-center g-2">
-                                    <div class="col-md-7">
-                                        <label class="adv-label text-primary mb-1"><i class="fa-solid fa-fingerprint me-1"></i>Student ID (Admission Number)<span class="adv-required">*</span></label>
-                                        <input type="text" class="form-control adv-control adv-control-readonly fs-5" name="admission_no" value="<?php echo sanitize($nextAdmissionNo); ?>" placeholder="e.g. ADM-2026-0001" <?php echo $isSuperAdmin ? '' : 'readonly'; ?> required>
-                                    </div>
-                                    <div class="col-md-5 text-md-end">
-                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill small">
-                                            <i class="fa-solid fa-shield-halved me-1"></i>Auto-Generated System ID
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="row g-3">
-                                <!-- Campus Selection (Required) -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Campus<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="campus" id="campusSelect" required>
-                                        <option value="">— Select Campus —</option>
-                                        <option value="Main Campus" <?php echo (($details['campus'] ?? '') === 'Main Campus') ? 'selected' : ''; ?>>Main Campus</option>
-                                        <option value="Boys Campus" <?php echo (($details['campus'] ?? '') === 'Boys Campus') ? 'selected' : ''; ?>>Boys Campus</option>
-                                        <option value="Junior Campus" <?php echo (($details['campus'] ?? '') === 'Junior Campus') ? 'selected' : ''; ?>>Junior Campus</option>
-                                    </select>
-                                    <div class="invalid-feedback">Please select a campus.</div>
-                                </div>
-
-                                <!-- Academic Type -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Academic Type<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="academic_type" id="academicTypeSelect" required>
-                                        <option value="School" <?php echo (($student['academic_type'] ?? 'School') === 'School') ? 'selected' : ''; ?>>School</option>
-                                        <option value="Academy" <?php echo (($student['academic_type'] ?? '') === 'Academy') ? 'selected' : ''; ?>>Academy</option>
-                                    </select>
-                                    <div class="invalid-feedback">Please select academic type.</div>
-                                </div>
-
-                                <!-- Academic Session -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Academic Session<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="academic_session" required>
-                                        <option value="2026-2027" <?php echo (($details['academic_session'] ?? '2026-2027') === '2026-2027') ? 'selected' : ''; ?>>2026-2027</option>
-                                        <option value="2025-2026" <?php echo (($details['academic_session'] ?? '') === '2025-2026') ? 'selected' : ''; ?>>2025-2026</option>
-                                        <option value="2024-2025" <?php echo (($details['academic_session'] ?? '') === '2024-2025') ? 'selected' : ''; ?>>2024-2025</option>
-                                    </select>
-                                    <div class="invalid-feedback">Please select academic session.</div>
-                                </div>
-
-                                <!-- Class Selection -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Class<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="school_class" id="schoolClassSelect" required>
-                                        <option value="">— Select Class —</option>
-                                        <?php foreach ($classList as $cls): ?>
-                                            <option value="<?php echo $cls; ?>" <?php echo isClassSelected($student['school_class'] ?? '', $cls) ? 'selected' : ''; ?>>
-                                                <?php echo ($cls === 'Prep' ? 'Prep' : 'Class ' . $cls); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <div class="invalid-feedback">Please select a class.</div>
-                                </div>
-
-                                <!-- Section Selection -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Section<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="school_section" id="schoolSectionSelect" required>
-                                        <option value="">— Select Section —</option>
-                                        <?php foreach ($sections as $sec): ?>
-                                            <option value="<?php echo $sec; ?>" <?php echo (($student['school_section'] ?? '') === $sec) ? 'selected' : ''; ?>><?php echo $sec; ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                    <div class="invalid-feedback">Please select a section.</div>
-                                </div>
-
-                                <!-- Admission Date -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Admission Date<span class="adv-required">*</span></label>
-                                    <input type="date" class="form-control adv-control" name="admission_date" value="<?php echo $student['enrollment_date'] ?? date('Y-m-d'); ?>" required>
-                                    <div class="invalid-feedback">Please specify admission date.</div>
-                                </div>
-
-                                <!-- Roll Number -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Roll Number</label>
-                                    <input type="text" class="form-control adv-control" name="roll_no" value="<?php echo sanitize($nextRollNo); ?>" placeholder="e.g. ROLL-2026-0001">
-                                </div>
-
-                                <!-- Status -->
-                                <div class="col-md-6 col-lg-4">
-                                    <label class="adv-label">Status<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="status" required>
-                                        <option value="Active" <?php echo (($student['status'] ?? 'Active') === 'Active') ? 'selected' : ''; ?>>Active</option>
-                                        <option value="Inactive" <?php echo (($student['status'] ?? '') === 'Inactive') ? 'selected' : ''; ?>>Inactive</option>
-                                        <option value="Suspended" <?php echo (($student['status'] ?? '') === 'Suspended') ? 'selected' : ''; ?>>Suspended</option>
-                                        <option value="Left" <?php echo (($student['status'] ?? '') === 'Left') ? 'selected' : ''; ?>>Left</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 2: Student Personal Information -->
-                    <div class="card adv-section-card" id="section-personal">
-                        <div class="adv-card-header">
-                            <h5 class="adv-card-title"><i class="fa-solid fa-user"></i>2. Student Personal Information</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="adv-label">First Name<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" name="first_name" value="<?php echo sanitize($student['first_name'] ?? ''); ?>" required placeholder="e.g. Muhammad">
-                                    <div class="invalid-feedback">First name is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Last Name<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" name="last_name" value="<?php echo sanitize($student['last_name'] ?? ''); ?>" required placeholder="e.g. Ali">
-                                    <div class="invalid-feedback">Last name is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Gender<span class="adv-required">*</span></label>
-                                    <select class="form-select adv-select" name="gender" required>
-                                        <option value="Male" <?php echo (($student['gender'] ?? '') === 'Male') ? 'selected' : ''; ?>>Male</option>
-                                        <option value="Female" <?php echo (($student['gender'] ?? '') === 'Female') ? 'selected' : ''; ?>>Female</option>
-                                        <option value="Other" <?php echo (($student['gender'] ?? '') === 'Other') ? 'selected' : ''; ?>>Other</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Date of Birth<span class="adv-required">*</span></label>
-                                    <input type="date" class="form-control adv-control" id="dobInput" name="date_of_birth" value="<?php echo $student['date_of_birth'] ?? ''; ?>" required>
-                                    <div class="invalid-feedback">Date of birth is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Age (Calculated)</label>
-                                    <input type="text" class="form-control adv-control adv-control-readonly" id="ageInput" readonly value="" placeholder="Calculated automatically">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">B-Form / CNIC<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" id="cnicInput" name="cnic_no" placeholder="35201-1234567-1" value="<?php echo sanitize($details['cnic_no'] ?? ''); ?>" required>
-                                    <div class="invalid-feedback">Valid B-Form / CNIC number is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Student Mobile</label>
-                                    <input type="tel" class="form-control adv-control" name="student_mobile" placeholder="0300-1234567" value="<?php echo sanitize($details['student_mobile'] ?? ''); ?>">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Student Email</label>
-                                    <input type="email" class="form-control adv-control" name="student_email" placeholder="student@example.com" value="<?php echo sanitize($details['student_email'] ?? ''); ?>">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 3: Parent & Guardian Information -->
-                    <div class="card adv-section-card" id="section-parent">
-                        <div class="adv-card-header">
-                            <h5 class="adv-card-title"><i class="fa-solid fa-users-between-lines"></i>3. Parent & Guardian Information</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="adv-label">Father Name<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" name="father_name" value="<?php echo sanitize($details['father_name'] ?? ''); ?>" required placeholder="e.g. Tariq Mehmood">
-                                    <div class="invalid-feedback">Father name is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Father CNIC<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" id="fatherCnicInput" name="father_cnic" placeholder="35201-1234567-1" value="<?php echo sanitize($details['father_cnic'] ?? ''); ?>" required>
-                                    <div class="invalid-feedback">Father CNIC is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Father Mobile<span class="adv-required">*</span></label>
-                                    <input type="tel" class="form-control adv-control" name="father_mobile" value="<?php echo sanitize($details['father_mobile'] ?? ''); ?>" required placeholder="0300-1234567">
-                                    <div class="invalid-feedback">Father mobile phone is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Guardian Name<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" name="guardian_name" value="<?php echo sanitize($student['guardian_name'] ?? ''); ?>" required placeholder="e.g. Tariq Mehmood">
-                                    <div class="invalid-feedback">Guardian name is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Guardian Mobile<span class="adv-required">*</span></label>
-                                    <input type="tel" class="form-control adv-control" name="guardian_phone" value="<?php echo sanitize($student['guardian_phone'] ?? ''); ?>" required placeholder="0300-1234567">
-                                    <div class="invalid-feedback">Guardian phone number is required.</div>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="adv-label">Relationship<span class="adv-required">*</span></label>
-                                    <input type="text" class="form-control adv-control" name="relationship" placeholder="Father, Mother, Uncle..." value="<?php echo sanitize($details['guardian_relationship'] ?? 'Father'); ?>" required>
-                                    <div class="invalid-feedback">Relationship is required.</div>
-                                </div>
-                                <div class="col-12">
-                                    <label class="adv-label">Guardian Email</label>
-                                    <input type="email" class="form-control adv-control" name="guardian_email" placeholder="guardian@example.com" value="<?php echo sanitize($student['guardian_email'] ?? ''); ?>">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 4: Address Details -->
-                    <div class="card adv-section-card" id="section-address">
-                        <div class="adv-card-header">
-                            <h5 class="adv-card-title"><i class="fa-solid fa-location-dot"></i>4. Address Details</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <div class="col-12">
-                                    <label class="adv-label">Current Address<span class="adv-required">*</span></label>
-                                    <textarea class="form-control adv-control" name="current_address" rows="3" required placeholder="House #, Street, Sector, City"><?php echo sanitize($details['current_address'] ?? $student['address'] ?? ''); ?></textarea>
-                                    <div class="invalid-feedback">Current address is required.</div>
-                                </div>
-                                <div class="col-12">
-                                    <label class="adv-label">Permanent Address</label>
-                                    <textarea class="form-control adv-control" name="permanent_address" rows="3" placeholder="Permanent home address (leave blank if same as current)"><?php echo sanitize($details['permanent_address'] ?? ''); ?></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SECTION 5: Photograph & Fee Details -->
-                    <div class="card adv-section-card" id="section-photo-fee">
-                        <div class="adv-card-header">
-                            <h5 class="adv-card-title"><i class="fa-solid fa-camera-retro"></i>5. Photograph & Fee Details</h5>
-                        </div>
-                        <div class="card-body p-4">
-                            <div class="row g-3">
-                                <!-- Photo Upload Component -->
-                                <div class="col-md-5 text-center border-end pe-md-3">
-                                    <label class="adv-label d-block">Student Photograph</label>
-                                    <div class="photo-upload-box mb-2">
-                                        <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? APP_URL . '/' . $details['doc_student_photo'] : 'https://placehold.co/140x160/e2e8f0/64748b?text=Upload+Photo'; ?>" alt="Student Photo">
-                                    </div>
-                                    <input type="file" class="form-control form-control-sm" name="doc_student_photo" id="photoInput" accept="image/jpeg,image/png" onchange="previewStudentImage(this)">
-                                    <div class="form-text text-muted small mt-1" style="font-size:0.75rem;">JPG or PNG, max size 5MB.</div>
-                                </div>
-
-                                <!-- Fee Structure -->
-                                <div class="col-md-7">
-                                    <div class="mb-3">
-                                        <label class="adv-label">Fee Plan<span class="adv-required">*</span></label>
-                                        <select class="form-select adv-select" name="fee_plan" required>
-                                            <option value="Regular Plan" <?php echo (($details['fee_plan'] ?? 'Regular Plan') === 'Regular Plan') ? 'selected' : ''; ?>>Regular Plan</option>
-                                            <option value="Sibling Discount Plan" <?php echo (($details['fee_plan'] ?? '') === 'Sibling Discount Plan') ? 'selected' : ''; ?>>Sibling Discount Plan</option>
-                                            <option value="Scholarship Plan" <?php echo (($details['fee_plan'] ?? '') === 'Scholarship Plan') ? 'selected' : ''; ?>>Scholarship Plan</option>
-                                        </select>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label class="adv-label">Admission Fee (PKR)</label>
-                                        <input type="number" step="100" class="form-control adv-control" name="fee_admission" value="<?php echo (float)($details['fee_admission'] ?? 5000.00); ?>">
-                                    </div>
-                                    <div>
-                                        <label class="adv-label">Monthly Tuition Fee (PKR)</label>
-                                        <input type="number" step="100" class="form-control adv-control" name="fee_monthly" value="<?php echo (float)($details['fee_monthly'] ?? 3000.00); ?>">
-                                    </div>
-                                </div>
-
-                                <!-- Remarks -->
-                                <div class="col-12 mt-3">
-                                    <label class="adv-label">Remarks / Special Notes</label>
-                                    <textarea class="form-control adv-control" name="remarks" rows="2" placeholder="Any health conditions, discounts, or special notes..."><?php echo sanitize($details['remarks'] ?? ''); ?></textarea>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
+            <!-- 2. FATHER & CONTACT DETAILS -->
+            <div class="p-0">
+                <div class="d-flex justify-content-between align-items-center px-4 py-2" style="background: #2563eb; color: white; font-weight: 700; text-transform: uppercase; font-size: 0.9rem;">
+                    <span><i class="fa-solid fa-user-tie me-2"></i>2. Father & Contact Details</span>
                 </div>
-
-                <!-- Form Bottom Actions Sticky Bar -->
-                <div class="card border-0 shadow-sm bg-white mt-4 mb-5 rounded-3">
-                    <div class="card-body p-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <a href="list.php" class="btn btn-outline-secondary rounded-2"><i class="fa-solid fa-arrow-left me-1"></i>Return to Student Directory</a>
-                        <div class="d-flex flex-wrap gap-2">
-                            <button type="reset" class="btn btn-light border text-secondary rounded-2">Reset Form</button>
-                            <?php if ($studentId === 0): ?>
-                                <button type="submit" name="save_and_new" class="btn btn-outline-primary rounded-2"><i class="fa-solid fa-square-plus me-1"></i>Save & Register Another</button>
-                                <button type="submit" class="btn btn-adv-primary" id="submitBtnBottom"><i class="fa-solid fa-user-plus me-2"></i>Register Student</button>
-                            <?php else: ?>
-                                <button type="submit" class="btn btn-adv-primary" id="submitBtnBottom"><i class="fa-solid fa-circle-check me-2"></i>Update Student Record</button>
-                            <?php endif; ?>
-                        </div>
+                <div class="row g-0">
+                    <!-- Row 1 -->
+                    <div class="col-12 border-bottom p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-user-shield me-2 text-primary"></i> Father Name:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold text-uppercase fs-5" style="border-color: #000 !important; border-style: dashed !important; color: #0f172a;" name="father_name" value="<?php echo sanitize($details['father_name'] ?? ''); ?>" required placeholder="e.g. TARIQ MEHMOOD">
+                    </div>
+                    <!-- Row 2 -->
+                    <div class="col-md-6 border-bottom border-end p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-id-card me-2 text-primary"></i> Father CNIC:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" id="fatherCnicInput" name="father_cnic" value="<?php echo sanitize($details['father_cnic'] ?? ''); ?>" placeholder="XXXXX-XXXXXXX-X">
+                    </div>
+                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-phone me-2 text-primary"></i> Phone Number:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" name="father_mobile" value="<?php echo sanitize($details['father_mobile'] ?? ''); ?>" required placeholder="03XX-XXXXXXX">
+                    </div>
+                    <!-- Row 3 -->
+                    <div class="col-12 p-4 bg-light d-flex align-items-center border-bottom">
+                        <label class="mb-0 me-4 text-muted fw-bold text-nowrap" style="width: 150px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot me-2 text-primary"></i> Address:</label>
+                        <div class="fw-bold text-dark border-bottom border-primary w-100 pb-1 fs-5" style="border-style: dashed !important;">Thokar Niaz Baig</div>
                     </div>
                 </div>
-            </form>
+            </div>
+            
+            <!-- Declaration -->
+            <div class="p-4" style="background: #f8fafc;">
+                <div class="p-3" style="border-left: 4px solid #2563eb; background: #ffffff; border-radius: 0 8px 8px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);">
+                    <h6 class="fw-bold text-primary text-uppercase mb-2" style="font-size: 0.8rem;"><i class="fa-solid fa-file-contract me-1"></i> Parent / Guardian Undertaking & Declaration:</h6>
+                    <p class="text-muted small mb-0" style="line-height: 1.6;">I hereby solemnly declare that the information provided above is complete, true, and correct to the best of my knowledge. I promise to strictly abide by all rules, discipline, code of conduct, and fee regulations of Indus Grammar School.</p>
+                </div>
+            </div>
 
+            <!-- Submit Button Bar -->
+            <div class="bg-white p-4 border-top d-flex justify-content-end gap-3 align-items-center">
+                <a href="list.php" class="text-secondary text-decoration-none fw-bold me-2 hover-primary"><i class="fa-solid fa-arrow-left me-1"></i>Cancel</a>
+                <button type="submit" class="btn btn-primary fw-bold shadow rounded-pill px-5 py-2 fs-5" id="submitBtnBottom">
+                    <i class="fa-solid <?php echo ($studentId > 0) ? 'fa-check' : 'fa-plus'; ?> me-2"></i>
+                    <?php echo ($studentId > 0) ? 'Update Student Record' : 'Register Student'; ?>
+                </button>
+            </div>
         </div>
-    </div>
+    </form>
 
     <!-- Hidden Form for Deletion -->
     <?php if ($studentId > 0): ?>
@@ -1187,6 +921,7 @@ include_once __DIR__ . '/../../includes/header.php';
 // Live Image Preview Handler
 function previewStudentImage(input) {
     const preview = document.getElementById('photoPreview');
+    const placeholder = document.getElementById('photoPlaceholder');
     if (input.files && input.files[0]) {
         const file = input.files[0];
         
@@ -1200,6 +935,8 @@ function previewStudentImage(input) {
         const reader = new FileReader();
         reader.onload = function(e) {
             preview.src = e.target.result;
+            preview.style.display = 'block';
+            if (placeholder) placeholder.style.display = 'none';
         }
         reader.readAsDataURL(file);
     }
