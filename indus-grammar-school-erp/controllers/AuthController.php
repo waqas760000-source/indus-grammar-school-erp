@@ -167,7 +167,8 @@ class AuthController {
         
         if (User::createRememberToken($userId, $selector, $tokenHash, $expiresAt)) {
             // Set cookie formatted as selector:validator
-            $host = parse_url($_SERVER['HTTP_HOST'] ?? '', PHP_URL_HOST) ?: ($_SERVER['SERVER_NAME'] ?? '');
+            $rawHost = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+            $host = explode(':', $rawHost)[0];
             $cookieDomain = (empty($host) || $host === 'localhost' || $host === '127.0.0.1') ? '' : $host;
 
             setcookie(

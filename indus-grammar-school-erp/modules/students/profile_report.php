@@ -759,11 +759,11 @@ if ($selectedId > 0) {
                         </div>
                         <div class="col-md-6">
                             <span class="info-label">Current Residential Address</span>
-                            <span class="info-value"><?php echo htmlspecialchars($student['current_address'] ?? '—'); ?></span>
+                            <span class="info-value">Thokar Niaz Baig</span>
                         </div>
                         <div class="col-md-6">
                             <span class="info-label">Permanent Address</span>
-                            <span class="info-value"><?php echo htmlspecialchars($student['permanent_address'] ?? '—'); ?></span>
+                            <span class="info-value">Thokar Niaz Baig</span>
                         </div>
                     </div>
                 </div>

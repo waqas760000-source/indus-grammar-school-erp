@@ -21,7 +21,6 @@ AuthMiddleware::requireGuest();
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/style.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
     <!-- FontAwesome 6 Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
@@ -33,8 +32,14 @@ AuthMiddleware::requireGuest();
     <div class="auth-container">
         <!-- Logo / School Branding -->
         <div class="text-center mb-4">
-            <div class="auth-logo mb-2">
-                <i class="fa-solid fa-graduation-cap"></i>
+            <div class="auth-logo mb-2" style="background: transparent; border: none; box-shadow: none;">
+                <?php $logoUrl = getSchoolLogoUrl(); if (!empty($logoUrl)): ?>
+                    <img src="<?php echo $logoUrl; ?>" alt="School Logo" style="width: 100px; height: 100px; object-fit: contain;">
+                <?php else: ?>
+                    <div style="width: 60px; height: 60px; background: linear-gradient(135deg, #1e3a8a, #2563eb); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; margin: 0 auto;">
+                        <i class="fa-solid fa-graduation-cap"></i>
+                    </div>
+                <?php endif; ?>
             </div>
             <h1 class="auth-title">Indus Grammar School</h1>
             <p class="auth-subtitle">School Management ERP System</p>
