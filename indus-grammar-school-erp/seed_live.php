@@ -14,16 +14,23 @@ echo '<!DOCTYPE html><html><head><title>Database Seeder & Migration</title>';
 echo '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">';
 echo '</head><body class="bg-light"><div class="container py-5"><div class="card shadow-sm">';
 echo '<div class="card-header bg-primary text-white"><h4 class="mb-0">🚀 Indus ERP Database Seeder & Migrator</h4></div>';
-echo '<div class="card-body"><pre class="bg-dark text-light p-4 rounded" style="max-height: 400px; overflow-y: auto;">';
+echo '<div class="card-body"><pre class="bg-dark text-light p-4 rounded" style="max-height: 500px; overflow-y: auto;">';
 
 try {
     // 1. Run migrations engine
     $runner = new MigrationRunner();
     $runner->migrate();
 
+    // 2. Run full student import script
+    echo "\n=== Running Student Seeder Script ===\n";
+    ob_start();
+    include __DIR__ . '/scratch/import_9th_computer_green.php';
+    $importOutput = ob_get_clean();
+    echo htmlspecialchars($importOutput);
+
     echo "\n=== Database sync & student seeding completed successfully! ===\n";
     echo '</pre>';
-    echo '<div class="alert alert-success mt-3">✅ All student records & database migrations are synced on live!</div>';
+    echo '<div class="alert alert-success mt-3">✅ All 3 student records & database migrations are synced on live!</div>';
     echo '<a href="dashboard.php" class="btn btn-success btn-lg mt-2">Go to Dashboard</a>';
 } catch (Exception $e) {
     echo '</pre>';
