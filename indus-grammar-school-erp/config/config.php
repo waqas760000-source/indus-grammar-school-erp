@@ -9,6 +9,7 @@ define('APP_NAME', getenv('APP_NAME') ?: 'Indus Grammar School ERP');
 define('APP_ENV', getenv('APP_ENV') ?: 'development');
 define('APP_TIMEZONE', getenv('APP_TIMEZONE') ?: 'Asia/Karachi');
 
+
 date_default_timezone_set(APP_TIMEZONE);
 
 // System Paths

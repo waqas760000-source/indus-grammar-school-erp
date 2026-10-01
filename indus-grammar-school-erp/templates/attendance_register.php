@@ -411,7 +411,7 @@ $toFormatted = date('d-M-Y', strtotime($to_date));
                 <div class="col-8 text-center">
                     <div class="school-title">INDUS GRAMMAR SCHOOL</div>
                     <div class="text-muted small fw-semibold" style="font-size:10px;">
-                        Main Campus • Helpline: +92 306 6544806 • Email: info@indusgrammar.edu.pk
+                        Main Campus • Helpline: +92 307 4918603 • Email: info@indusgrammar.edu.pk
                     </div>
                     <div class="mt-1">
                         <span class="report-title-badge">Official Attendance Register & History Log</span>

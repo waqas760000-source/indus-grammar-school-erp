@@ -4,7 +4,7 @@
  * Version 4.0.0
  */
 
-require_once 'e:/Xampo/htdocs/indus-grammar-school-erp/indus-grammar-school-erp/config/app.php';
+require_once __DIR__ . '/../config/app.php';
 
 if (!isLoggedIn()) {
     jsonResponse(['success' => false, 'message' => 'Unauthorized.'], 401);
@@ -624,7 +624,7 @@ switch ($action) {
                 FROM students s 
                 LEFT JOIN classes c ON s.class_id = c.id
                 LEFT JOIN student_registration_details d ON s.id = d.student_id
-                WHERE (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR s.admission_no LIKE :q3 OR d.roll_no LIKE :q4)
+                WHERE (s.first_name LIKE :q1 OR s.last_name LIKE :q2 OR CONCAT(s.first_name, ' ', s.last_name) LIKE :q3 OR s.admission_no LIKE :q4 OR d.roll_no LIKE :q5 OR d.father_name LIKE :q6)
                   AND s.status = 'Active' LIMIT 15
             ");
             $searchTerm = '%' . $q . '%';
@@ -632,7 +632,9 @@ switch ($action) {
                 'q1' => $searchTerm,
                 'q2' => $searchTerm,
                 'q3' => $searchTerm,
-                'q4' => $searchTerm
+                'q4' => $searchTerm,
+                'q5' => $searchTerm,
+                'q6' => $searchTerm
             ]);
             $students = $stmt->fetchAll();
             

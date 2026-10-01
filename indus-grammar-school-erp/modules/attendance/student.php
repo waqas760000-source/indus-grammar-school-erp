@@ -151,26 +151,30 @@ if (!empty($class_name) && !empty($section_name)) {
     try {
         $params = [
             'date' => $selectedDate,
-            'academic_type' => $academic_type,
             'class1' => $class_name,
             'class2' => $class_name,
+            'class3' => $class_name,
             'section1' => $section_name,
             'section2' => $section_name
         ];
 
         $whereConds = [
             "s.status = 'Active'",
-            "s.academic_type = :academic_type",
-            "(c.class_name = :class1 OR s.school_class = :class2)",
+            "(c.class_name = :class1 OR s.school_class = :class2 OR s.class_id IN (SELECT id FROM classes WHERE class_name = :class3))",
             "(c.section = :section1 OR s.school_section = :section2)"
         ];
+
+        if (!empty($academic_type) && $academic_type !== 'All') {
+            $whereConds[] = "(s.academic_type = :academic_type OR s.academic_type IS NULL OR s.academic_type = '')";
+            $params['academic_type'] = $academic_type;
+        }
 
         if (!empty($selected_campus)) {
             $whereConds[] = "(d.campus = :campus OR d.campus IS NULL OR d.campus = '')";
             $params['campus'] = $selected_campus;
         }
 
-        if (!empty($selected_session)) {
+        if (!empty($_GET['academic_session']) && $selected_session !== '') {
             $whereConds[] = "(d.academic_session = :session OR d.academic_session IS NULL OR d.academic_session = '')";
             $params['session'] = $selected_session;
         }

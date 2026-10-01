@@ -883,7 +883,7 @@ if ($selectedId > 0) {
                         <div class="col-md-4">
                             <div class="p-3 border rounded-3 bg-white">
                                 <span class="info-label">Monthly Tuition Fee</span>
-                                <span class="fs-5 fw-bold text-dark">Rs. <?php echo number_format((float)($student['fee_monthly'] ?? 3000), 2); ?></span>
+                                <span class="fs-5 fw-bold text-dark">Rs. <?php echo number_format((float)(($student['tuition_fee'] > 0) ? $student['tuition_fee'] : ($student['fee_monthly'] ?? 0)), 2); ?></span>
                             </div>
                         </div>
                         <div class="col-md-4">

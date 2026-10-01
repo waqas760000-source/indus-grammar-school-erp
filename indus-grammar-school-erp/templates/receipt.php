@@ -428,7 +428,7 @@ $copies = [
                     <td vertical-align="middle" class="ps-2">
                         <h1 class="school-title">INDUS GRAMMAR SCHOOL</h1>
                         <div class="school-sub">EXCELLENCE IN EDUCATION &middot; MAIN CAMPUS</div>
-                        <div class="school-contact">Lahore, Pakistan &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                        <div class="school-contact">Lahore, Pakistan &middot; Ph: +92 307 4918603 &middot; info@indusgrammar.edu.pk</div>
                     </td>
                     <td width="160" text-align="right" class="text-end ps-2" vertical-align="top">
                         <div class="receipt-tag-box" style="border-color: <?php echo $cp['color']; ?>; color: <?php echo $cp['color']; ?>;">

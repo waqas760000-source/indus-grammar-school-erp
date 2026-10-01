@@ -117,11 +117,16 @@ class Fee {
         try {
             $db = Database::getConnection();
             $stmt = $db->prepare("
-                SELECT sfa.*, fs.admission_fee, fs.tuition_fee, fs.computer_fee, fs.exam_fee, 
+                SELECT sfa.*, 
+                       COALESCE(NULLIF(d.fee_monthly, 0), NULLIF(s.tuition_fee, 0), fs.tuition_fee, 0.00) as tuition_fee,
+                       COALESCE(NULLIF(d.fee_discount, 0), sfa.discount_flat, 0.00) as discount_flat,
+                       fs.admission_fee, fs.computer_fee, fs.exam_fee, 
                        fs.transport_fee, fs.annual_charges, fs.security_deposit, fs.other_charges,
                        fs.academic_type, fs.class_id, fs.academic_year
                 FROM student_fee_assignments sfa
                 JOIN fee_structure fs ON sfa.fee_structure_id = fs.id
+                LEFT JOIN students s ON sfa.student_id = s.id
+                LEFT JOIN student_registration_details d ON sfa.student_id = d.student_id
                 WHERE sfa.student_id = :sid
             ");
             $stmt->execute(['sid' => $studentId]);

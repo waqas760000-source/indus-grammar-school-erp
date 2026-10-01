@@ -338,7 +338,7 @@ $schoolLogoUrl = getSchoolLogoUrl();
                 <td vertical-align="middle" class="ps-2">
                     <h1 class="school-title">INDUS GRAMMAR SCHOOL & ACADEMY</h1>
                     <div class="summary-sub-title">STUDENT ENROLLMENT & CLASS SUMMARY REPORT</div>
-                    <div class="summary-contact">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                    <div class="summary-contact">Main Campus, Lahore &middot; Ph: +92 307 4918603 &middot; info@indusgrammar.edu.pk</div>
                 </td>
                 <td width="180" text-align="right" class="text-end" vertical-align="top">
                     <div class="border p-2 bg-light text-center rounded">
