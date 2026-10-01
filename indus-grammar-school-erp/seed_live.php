@@ -21,16 +21,20 @@ try {
     $runner = new MigrationRunner();
     $runner->migrate();
 
-    // 2. Run full student import script
-    echo "\n=== Running Student Seeder Script ===\n";
+    // 2. Run student seeder scripts
+    echo "\n=== Running 9th Computer Green Seeder ===\n";
     ob_start();
     include __DIR__ . '/scratch/import_9th_computer_green.php';
-    $importOutput = ob_get_clean();
-    echo htmlspecialchars($importOutput);
+    echo htmlspecialchars(ob_get_clean());
+
+    echo "\n=== Running 9th Biology Red Seeder ===\n";
+    ob_start();
+    include __DIR__ . '/scratch/import_9th_bio_red.php';
+    echo htmlspecialchars(ob_get_clean());
 
     echo "\n=== Database sync & student seeding completed successfully! ===\n";
     echo '</pre>';
-    echo '<div class="alert alert-success mt-3">✅ All 3 student records & database migrations are synced on live!</div>';
+    echo '<div class="alert alert-success mt-3">✅ All student records & database migrations are synced on live!</div>';
     echo '<a href="dashboard.php" class="btn btn-success btn-lg mt-2">Go to Dashboard</a>';
 } catch (Exception $e) {
     echo '</pre>';
