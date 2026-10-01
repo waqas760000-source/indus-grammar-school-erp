@@ -432,7 +432,7 @@ $activeClassTitle = ($student['class_name'] ?? $student['school_class'] ?? 'Clas
                 </div>
                 <div class="header-title-center">
                     <h1 class="school-main-title">Indus Grammar School</h1>
-                    <p class="school-subtitle">Main Campus, Block 5, Gulshan-e-Iqbal | Tel: +92 306 6544806</p>
+                    <p class="school-subtitle">Main Campus, Block 5, Gulshan-e-Iqbal | Tel: +92 307 4918603</p>
                 </div>
                 <div class="header-logo-right">
                     <div class="board-seal-circle">

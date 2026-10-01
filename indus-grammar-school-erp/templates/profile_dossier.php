@@ -356,7 +356,7 @@ $attPercent = ($totalAttDays > 0) ? round(($attendanceStats['Present'] / $totalA
                 <td vertical-align="middle" class="ps-2">
                     <h1 class="school-title">INDUS GRAMMAR SCHOOL</h1>
                     <div class="dossier-sub-title">CUMULATIVE STUDENT PROFILE DOSSIER</div>
-                    <div class="school-contact">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                    <div class="school-contact">Main Campus, Lahore &middot; Ph: +92 307 4918603 &middot; info@indusgrammar.edu.pk</div>
                 </td>
                 <td width="130" text-align="right" class="text-end" vertical-align="top">
                     <div class="photo-holder-box">
@@ -526,7 +526,7 @@ $attPercent = ($totalAttDays > 0) ? round(($attendanceStats['Present'] / $totalA
                 </td>
                 <td class="lbl">Monthly Tuition Fee :</td>
                 <td class="val font-monospace fw-bold">
-                    Rs. <?php echo number_format((float)($student['fee_monthly'] ?? 3000), 2); ?>
+                    Rs. <?php echo number_format((float)(($student['tuition_fee'] > 0) ? $student['tuition_fee'] : ($student['fee_monthly'] ?? 0)), 2); ?>
                 </td>
             </tr>
             <tr>

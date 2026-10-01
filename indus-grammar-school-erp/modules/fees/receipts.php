@@ -255,7 +255,7 @@ try {
                 <div>
                     <h2 class="fw-bold text-dark mb-0" style="letter-spacing: 0.5px;">INDUS GRAMMAR SCHOOL</h2>
                     <div class="text-uppercase fw-bold text-primary small">Excellence in Education &middot; Official Financial Ledger Report</div>
-                    <div class="text-muted small">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                    <div class="text-muted small">Main Campus, Lahore &middot; Ph: +92 307 4918603 &middot; info@indusgrammar.edu.pk</div>
                 </div>
             </div>
             <div class="text-end">

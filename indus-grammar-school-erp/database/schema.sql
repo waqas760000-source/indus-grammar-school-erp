@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS `students` (
   `guardian_phone` VARCHAR(20) NOT NULL,
   `guardian_email` VARCHAR(100) NULL,
   `address` TEXT NOT NULL,
+  `tuition_fee` DECIMAL(10,2) NULL DEFAULT 0.00,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`)

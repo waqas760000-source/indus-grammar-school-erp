@@ -359,7 +359,7 @@ $formattedDate = date('d-M-Y', strtotime($filter_date));
                 <td vertical-align="middle" class="ps-2">
                     <h1 class="school-title">INDUS GRAMMAR SCHOOL</h1>
                     <div class="sub-title">DAILY STUDENT ATTENDANCE REPORT</div>
-                    <div class="school-contact">Main Campus, Lahore &middot; Ph: +92 306 6544806 &middot; info@indusgrammar.edu.pk</div>
+                    <div class="school-contact">Main Campus, Lahore &middot; Ph: +92 307 4918603 &middot; info@indusgrammar.edu.pk</div>
                 </td>
                 <td width="200" text-align="right" class="text-end" vertical-align="top">
                     <div class="border p-2 bg-light text-center rounded">

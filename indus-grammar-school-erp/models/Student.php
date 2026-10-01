@@ -170,12 +170,12 @@ class Student {
                         admission_no, roll_no, first_name, last_name, gender, date_of_birth, cnic_bform,
                         enrollment_date, class_id, status, guardian_name, guardian_cnic,
                         guardian_phone, guardian_email, address,
-                        academic_type, school_class, school_section
+                        academic_type, school_class, school_section, tuition_fee
                     ) VALUES (
                         :admission_no, :roll_no, :first_name, :last_name, :gender, :date_of_birth, :cnic_bform,
                         :enrollment_date, :class_id, :status, :guardian_name, :guardian_cnic,
                         :guardian_phone, :guardian_email, :address,
-                        :academic_type, :school_class, :school_section
+                        :academic_type, :school_class, :school_section, :tuition_fee
                     )";
             
             $stmt = $db->prepare($sql);
@@ -197,7 +197,8 @@ class Student {
                 'address' => $data['address'],
                 'academic_type' => $data['academic_type'] ?? 'School',
                 'school_class' => $data['school_class'] ?? null,
-                'school_section' => $data['school_section'] ?? null
+                'school_section' => $data['school_section'] ?? null,
+                'tuition_fee' => isset($data['tuition_fee']) ? (float)$data['tuition_fee'] : 0.00
             ]);
 
             return (int)$db->lastInsertId();
@@ -234,7 +235,8 @@ class Student {
                         address = :address,
                         academic_type = :academic_type,
                         school_class = :school_class,
-                        school_section = :school_section
+                        school_section = :school_section,
+                        tuition_fee = :tuition_fee
                     WHERE id = :id";
             
             $stmt = $db->prepare($sql);
@@ -256,7 +258,8 @@ class Student {
                 'address' => $data['address'],
                 'academic_type' => $data['academic_type'] ?? 'School',
                 'school_class' => $data['school_class'] ?? null,
-                'school_section' => $data['school_section'] ?? null
+                'school_section' => $data['school_section'] ?? null,
+                'tuition_fee' => isset($data['tuition_fee']) ? (float)$data['tuition_fee'] : 0.00
             ]);
         } catch (PDOException $e) {
             error_log("Student::update error: " . $e->getMessage());

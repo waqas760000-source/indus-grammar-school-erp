@@ -139,24 +139,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $db->beginTransaction();
             
-            // 1. Campus selection (Defaulting to Main Campus)
+            // 1. Campus selection (default to Main Campus)
             $campus = sanitize($_POST['campus'] ?? 'Main Campus');
 
-            // Basic required fields verification
+            // Basic required fields verification (Simplified Form: Name, Father Name, Phone, Address)
             $first_name = sanitize($_POST['first_name'] ?? '');
             $last_name = sanitize($_POST['last_name'] ?? '');
+            $father_name = sanitize($_POST['father_name'] ?? '');
+            $father_mobile = sanitize($_POST['father_mobile'] ?? '');
+            $current_address = sanitize($_POST['current_address'] ?? '');
+            
+            // Auto-fill guardian info from father details for backward compatibility
+            $guardian_name = $father_name ?: ($first_name . ' Guardian');
+            $guardian_phone = $father_mobile ?: '0300-0000000';
             $gender = sanitize($_POST['gender'] ?? 'Male');
             $dob = sanitize($_POST['date_of_birth'] ?? '2010-01-01');
-            $guardian_name = sanitize($_POST['father_name'] ?? '');
-            $guardian_phone = sanitize($_POST['father_mobile'] ?? '');
             $status = sanitize($_POST['status'] ?? 'Active');
             
-            if (!$first_name || !$guardian_name || !$guardian_phone) {
+            if (!$first_name || !$father_name || !$father_mobile) {
                 throw new Exception("Please fill in Student Name, Father's Name, and Father's Mobile.");
             }
             
             // Academic Fields
-            $academic_type = sanitize($_POST['academic_type'] ?? 'School');
+            $academic_type = 'School';
             $school_class = sanitize($_POST['school_class'] ?? '');
             $school_section = sanitize($_POST['school_section'] ?? '');
             $academic_session = sanitize($_POST['academic_session'] ?? '2026-2027');
@@ -227,14 +232,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     if ($checkCnic->fetchColumn() > 0) throw new Exception("B-Form / CNIC Number '$cnic_no' is already registered.");
                 }
                 
+                $tuition_fee = isset($_POST['tuition_fee']) ? (float)$_POST['tuition_fee'] : 0.00;
+
                 // 1. Insert into core students table
                 $stmtSt = $db->prepare("
                     INSERT INTO students (
                         admission_no, first_name, last_name, gender, date_of_birth, enrollment_date, class_id, status, guardian_name, guardian_phone, guardian_email, address,
-                        academic_type, school_class, school_section
+                        academic_type, school_class, school_section, tuition_fee
                     ) VALUES (
                         :adm, :fn, :ln, :gen, :dob, :enr, :cid, :stat, :gname, :gphone, :gemail, :addr,
-                        :academic_type, :school_class, :school_section
+                        :academic_type, :school_class, :school_section, :tfee
                     )
                 ");
                 $stmtSt->execute([
@@ -252,7 +259,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'addr' => 'Thokar Niaz Baig',
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
-                    'school_section' => $school_section
+                    'school_section' => $school_section,
+                    'tfee' => $tuition_fee
                 ]);
                 $currStudentId = (int)$db->lastInsertId();
             } else {
@@ -278,13 +286,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $adm_no = $student['admission_no'];
                 }
                 
+                $tuition_fee = isset($_POST['tuition_fee']) ? (float)$_POST['tuition_fee'] : 0.00;
+
                 // 1. Update core students table
                 $stmtSt = $db->prepare("
                     UPDATE students SET 
                         admission_no = :adm, first_name = :fn, last_name = :ln, gender = :gen, date_of_birth = :dob, 
                         class_id = :cid, status = :stat, guardian_name = :gname, guardian_phone = :gphone, 
                         guardian_email = :gemail, address = :addr,
-                        academic_type = :academic_type, school_class = :school_class, school_section = :school_section
+                        academic_type = :academic_type, school_class = :school_class, school_section = :school_section,
+                        tuition_fee = :tfee
                     WHERE id = :id
                 ");
                 $stmtSt->execute([
@@ -302,7 +313,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'addr' => 'Thokar Niaz Baig',
                     'academic_type' => $academic_type,
                     'school_class' => $school_class,
-                    'school_section' => $school_section
+                    'school_section' => $school_section,
+                    'tfee' => $tuition_fee
                 ]);
             }
             
@@ -322,7 +334,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     cnic_no, student_mobile, student_email,
                     father_name, father_cnic, father_mobile,
                     guardian_relationship, guardian_cnic, guardian_address, current_address, permanent_address,
-                    fee_plan, fee_admission, fee_monthly,
+                    fee_plan, fee_admission, fee_monthly, tuition_fee,
                     remarks, doc_student_photo,
                     academic_type, school_class, school_section
                 ) VALUES (
@@ -330,7 +342,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     :cnic, :smob, :sem,
                     :fname, :fcnic, :fmob,
                     :grel, :gcnic, :gaddr, :curr_addr, :perm_addr,
-                    :fplan, :fadm, :fmonth,
+                    :fplan, :fadm, :fmonth, :tfee,
                     :rem, :d_std,
                     :academic_type, :school_class, :school_section
                 ) ON DUPLICATE KEY UPDATE 
@@ -339,7 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     father_name = VALUES(father_name), father_cnic = VALUES(father_cnic), father_mobile = VALUES(father_mobile),
                     guardian_relationship = VALUES(guardian_relationship), guardian_cnic = VALUES(guardian_cnic), guardian_address = VALUES(guardian_address),
                     current_address = VALUES(current_address), permanent_address = VALUES(permanent_address),
-                    fee_plan = VALUES(fee_plan), fee_admission = VALUES(fee_admission), fee_monthly = VALUES(fee_monthly),
+                    fee_plan = VALUES(fee_plan), fee_admission = VALUES(fee_admission), fee_monthly = VALUES(fee_monthly), tuition_fee = VALUES(tuition_fee),
                     remarks = VALUES(remarks), doc_student_photo = VALUES(doc_student_photo),
                     academic_type = VALUES(academic_type), school_class = VALUES(school_class), school_section = VALUES(school_section)
             ");
@@ -364,6 +376,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'fplan' => sanitize($_POST['fee_plan'] ?? 'Regular Plan'),
                 'fadm' => (float)($_POST['fee_admission'] ?? 5000.00),
                 'fmonth' => (float)($_POST['fee_monthly'] ?? 3000.00),
+                'tfee' => $tuition_fee,
                 'rem' => sanitize($_POST['remarks'] ?? ''),
                 'd_std' => $docStudentPhoto ?: '',
                 'academic_type' => $academic_type,
@@ -853,10 +866,17 @@ include_once __DIR__ . '/../../includes/header.php';
                         <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-address-card me-2 text-primary"></i> B-Form / CNIC:</label>
                         <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" id="cnicInput" name="cnic_no" value="<?php echo sanitize($details['cnic_no'] ?? ''); ?>" placeholder="XXXXX-XXXXXXX-X">
                     </div>
-                    <!-- Row 5 (Student Mobile) -->
-                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center">
+                    <!-- Row 5 (Student Mobile & Tuition Fee) -->
+                    <div class="col-md-6 border-bottom border-end p-3 d-flex align-items-center">
                         <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-mobile-screen me-2 text-primary"></i> Student Mobile:</label>
                         <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" name="student_mobile" value="<?php echo sanitize($details['student_mobile'] ?? ''); ?>" placeholder="03XX-XXXXXXX">
+                    </div>
+                    <div class="col-md-6 border-bottom p-3 d-flex align-items-center bg-light">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-money-bill-wave me-2 text-primary"></i> Tuition Fee:</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text border-0 bg-transparent fw-bold text-primary">Rs.</span>
+                            <input type="number" step="0.01" min="0" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold text-dark fs-5" style="border-color: #2563eb !important; background: transparent;" name="tuition_fee" value="<?php echo sanitize($student['tuition_fee'] ?? $details['tuition_fee'] ?? '0.00'); ?>" placeholder="0.00">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -882,9 +902,12 @@ include_once __DIR__ . '/../../includes/header.php';
                         <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold font-monospace" style="border-color: #000 !important;" name="father_mobile" value="<?php echo sanitize($details['father_mobile'] ?? ''); ?>" required placeholder="03XX-XXXXXXX">
                     </div>
                     <!-- Row 3 -->
-                    <div class="col-12 p-4 bg-light d-flex align-items-center border-bottom">
-                        <label class="mb-0 me-4 text-muted fw-bold text-nowrap" style="width: 150px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot me-2 text-primary"></i> Address:</label>
-                        <div class="fw-bold text-dark border-bottom border-primary w-100 pb-1 fs-5" style="border-style: dashed !important;">Thokar Niaz Baig</div>
+                    <div class="col-12 p-3 bg-light d-flex align-items-center border-bottom">
+                        <label class="mb-0 me-3 text-muted fw-bold text-nowrap" style="width: 160px; font-size: 0.9rem;"><i class="fa-solid fa-location-dot me-2 text-primary"></i> Address:</label>
+                        <input type="text" class="form-control border-0 border-bottom rounded-0 px-2 fw-bold text-uppercase fs-5" style="border-color: #2563eb !important; border-style: dashed !important; color: #0f172a;" name="current_address" value="<?php echo sanitize($details['current_address'] ?? $student['address'] ?? ''); ?>" placeholder="e.g. HOUSE #, STREET, CITY / AREA">
+                    </div>
+                </div>
+            </div>
                     </div>
                 </div>
             </div>
