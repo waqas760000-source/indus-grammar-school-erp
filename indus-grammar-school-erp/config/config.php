@@ -58,6 +58,11 @@ define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 define('SECURE_SESSION', false); 
 define('CSRF_TOKEN_EXPIRE', 7200); 
 define('REMEMBER_ME_EXPIRE', 86400 * 30); 
+
+if (!defined('CURRENT_ACADEMIC_YEAR')) {
+    define('CURRENT_ACADEMIC_YEAR', '2025-2026');
+}
+
 define('REMEMBER_ME_COOKIE', 'igs_remember_token');
 
 // Session configuration

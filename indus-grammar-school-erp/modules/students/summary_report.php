@@ -394,6 +394,9 @@ body {
             <?php 
             $printUrl = "../../templates/summary_report.php?search_campus=" . urlencode($search_campus) . "&search_academic_type=" . urlencode($search_academic_type) . "&search_session=" . urlencode($search_session) . "&search_class=" . $search_class . "&search_section=" . urlencode($search_section) . "&search_status=" . urlencode($search_status);
             ?>
+            <a href="../../templates/student_details_report.php<?php echo $search_class > 0 ? '?class_id='.$search_class : ''; ?>" target="_blank" class="btn btn-info text-white fw-bold px-3 rounded-pill">
+                <i class="fa-solid fa-file-invoice-dollar me-1.5"></i>Student Details Report
+            </a>
             <a href="<?php echo $printUrl; ?>" target="_blank" class="btn btn-warning text-dark fw-bold px-3 rounded-pill">
                 <i class="fa-solid fa-print me-1.5"></i>Print A4 Sheet
             </a>

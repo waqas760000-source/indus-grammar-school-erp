@@ -306,6 +306,9 @@ body {
             </div>
             <div class="col-lg-5 text-lg-end mt-4 mt-lg-0 no-print">
                 <div class="d-inline-flex flex-wrap gap-2 justify-content-lg-end">
+                    <a href="../../templates/student_details_report.php?class_id=<?php echo $selectedClass; ?>" target="_blank" class="btn btn-warning text-dark fw-bold px-3 py-2 rounded-3 shadow-sm">
+                        <i class="fa-solid fa-file-invoice-dollar me-2"></i>Student Details Report
+                    </a>
                     <button class="btn btn-light fw-bold text-dark px-4 py-2 rounded-3 shadow-sm" onclick="exportToExcel()">
                         <i class="fa-solid fa-file-excel text-success me-2"></i>Export Excel / CSV
                     </button>
@@ -328,6 +331,7 @@ body {
                 <div class="col-lg-3 col-md-6">
                     <label class="form-label small fw-bold text-dark">Report Focus / Sub-type</label>
                     <select class="form-select" name="report_type" onchange="this.form.submit()">
+                        <option value="student_details_report" <?php echo $selectedReport === 'student_details_report' ? 'selected' : ''; ?>>Student Details Report (Fee & Class Roster)</option>
                         <option value="student_list" <?php echo $selectedReport === 'student_list' ? 'selected' : ''; ?>>All Student Roster</option>
                         <option value="admission_register" <?php echo $selectedReport === 'admission_register' ? 'selected' : ''; ?>>Admissions Register Log</option>
                         <option value="class_wise" <?php echo $selectedReport === 'class_wise' ? 'selected' : ''; ?>>Class-Wise Breakdown</option>

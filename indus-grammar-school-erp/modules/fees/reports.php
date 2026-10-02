@@ -19,6 +19,11 @@ $academType = sanitize($_GET['academic_type'] ?? '');
 $classId    = isset($_GET['class_id']) ? (int)$_GET['class_id'] : 0;
 $payMethod  = sanitize($_GET['payment_method'] ?? '');
 
+if ($reportType === 'student_details_report') {
+    header("Location: ../../templates/student_details_report.php" . ($classId > 0 ? "?class_id=" . $classId : ""));
+    exit;
+}
+
 // Fetch summary stats metrics
 $summary = Fee::getSummaryStats($dateFrom, $dateTo);
 
@@ -392,8 +397,11 @@ $currentReportTitle = $reportTitles[$reportType] ?? 'Fee Financial Report';
                 </div>
             </div>
         </div>
-        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-            <div class="d-flex gap-2 justify-content-lg-end">
+        <div class="col-lg-5 text-lg-end mt-3 mt-lg-0">
+            <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+                <a href="../../templates/student_details_report.php<?php echo $classId > 0 ? '?class_id='.$classId : ''; ?>" target="_blank" class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm rounded-3">
+                    <i class="fa-solid fa-file-invoice-dollar me-2"></i>Student Details Report
+                </a>
                 <button onclick="window.print()" class="btn btn-light fw-bold text-dark px-3 py-2 shadow-sm rounded-3">
                     <i class="fa-solid fa-print me-2 text-primary"></i>Print Report
                 </button>
@@ -480,6 +488,7 @@ $currentReportTitle = $reportTitles[$reportType] ?? 'Fee Financial Report';
             <div class="col-12 col-md-3">
                 <label class="form-label small fw-bold text-muted text-uppercase">Report Module</label>
                 <select class="form-select fw-bold text-primary" name="report_type" onchange="this.form.submit()">
+                    <option value="student_details_report">Student Details Report (Fee & Class Breakdown)</option>
                     <option value="daily_collection" <?php echo ($reportType === 'daily_collection') ? 'selected' : ''; ?>>Daily Fee Payments Log</option>
                     <option value="monthly_collection" <?php echo ($reportType === 'monthly_collection') ? 'selected' : ''; ?>>Monthly Collection Summary</option>
                     <option value="class_collection" <?php echo ($reportType === 'class_collection') ? 'selected' : ''; ?>>Class-Wise Collection Audit</option>

@@ -36,4 +36,7 @@ define('STATUS_ACTIVE', 1);
 define('STATUS_INACTIVE', 0);
 
 // Academic terms/sessions
-define('CURRENT_ACADEMIC_YEAR', '2026-2027');
+if (!defined('CURRENT_ACADEMIC_YEAR')) {
+    define('CURRENT_ACADEMIC_YEAR', '2025-2026');
+}
+

@@ -75,6 +75,7 @@ $userInitials = strtoupper(substr($userFullName, 0, 1));
                     <li class="<?php echo $currentScript === 'family_phone_list.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/family_phone_list.php">Family Phone Numbers List</a></li>
                     <li class="<?php echo $currentScript === 'profile_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/profile_report.php">Student Profile Dossier</a></li>
                     <li class="<?php echo $currentScript === 'summary_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/students/summary_report.php">Student Summary Report</a></li>
+                    <li class="<?php echo $currentScript === 'student_details_report.php' ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/templates/student_details_report.php" target="_blank">Student Details Report</a></li>
                 </ul>
             </li>
             <?php endif; ?>
