@@ -31,6 +31,11 @@ $reportTitle = "Fee Report";
 $reportData = [];
 
 try {
+    if ($selectedReport === 'student_details_report') {
+        header("Location: ../../templates/student_details_report.php" . ($selectedClass > 0 ? "?class_id=" . $selectedClass : ""));
+        exit;
+    }
+
     switch ($selectedReport) {
         
         case 'daily_collection':
@@ -364,8 +369,11 @@ try {
                 </div>
             </div>
         </div>
-        <div class="col-lg-4 text-lg-end mt-3 mt-lg-0">
-            <div class="d-flex gap-2 justify-content-lg-end">
+        <div class="col-lg-5 text-lg-end mt-3 mt-lg-0">
+            <div class="d-flex gap-2 justify-content-lg-end flex-wrap">
+                <a href="../../templates/student_details_report.php<?php echo $selectedClass > 0 ? '?class_id='.$selectedClass : ''; ?>" target="_blank" class="btn btn-warning fw-bold text-dark px-3 py-2 shadow-sm rounded-3">
+                    <i class="fa-solid fa-file-invoice-dollar me-2"></i>Student Details Report
+                </a>
                 <button onclick="window.print()" class="btn btn-light fw-bold text-dark px-3 py-2 shadow-sm rounded-3">
                     <i class="fa-solid fa-print me-2 text-primary"></i>Print Ledger
                 </button>
@@ -452,6 +460,7 @@ try {
             <div class="col-12 col-md-3">
                 <label class="form-label small fw-bold text-muted text-uppercase">Report Type</label>
                 <select class="form-select fw-bold text-primary" name="report_type" onchange="this.form.submit()">
+                    <option value="student_details_report">Student Details Report (Fee & Class Breakdown)</option>
                     <option value="daily_collection" <?php echo $selectedReport === 'daily_collection' ? 'selected' : ''; ?>>Daily Collection</option>
                     <option value="monthly_collection" <?php echo $selectedReport === 'monthly_collection' ? 'selected' : ''; ?>>Monthly Collection</option>
                     <option value="pending_fees" <?php echo $selectedReport === 'pending_fees' ? 'selected' : ''; ?>>Outstanding Pending Fees</option>

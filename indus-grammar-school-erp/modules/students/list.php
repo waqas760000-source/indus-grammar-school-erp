@@ -41,6 +41,7 @@ if ($totalPages < 1) $totalPages = 1;
         <h3 class="fw-bold text-secondary mb-0"><i class="fa-solid fa-user-graduate me-2 text-primary"></i>Student Directory</h3>
     </div>
     <div class="col-sm-6 text-sm-end mt-3 mt-sm-0">
+        <a href="../../templates/student_details_report.php?class_id=<?php echo (int)($filters['class_id'] ?? 0); ?>" target="_blank" class="btn btn-warning text-dark fw-bold px-3 py-2 me-2"><i class="fa-solid fa-file-invoice-dollar me-2"></i>Student Details Report</a>
         <?php if (hasPermission('student_create')): ?>
             <a href="registration.php" class="btn btn-primary px-4 py-2"><i class="fa-solid fa-plus me-2"></i>Register Student</a>
         <?php endif; ?>
