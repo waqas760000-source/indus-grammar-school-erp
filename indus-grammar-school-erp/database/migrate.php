@@ -95,9 +95,29 @@ class MigrationRunner {
             }
 
             try {
-                // Execute migration SQL
+                // Execute migration SQL queries statement by statement
                 $this->db->exec("SET FOREIGN_KEY_CHECKS = 0;");
-                $this->db->exec($sql);
+                
+                // Clean and split SQL file into individual statements
+                $cleanSql = preg_replace('/--.*$/m', '', $sql);
+                $cleanSql = preg_replace('/\/\*.*?\*\//s', '', $cleanSql);
+                $statements = array_filter(array_map('trim', explode(';', $cleanSql)));
+                
+                foreach ($statements as $stmtSql) {
+                    if ($stmtSql === '') continue;
+                    try {
+                        $this->db->exec($stmtSql);
+                    } catch (PDOException $pe) {
+                        $errorCode = $pe->errorInfo[1] ?? 0;
+                        $sqlState = $pe->errorInfo[0] ?? '';
+                        // Ignore harmless duplicate errors: 1060 (duplicate column), 1050 (table exists), 1061 (key exists)
+                        if (in_array($errorCode, [1060, 1050, 1061]) || $sqlState === '42S21' || str_contains($pe->getMessage(), 'Duplicate column')) {
+                            continue;
+                        }
+                        throw $pe;
+                    }
+                }
+                
                 $this->db->exec("SET FOREIGN_KEY_CHECKS = 1;");
 
                 // Record in migrations table
