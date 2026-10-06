@@ -73,11 +73,13 @@ try {
     $todayCollection = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE payment_date = CURRENT_DATE")->fetchColumn();
     $todayTransactionsCount = (int)$db->query("SELECT COUNT(*) FROM fee_payments WHERE payment_date = CURRENT_DATE")->fetchColumn();
 
-    // Current Month Fee Summary
-    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(total_payable), 0) FROM fee_ledger WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
+    // Single Month School Fee Summary (After Discount)
+    $feeGross = (float)$db->query("SELECT COALESCE(SUM(srd.fee_monthly), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(srd.fee_discount), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(srd.tuition_fee), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+    
     $feeReceived = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
     $feeBalance = max(0, $feeReceivable - $feeReceived);
-    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(discount_amount), 0) FROM fee_ledger WHERE MONTH(due_date) = MONTH(CURRENT_DATE) AND YEAR(due_date) = YEAR(CURRENT_DATE)")->fetchColumn();
     $feeCollectionPct = $feeReceivable > 0 ? round(($feeReceived / $feeReceivable) * 100, 1) : 0;
 
     // Current Month Arrear Status
@@ -496,10 +498,10 @@ $adminDisplayName = sanitize($currentUser['username'] === 'waqas7600' ? 'Waqas A
         <div class="col-12 col-sm-6 col-lg-3">
             <div class="stat-card-sample stat-card-emerald">
                 <div>
-                    <div class="stat-card-number" style="font-size: 1.85rem;">Rs. <?php echo number_format($todayCollection); ?></div>
-                    <div class="stat-card-title">Today's Fee Collection</div>
-                    <div class="small mt-2" style="font-size: 0.75rem; opacity: 0.9;">
-                        <span><i class="fa-solid fa-receipt me-1"></i><?php echo $todayTransactionsCount; ?> Payment Receipts</span>
+                    <div class="stat-card-number" style="font-size: 1.7rem;">Rs. <?php echo number_format($feeReceivable); ?></div>
+                    <div class="stat-card-title">Fee (After Discount)</div>
+                    <div class="small mt-2" style="font-size: 0.75rem; opacity: 0.95;">
+                        <span><i class="fa-solid fa-tags me-1"></i>Rs. <?php echo number_format($discountGiven); ?> Concession Applied</span>
                     </div>
                 </div>
                 <div class="stat-card-badge">
@@ -624,13 +626,14 @@ $adminDisplayName = sanitize($currentUser['username'] === 'waqas7600' ? 'Waqas A
         <!-- Monthly Financial Collections Chart -->
         <div class="col-12 col-lg-4">
             <div class="table-card p-4 h-100">
-                <h5 class="section-title mb-3"><i class="fa-solid fa-chart-line text-primary"></i>Monthly Fee Recovery</h5>
-                <div style="height: 230px; position: relative;">
+                <h5 class="section-title mb-1"><i class="fa-solid fa-chart-line text-primary"></i>Monthly Fee Recovery</h5>
+                <div class="small text-muted mb-3">Expected Fee (After Discount): <strong class="text-dark">Rs. <?php echo number_format($feeReceivable); ?></strong></div>
+                <div style="height: 210px; position: relative;">
                     <canvas id="financialDoughnutChart"></canvas>
                 </div>
                 <div class="d-flex justify-content-around text-center mt-3 pt-2 border-top small">
-                    <div><span class="d-block text-muted" style="font-size:0.75rem;">Received</span><strong class="text-success">Rs. <?php echo number_format($feeReceived); ?></strong></div>
-                    <div><span class="d-block text-muted" style="font-size:0.75rem;">Pending Balance</span><strong class="text-danger">Rs. <?php echo number_format($feeBalance); ?></strong></div>
+                    <div><span class="d-block text-muted" style="font-size:0.75rem;">Received (Paid)</span><strong class="text-success">Rs. <?php echo number_format($feeReceived); ?></strong></div>
+                    <div><span class="d-block text-muted" style="font-size:0.75rem;">Pending Fee (Due)</span><strong class="text-danger">Rs. <?php echo number_format($feeBalance); ?></strong></div>
                 </div>
             </div>
         </div>

@@ -425,6 +425,9 @@ if ($selectedId > 0) {
                     <i class="fa-regular fa-pen-to-square me-1"></i> Edit Student Details
                 </a>
             <?php endif; ?>
+            <a href="../../templates/student_profile_report.php?id=<?php echo $selectedId; ?>" target="_blank" class="btn btn-sm btn-success text-white fw-bold px-3 shadow-sm" title="Print/View Official Student Profile Report">
+                <i class="fa-solid fa-address-card me-1"></i> Student Profile Report
+            </a>
             <a href="../../templates/profile_dossier.php?id=<?php echo $selectedId; ?>" target="_blank" class="btn btn-sm btn-warning text-dark fw-bold px-3 shadow-sm">
                 <i class="fa-solid fa-print me-1"></i> Print Formal A4 Dossier
             </a>

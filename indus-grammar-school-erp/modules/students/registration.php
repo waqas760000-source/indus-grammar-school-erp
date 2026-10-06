@@ -568,8 +568,15 @@ include_once __DIR__ . '/../../includes/header.php';
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <?php if (!empty($studentId) && $studentId > 0): ?>
+                    <a href="../../templates/student_profile_report.php?id=<?php echo $studentId; ?>" target="_blank" class="btn btn-sm btn-success text-white rounded-2 px-3 py-1.5 fw-bold shadow-sm" title="Print/View Official Student Profile Report">
+                        <i class="fa-solid fa-address-card me-1"></i>Student Profile Report
+                    </a>
                     <a href="profile_report.php?id=<?php echo $studentId; ?>" class="btn btn-sm btn-info text-white rounded-2 px-3 py-1.5 fw-bold shadow-sm">
-                        <i class="fa-solid fa-address-card me-1"></i>View Profile
+                        <i class="fa-solid fa-circle-user me-1"></i>View Profile
+                    </a>
+                <?php else: ?>
+                    <a href="../../templates/student_profile_report.php" target="_blank" class="btn btn-sm btn-success text-white rounded-2 px-3 py-1.5 fw-bold shadow-sm" title="Print/View Student Profile Reports">
+                        <i class="fa-solid fa-address-card me-1"></i>Student Profile Report
                     </a>
                 <?php endif; ?>
                 <a href="../../templates/registration_form.php<?php echo ($studentId > 0) ? '?id=' . $studentId : ''; ?>" target="_blank" class="btn btn-sm btn-warning text-dark rounded-2 px-3 py-1.5 fw-bold shadow-sm">

@@ -1,14 +1,15 @@
 <?php
 require_once __DIR__ . '/../config/app.php';
 $db = Database::getConnection();
-echo "--- STAFF ATTENDANCE ---\n";
-$stmt = $db->query("DESCRIBE staff_attendance");
-print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
 
-echo "--- STAFF ATTENDANCE SETTINGS ---\n";
-try {
-    $stmt = $db->query("DESCRIBE staff_attendance_settings");
-    print_r($stmt->fetchAll(PDO::FETCH_ASSOC));
-} catch (Exception $e) {
-    echo $e->getMessage() . "\n";
+echo "--- STUDENTS ---\n";
+$st = $db->query('DESCRIBE students');
+while($r = $st->fetch(PDO::FETCH_ASSOC)) {
+    echo $r['Field'] . " (" . $r['Type'] . ")\n";
+}
+
+echo "\n--- STUDENT_REGISTRATION_DETAILS ---\n";
+$st2 = $db->query('DESCRIBE student_registration_details');
+while($r = $st2->fetch(PDO::FETCH_ASSOC)) {
+    echo $r['Field'] . " (" . $r['Type'] . ")\n";
 }

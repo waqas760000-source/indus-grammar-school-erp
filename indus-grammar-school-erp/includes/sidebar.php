@@ -195,6 +195,7 @@ $userInitials = strtoupper(substr($userFullName, 0, 1));
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/roles.php') || str_contains($_SERVER['PHP_SELF'], '/permissions.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/roles.php">Roles & Permissions</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/settings.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/settings.php">School Settings</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/academic.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/academic.php">Academic Settings</a></li>
+                    <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/classes.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/classes.php">Class Management</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/backup.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/backup.php">Backup & Restore</a></li>
                     <li class="<?php echo str_contains($_SERVER['PHP_SELF'], '/logs.php') ? 'active' : ''; ?>"><a href="<?php echo APP_URL; ?>/modules/administration/logs.php">Audit Logs</a></li>
                 </ul>
