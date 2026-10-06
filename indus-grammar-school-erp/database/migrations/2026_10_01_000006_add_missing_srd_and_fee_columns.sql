@@ -49,8 +49,9 @@ ALTER TABLE `student_registration_details` ADD COLUMN `academic_type` varchar(50
 ALTER TABLE `student_registration_details` ADD COLUMN `school_class` varchar(50) DEFAULT NULL;
 ALTER TABLE `student_registration_details` ADD COLUMN `school_section` varchar(20) DEFAULT NULL;
 
--- 3. Add tuition_fee to students table if missing
+-- 3. Add tuition_fee and cnic_bform to students table if missing
 ALTER TABLE `students` ADD COLUMN `tuition_fee` decimal(10,2) DEFAULT '0.00';
+ALTER TABLE `students` ADD COLUMN `cnic_bform` varchar(25) DEFAULT NULL;
 
 -- 4. Ensure fee_settings columns exist
 ALTER TABLE `fee_settings` ADD COLUMN `auto_fee_enabled` tinyint(1) NOT NULL DEFAULT '1';

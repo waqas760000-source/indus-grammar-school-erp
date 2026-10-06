@@ -64,10 +64,10 @@ try {
             s.gender,
             s.address,
             s.status,
-            s.tuition_fee as std_tuition_fee,
+            d.tuition_fee as std_tuition_fee,
             c.id as class_id,
-            COALESCE(c.class_name, s.school_class, 'Unassigned') as class_name,
-            COALESCE(c.section, s.school_section, 'Red') as section,
+            COALESCE(c.class_name, d.school_class, 'Unassigned') as class_name,
+            COALESCE(c.section, d.school_section, 'Red') as section,
             d.father_name,
             d.father_mobile,
             d.student_mobile,
@@ -75,8 +75,7 @@ try {
             s.id as family_group,
             d.fee_monthly,
             d.fee_discount,
-            d.tuition_fee as net_tuition_fee,
-            d.fee_scholarship
+            d.tuition_fee as net_tuition_fee
         FROM students s
         LEFT JOIN classes c ON s.class_id = c.id
         LEFT JOIN student_registration_details d ON s.id = d.student_id
