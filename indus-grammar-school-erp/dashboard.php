@@ -74,9 +74,16 @@ try {
     $todayTransactionsCount = (int)$db->query("SELECT COUNT(*) FROM fee_payments WHERE payment_date = CURRENT_DATE")->fetchColumn();
 
     // Single Month School Fee Summary (After Discount)
-    $feeGross = (float)$db->query("SELECT COALESCE(SUM(srd.fee_monthly), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
-    $discountGiven = (float)$db->query("SELECT COALESCE(SUM(srd.fee_discount), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
-    $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(srd.tuition_fee), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+    $feeGross = 0.0;
+    $discountGiven = 0.0;
+    $feeReceivable = 0.0;
+    try {
+        $feeGross = (float)$db->query("SELECT COALESCE(SUM(srd.fee_monthly), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+        $discountGiven = (float)$db->query("SELECT COALESCE(SUM(srd.fee_discount), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+        $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(srd.tuition_fee), 0) FROM student_registration_details srd JOIN students s ON srd.student_id = s.id WHERE s.status = 'Active'")->fetchColumn();
+    } catch (Exception $e) {
+        $feeReceivable = (float)$db->query("SELECT COALESCE(SUM(total_payable), 0) FROM fee_ledger WHERE status IN ('Pending', 'Partial')")->fetchColumn();
+    }
     
     $feeReceived = (float)$db->query("SELECT COALESCE(SUM(amount_paid), 0) FROM fee_payments WHERE MONTH(payment_date) = MONTH(CURRENT_DATE) AND YEAR(payment_date) = YEAR(CURRENT_DATE)")->fetchColumn();
     $feeBalance = max(0, $feeReceivable - $feeReceived);
