@@ -452,45 +452,55 @@ try {
                 <div class="p-4 border-bottom d-flex align-items-center justify-content-between bg-white">
                     <div>
                         <h5 class="fw-bold mb-0 text-dark fs-6 d-flex align-items-center gap-2">
-                            <i class="fa-solid fa-school text-primary"></i> Registered Classes & Section Codes
+                            <i class="fa-solid fa-school text-primary"></i> Registered School Classes Directory
                         </h5>
-                        <p class="text-muted small mb-0 mt-0.5">Register class levels and section combinations for student enrollment.</p>
+                        <p class="text-muted small mb-0 mt-0.5">Manage registered class levels, assigned teachers, monthly fees, and active status.</p>
                     </div>
-                    <button class="btn btn-primary btn-sm fw-bold px-3 rounded-2 shadow-sm" data-bs-toggle="modal" data-bs-target="#addClassModal">
-                        <i class="fa-solid fa-plus-circle me-1"></i> Add Class & Section
-                    </button>
+                    <div>
+                        <a href="classes.php" class="btn btn-primary btn-sm fw-bold px-3 rounded-2 shadow-sm">
+                            <i class="fa-solid fa-gear me-1"></i> Open Full Class Manager
+                        </a>
+                    </div>
                 </div>
                 <div class="table-responsive">
                     <table class="table academic-table table-hover align-middle mb-0">
                         <thead>
                             <tr>
-                                <th width="80">ID</th>
-                                <th>Class Title</th>
-                                <th>Section Code</th>
-                                <th class="text-end" width="160">Actions</th>
+                                <th width="70" class="text-center">Sr.</th>
+                                <th>Class</th>
+                                <th>Teacher</th>
+                                <th class="text-center">MonthlyFee</th>
+                                <th class="text-center">ClassGroup</th>
+                                <th class="text-center">Active</th>
+                                <th class="text-end" width="160">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (!empty($classes)): ?>
-                                <?php foreach ($classes as $c): ?>
+                                <?php foreach ($classes as $idx => $c): ?>
                                     <tr>
-                                        <td class="fw-bold text-muted">#<?php echo $c['id']; ?></td>
+                                        <td class="text-center fw-bold text-muted"><?php echo ($idx + 1); ?></td>
                                         <td class="fw-bold text-dark fs-6"><?php echo sanitize($c['class_name']); ?></td>
-                                        <td>
-                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1.5 rounded-pill fw-bold">
-                                                Section <?php echo sanitize($c['section']); ?>
-                                            </span>
+                                        <td class="fw-semibold text-secondary"><?php echo sanitize($c['teacher_name'] ?? 'ZAINAB'); ?></td>
+                                        <td class="text-center fw-bold text-dark">Rs. <?php echo number_format($c['monthly_fee'] ?? 2500); ?></td>
+                                        <td class="text-center text-muted"><?php echo sanitize($c['class_group'] ?? '0'); ?></td>
+                                        <td class="text-center">
+                                            <?php if (strtoupper($c['status'] ?? 'YES') === 'YES'): ?>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill fw-bold">YES</span>
+                                            <?php else: ?>
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1 rounded-pill fw-bold">NO</span>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="text-end">
-                                            <button class="btn btn-sm btn-outline-danger btn-delete-class rounded-2" data-id="<?php echo $c['id']; ?>" title="Delete Class Section">
-                                                <i class="fa-solid fa-trash-can"></i>
-                                            </button>
+                                            <a href="classes.php" class="btn btn-sm btn-outline-primary fw-bold rounded-2 px-3 py-1">
+                                                <i class="fa-solid fa-pen-to-square me-1"></i>Edit
+                                            </a>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php else: ?>
                                 <tr>
-                                    <td colspan="4" class="text-center py-4 text-muted">No classes or sections registered yet.</td>
+                                    <td colspan="7" class="text-center py-4 text-muted">No classes or sections registered yet.</td>
                                 </tr>
                             <?php endif; ?>
                         </tbody>
