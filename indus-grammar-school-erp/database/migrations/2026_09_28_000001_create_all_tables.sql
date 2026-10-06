@@ -140,6 +140,41 @@ CREATE TABLE IF NOT EXISTS `students` (
   CONSTRAINT `students_ibfk_1` FOREIGN KEY (`class_id`) REFERENCES `classes` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `student_registration_details` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `student_id` int NOT NULL,
+  `roll_no` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT '0',
+  `admission_date` date DEFAULT NULL,
+  `academic_session` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT '2025-2026',
+  `campus` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT 'Main Campus',
+  `cnic_no` varchar(25) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `student_mobile` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `student_email` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `father_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `father_cnic` varchar(25) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `father_mobile` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `guardian_relationship` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'Father',
+  `guardian_cnic` varchar(25) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `guardian_address` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `current_address` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `permanent_address` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `fee_plan` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'Regular Plan',
+  `fee_admission` decimal(10,2) DEFAULT '0.00',
+  `fee_monthly` decimal(10,2) DEFAULT '0.00',
+  `fee_discount` decimal(10,2) DEFAULT '0.00',
+  `tuition_fee` decimal(10,2) DEFAULT '0.00',
+  `remarks` text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `doc_student_photo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `academic_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT 'School',
+  `school_class` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `school_section` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_srd_student_id` (`student_id`),
+  CONSTRAINT `srd_fk_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `admissions` (
   `id` int NOT NULL AUTO_INCREMENT,
   `application_no` varchar(30) COLLATE utf8mb4_unicode_ci NOT NULL,
