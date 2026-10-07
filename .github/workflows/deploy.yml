@@ -14,12 +14,52 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Execute Remote SSH Deployment
+      - name: Execute Remote SSH Deployment (Password Auth)
+        if: ${{ secrets.VPS_PASSWORD != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER != '' && secrets.VPS_USER || 'root' }}
           password: ${{ secrets.VPS_PASSWORD }}
+          port: ${{ secrets.VPS_PORT != '' && secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            echo "=========================================================="
+            echo "🚀 Starting Automated Production Deployment on VPS..."
+            echo "=========================================================="
+            
+            cd /var/www/indus-grammar-school-erp
+            
+            # 1. Fetch and pull latest changes from main
+            echo "[+] Pulling latest code from origin/main..."
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # 2. Restart web container to reload PHP files and clear cache
+            echo "[+] Reloading web container..."
+            docker compose -f docker-compose.prod.yml restart web
+            
+            # 3. Run pending database migrations
+            echo "[+] Executing database migrations..."
+            docker exec igs_erp_web_prod php database/migrate.php
+            
+            # 4. Ensure storage & upload permissions
+            echo "[+] Ensuring directory permissions..."
+            mkdir -p ./indus-grammar-school-erp/storage ./indus-grammar-school-erp/uploads
+            chmod -R 775 ./indus-grammar-school-erp/storage
+            chmod -R 775 ./indus-grammar-school-erp/uploads
+            
+            echo "=========================================================="
+            echo "✅ Deployment & Migrations Completed Successfully!"
+            echo "   Live at: https://indusschoolacadmy.space"
+            echo "=========================================================="
+
+      - name: Execute Remote SSH Deployment (Key Auth)
+        if: ${{ secrets.VPS_PASSWORD == '' && secrets.VPS_SSH_KEY != '' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER != '' && secrets.VPS_USER || 'root' }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT != '' && secrets.VPS_PORT || 22 }}
           script: |
