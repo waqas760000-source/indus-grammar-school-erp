@@ -3136,7 +3136,12 @@ try {
                     $nullSql = ($colMeta['Null'] === 'YES') ? 'NULL' : 'NOT NULL';
                     $defaultSql = '';
                     if ($colMeta['Default'] !== null) {
-                        $defaultSql = "DEFAULT " . $db->quote($colMeta['Default']);
+                        $defVal = $colMeta['Default'];
+                        if (strtoupper($defVal) === 'CURRENT_TIMESTAMP' || strtoupper($defVal) === 'CURRENT_TIMESTAMP()') {
+                            $defaultSql = "DEFAULT CURRENT_TIMESTAMP";
+                        } else {
+                            $defaultSql = "DEFAULT " . $db->quote($defVal);
+                        }
                     } else if ($colMeta['Null'] === 'YES') {
                         $defaultSql = "DEFAULT NULL";
                     }
