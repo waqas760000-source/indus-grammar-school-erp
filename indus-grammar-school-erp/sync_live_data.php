@@ -78,6 +78,3083 @@ try {
     }
 
     echo "\n=========================================================================\n";
+    echo "   STEP 1.5: AUTOMATIC SCHEMA ALIGNMENT (ADD MISSING COLUMNS TO LIVE)    \n";
+    echo "=========================================================================\n";
+
+    $schemaDefs = array (
+  'academic_sessions' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'session_name',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'is_active',
+      'Type' => 'tinyint(1)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+  ),
+  'classes' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'class_name',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'section',
+      'Type' => 'varchar(10)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    4 => 
+    array (
+      'Field' => 'teacher_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'ZAINAB',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'monthly_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '2500.00',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'class_group',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'varchar(10)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'YES',
+      'Extra' => '',
+    ),
+  ),
+  'subjects' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'subject_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'subject_code',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'class_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'total_marks',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '100',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    6 => 
+    array (
+      'Field' => 'academic_type',
+      'Type' => 'enum(\'School\',\'Academy\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'School',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'passing_marks',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '40',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'teacher_id',
+      'Type' => 'int',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Active\',\'Inactive\')',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Active',
+      'Extra' => '',
+    ),
+  ),
+  'fee_structure' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'academic_type',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => 'School',
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'class_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'admission_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'tuition_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'computer_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'exam_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'transport_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'annual_charges',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'security_deposit',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'other_charges',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Active',
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'academic_year',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    13 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    14 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'fee_settings' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'late_fine_amount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'grace_days',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'fine_type',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Fixed',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    5 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+    6 => 
+    array (
+      'Field' => 'auto_fee_enabled',
+      'Type' => 'tinyint(1)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '1',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'auto_fee_day',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '1',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'last_auto_fee_run',
+      'Type' => 'varchar(20)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+  ),
+  'school_settings' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'school_name',
+      'Type' => 'varchar(255)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'school_logo',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'school_address',
+      'Type' => 'text',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'city',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'phone_number',
+      'Type' => 'varchar(30)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'whatsapp_number',
+      'Type' => 'varchar(30)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'email',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'website',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'principal_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'owner_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'registration_number',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'current_academic_session',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '2026-2027',
+      'Extra' => '',
+    ),
+    13 => 
+    array (
+      'Field' => 'timezone',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Asia/Karachi',
+      'Extra' => '',
+    ),
+    14 => 
+    array (
+      'Field' => 'currency',
+      'Type' => 'varchar(10)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'PKR',
+      'Extra' => '',
+    ),
+    15 => 
+    array (
+      'Field' => 'date_format',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Y-m-d',
+      'Extra' => '',
+    ),
+    16 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    17 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+    18 => 
+    array (
+      'Field' => 'bank_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Meezan Bank Ltd',
+      'Extra' => '',
+    ),
+    19 => 
+    array (
+      'Field' => 'bank_account_title',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Indus Grammar School',
+      'Extra' => '',
+    ),
+    20 => 
+    array (
+      'Field' => 'bank_account_no',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'PK64 MEZN 0001 0203 0405 0607',
+      'Extra' => '',
+    ),
+    21 => 
+    array (
+      'Field' => 'jazzcash_title',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Indus Grammar School',
+      'Extra' => '',
+    ),
+    22 => 
+    array (
+      'Field' => 'jazzcash_number',
+      'Type' => 'varchar(30)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '03066544806',
+      'Extra' => '',
+    ),
+  ),
+  'attendance_settings' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'school_start_time',
+      'Type' => 'time',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '08:00:00',
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'late_arrival_time',
+      'Type' => 'time',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '08:15:00',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'working_days',
+      'Type' => 'varchar(255)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Monday,Tuesday,Wednesday,Thursday,Friday,Saturday',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'weekend_days',
+      'Type' => 'varchar(255)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Sunday',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'default_status',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Present',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'allow_edit',
+      'Type' => 'tinyint(1)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '1',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'lock_hours',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '24',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    9 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'payroll_settings' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'salary_payment_date',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '10',
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'working_days_per_month',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '26',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'late_deduction_rule',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.25',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'half_day_rule',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.50',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'absent_deduction_rule',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '1.00',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'overtime_rate',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'currency',
+      'Type' => 'varchar(10)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Rs.',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'default_payment_method',
+      'Type' => 'enum(\'Cash\',\'Bank Transfer\',\'Cheque\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Bank Transfer',
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'auto_issue_enabled',
+      'Type' => 'tinyint(1)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '1',
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'auto_issue_day',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '10',
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'auto_issue_status',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Pending',
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'last_auto_issue_run',
+      'Type' => 'varchar(20)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+  ),
+  'cash_register' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'opening_balance',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'total_collections',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'total_expenses',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'closing_balance',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'closed_by',
+      'Type' => 'int',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Open\',\'Closed\')',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Open',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'notes',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    10 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'grade_setup' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'grade',
+      'Type' => 'varchar(10)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'min_percentage',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'max_percentage',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'grade_point',
+      'Type' => 'decimal(3,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'remarks',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+  ),
+  'exam_types' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'exam_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'academic_session',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'academic_type',
+      'Type' => 'enum(\'School\',\'Academy\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'School',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'start_date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'end_date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'total_marks',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '100',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'passing_percentage',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '40.00',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Active\',\'Inactive\')',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Active',
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    10 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'exams' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'exam_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'exam_type',
+      'Type' => 'enum(\'Mid-Term\',\'Final\',\'Test\',\'Quiz\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Mid-Term',
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'academic_year',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'start_date',
+      'Type' => 'date',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'end_date',
+      'Type' => 'date',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Upcoming\',\'Active\',\'Completed\')',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Upcoming',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    8 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'users' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'username',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'full_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'email',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'mobile_no',
+      'Type' => 'varchar(20)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'profile_photo',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'password_hash',
+      'Type' => 'varchar(255)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'role_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'is_active',
+      'Type' => 'tinyint(1)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => '1',
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'last_login',
+      'Type' => 'datetime',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    11 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'roles' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'name',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'code',
+      'Type' => 'varchar(30)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'description',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    5 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'permissions' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'code',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'module',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'description',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+  ),
+  'role_permissions' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'role_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    1 => 
+    array (
+      'Field' => 'permission_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+  ),
+  'students' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'admission_no',
+      'Type' => 'varchar(30)',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'roll_no',
+      'Type' => 'varchar(20)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'first_name',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'last_name',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'gender',
+      'Type' => 'enum(\'Male\',\'Female\',\'Other\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'date_of_birth',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'cnic_bform',
+      'Type' => 'varchar(25)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'enrollment_date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'class_id',
+      'Type' => 'int',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Active\',\'Inactive\',\'Suspended\')',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => 'Active',
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'guardian_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'guardian_cnic',
+      'Type' => 'varchar(25)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    13 => 
+    array (
+      'Field' => 'guardian_phone',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    14 => 
+    array (
+      'Field' => 'guardian_email',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    15 => 
+    array (
+      'Field' => 'address',
+      'Type' => 'text',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    16 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    17 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+    18 => 
+    array (
+      'Field' => 'academic_type',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'School',
+      'Extra' => '',
+    ),
+    19 => 
+    array (
+      'Field' => 'school_class',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    20 => 
+    array (
+      'Field' => 'school_section',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    21 => 
+    array (
+      'Field' => 'tuition_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    22 => 
+    array (
+      'Field' => 'academy_program',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    23 => 
+    array (
+      'Field' => 'academy_batch',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+  ),
+  'student_registration_details' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    1 => 
+    array (
+      'Field' => 'roll_no',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'admission_date',
+      'Type' => 'date',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'academic_session',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'campus',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'blood_group',
+      'Type' => 'varchar(10)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'religion',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'nationality',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'cnic_no',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'birth_cert_no',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'birth_place',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'student_mobile',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'student_email',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    13 => 
+    array (
+      'Field' => 'father_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    14 => 
+    array (
+      'Field' => 'father_cnic',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    15 => 
+    array (
+      'Field' => 'father_mobile',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    16 => 
+    array (
+      'Field' => 'father_occupation',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    17 => 
+    array (
+      'Field' => 'father_office',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    18 => 
+    array (
+      'Field' => 'father_income',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    19 => 
+    array (
+      'Field' => 'father_email',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    20 => 
+    array (
+      'Field' => 'father_photo',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    21 => 
+    array (
+      'Field' => 'mother_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    22 => 
+    array (
+      'Field' => 'mother_cnic',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    23 => 
+    array (
+      'Field' => 'mother_mobile',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    24 => 
+    array (
+      'Field' => 'mother_occupation',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    25 => 
+    array (
+      'Field' => 'mother_email',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    26 => 
+    array (
+      'Field' => 'mother_photo',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    27 => 
+    array (
+      'Field' => 'guardian_relationship',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    28 => 
+    array (
+      'Field' => 'guardian_cnic',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    29 => 
+    array (
+      'Field' => 'guardian_address',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    30 => 
+    array (
+      'Field' => 'current_address',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    31 => 
+    array (
+      'Field' => 'permanent_address',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    32 => 
+    array (
+      'Field' => 'city',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    33 => 
+    array (
+      'Field' => 'province',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    34 => 
+    array (
+      'Field' => 'postal_code',
+      'Type' => 'varchar(20)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    35 => 
+    array (
+      'Field' => 'country',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    36 => 
+    array (
+      'Field' => 'prev_school',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    37 => 
+    array (
+      'Field' => 'prev_class',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    38 => 
+    array (
+      'Field' => 'prev_roll_no',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    39 => 
+    array (
+      'Field' => 'prev_result',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    40 => 
+    array (
+      'Field' => 'leaving_cert_no',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    41 => 
+    array (
+      'Field' => 'test_marks',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    42 => 
+    array (
+      'Field' => 'medical_condition',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    43 => 
+    array (
+      'Field' => 'allergies',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    44 => 
+    array (
+      'Field' => 'disability',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    45 => 
+    array (
+      'Field' => 'emergency_contact',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    46 => 
+    array (
+      'Field' => 'doctor_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    47 => 
+    array (
+      'Field' => 'doctor_contact',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    48 => 
+    array (
+      'Field' => 'transport_required',
+      'Type' => 'tinyint(1)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0',
+      'Extra' => '',
+    ),
+    49 => 
+    array (
+      'Field' => 'transport_route',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    50 => 
+    array (
+      'Field' => 'pickup_point',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    51 => 
+    array (
+      'Field' => 'drop_point',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    52 => 
+    array (
+      'Field' => 'transport_vehicle',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    53 => 
+    array (
+      'Field' => 'transport_driver',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    54 => 
+    array (
+      'Field' => 'sponsor_required',
+      'Type' => 'tinyint(1)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0',
+      'Extra' => '',
+    ),
+    55 => 
+    array (
+      'Field' => 'sponsor_name',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    56 => 
+    array (
+      'Field' => 'sponsor_org',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    57 => 
+    array (
+      'Field' => 'sponsor_contact',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    58 => 
+    array (
+      'Field' => 'sponsor_amount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    59 => 
+    array (
+      'Field' => 'fee_plan',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    60 => 
+    array (
+      'Field' => 'fee_admission',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    61 => 
+    array (
+      'Field' => 'fee_monthly',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    62 => 
+    array (
+      'Field' => 'tuition_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    63 => 
+    array (
+      'Field' => 'fee_discount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    64 => 
+    array (
+      'Field' => 'fee_scholarship',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    65 => 
+    array (
+      'Field' => 'fee_fine',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    66 => 
+    array (
+      'Field' => 'fee_security',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    67 => 
+    array (
+      'Field' => 'remarks',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    68 => 
+    array (
+      'Field' => 'special_notes',
+      'Type' => 'text',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    69 => 
+    array (
+      'Field' => 'doc_student_photo',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    70 => 
+    array (
+      'Field' => 'doc_father_cnic',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    71 => 
+    array (
+      'Field' => 'doc_mother_cnic',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    72 => 
+    array (
+      'Field' => 'doc_bform',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    73 => 
+    array (
+      'Field' => 'doc_birth_cert',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    74 => 
+    array (
+      'Field' => 'doc_leaving_cert',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    75 => 
+    array (
+      'Field' => 'doc_prev_result',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    76 => 
+    array (
+      'Field' => 'doc_medical_cert',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    77 => 
+    array (
+      'Field' => 'doc_other',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    78 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    79 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+    80 => 
+    array (
+      'Field' => 'academic_type',
+      'Type' => 'varchar(50)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'School',
+      'Extra' => '',
+    ),
+    81 => 
+    array (
+      'Field' => 'school_class',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    82 => 
+    array (
+      'Field' => 'school_section',
+      'Type' => 'varchar(50)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    83 => 
+    array (
+      'Field' => 'academy_program',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    84 => 
+    array (
+      'Field' => 'academy_batch',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+  ),
+  'student_fee_assignments' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'UNI',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'fee_structure_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'discount_percentage',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'discount_flat',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'discount_reason',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Active',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    8 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'fee_ledger' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'month',
+      'Type' => 'varchar(30)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'academic_year',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'admission_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'tuition_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'computer_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'exam_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'transport_fee',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'annual_charges',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'security_deposit',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    11 => 
+    array (
+      'Field' => 'other_charges',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    12 => 
+    array (
+      'Field' => 'fine_amount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    13 => 
+    array (
+      'Field' => 'discount_amount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    14 => 
+    array (
+      'Field' => 'total_payable',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    15 => 
+    array (
+      'Field' => 'paid_amount',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    16 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'varchar(20)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Pending',
+      'Extra' => '',
+    ),
+    17 => 
+    array (
+      'Field' => 'due_date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    18 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    19 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'attendance' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'class_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'date',
+      'Type' => 'date',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Present\',\'Absent\',\'Late\',\'Leave\')',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => 'Present',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'remarks',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'marked_by',
+      'Type' => 'int',
+      'Null' => 'YES',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+  ),
+  'marks' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'exam_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'subject_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'marks_obtained',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'total_marks',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '100',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'remarks',
+      'Type' => 'varchar(100)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+  ),
+  'student_marks' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'exam_type_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'subject_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'marks_obtained',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'remarks',
+      'Type' => 'varchar(255)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Present\',\'Absent\',\'Leave\',\'Exempt\')',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'Present',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    8 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+  'exam_results' => 
+  array (
+    0 => 
+    array (
+      'Field' => 'id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'PRI',
+      'Default' => NULL,
+      'Extra' => 'auto_increment',
+    ),
+    1 => 
+    array (
+      'Field' => 'exam_type_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    2 => 
+    array (
+      'Field' => 'student_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    3 => 
+    array (
+      'Field' => 'class_id',
+      'Type' => 'int',
+      'Null' => 'NO',
+      'Key' => 'MUL',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    4 => 
+    array (
+      'Field' => 'total_marks',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    5 => 
+    array (
+      'Field' => 'obtained_marks',
+      'Type' => 'decimal(10,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    6 => 
+    array (
+      'Field' => 'percentage',
+      'Type' => 'decimal(5,2)',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => '0.00',
+      'Extra' => '',
+    ),
+    7 => 
+    array (
+      'Field' => 'grade',
+      'Type' => 'varchar(10)',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    8 => 
+    array (
+      'Field' => 'position',
+      'Type' => 'int',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => NULL,
+      'Extra' => '',
+    ),
+    9 => 
+    array (
+      'Field' => 'status',
+      'Type' => 'enum(\'Pass\',\'Fail\')',
+      'Null' => 'NO',
+      'Key' => '',
+      'Default' => 'Fail',
+      'Extra' => '',
+    ),
+    10 => 
+    array (
+      'Field' => 'created_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED',
+    ),
+    11 => 
+    array (
+      'Field' => 'updated_at',
+      'Type' => 'timestamp',
+      'Null' => 'YES',
+      'Key' => '',
+      'Default' => 'CURRENT_TIMESTAMP',
+      'Extra' => 'DEFAULT_GENERATED on update CURRENT_TIMESTAMP',
+    ),
+  ),
+);
+
+    foreach ($schemaDefs as $tbl => $cols) {
+        try {
+            $existingCols = $db->query("SHOW COLUMNS FROM `$tbl`")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($cols as $colMeta) {
+                $colName = $colMeta['Field'];
+                if (!in_array($colName, $existingCols)) {
+                    $type = $colMeta['Type'];
+                    $nullSql = ($colMeta['Null'] === 'YES') ? 'NULL' : 'NOT NULL';
+                    $defaultSql = '';
+                    if ($colMeta['Default'] !== null) {
+                        $defaultSql = "DEFAULT " . $db->quote($colMeta['Default']);
+                    } else if ($colMeta['Null'] === 'YES') {
+                        $defaultSql = "DEFAULT NULL";
+                    }
+                    $alterSql = "ALTER TABLE `$tbl` ADD COLUMN `$colName` $type $nullSql $defaultSql";
+                    try {
+                        $db->exec($alterSql);
+                        echo "  [+] Added missing column `$colName` to `$tbl`\n";
+                    } catch (Exception $ae) {
+                        echo "  [!] Could not add `$colName` to `$tbl`: " . $ae->getMessage() . "\n";
+                    }
+                }
+            }
+        } catch (Exception $te) {
+            echo "  [!] Schema check error on `$tbl`: " . $te->getMessage() . "\n";
+        }
+    }
+
+    echo "\n=========================================================================\n";
     echo "   STEP 2: EXECUTING SAFE UPSERT DATA SYNCHRONIZATION (1,052 STUDENTS)   \n";
     echo "=========================================================================\n";
 
