@@ -45,6 +45,7 @@ jobs:
             
             # 4. Ensure storage & upload permissions
             echo "[+] Ensuring directory permissions..."
+            mkdir -p ./indus-grammar-school-erp/storage ./indus-grammar-school-erp/uploads
             chmod -R 775 ./indus-grammar-school-erp/storage
             chmod -R 775 ./indus-grammar-school-erp/uploads
             
