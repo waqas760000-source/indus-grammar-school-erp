@@ -39,9 +39,11 @@ jobs:
             echo "[+] Reloading web container..."
             docker compose -f docker-compose.prod.yml restart web
             
-            # 3. Run pending database migrations
+            # 3. Run pending database migrations & 1,052 student data sync
             echo "[+] Executing database migrations..."
             docker exec igs_erp_web_prod php database/migrate.php
+            echo "[+] Executing production 1,052 student data & fee ledger sync..."
+            docker exec igs_erp_web_prod php sync_live_data.php
             
             # 4. Ensure storage & upload permissions
             echo "[+] Ensuring directory permissions..."
