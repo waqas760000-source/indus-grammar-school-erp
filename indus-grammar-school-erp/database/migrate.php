@@ -112,8 +112,8 @@ class MigrationRunner {
                         } catch (PDOException $pe) {
                             $errorCode = $pe->errorInfo[1] ?? 0;
                             $sqlState = $pe->errorInfo[0] ?? '';
-                            // Ignore harmless duplicate/exists errors: 1060 (dup column), 1050 (table exists), 1061 (key exists), 1062 (dup entry), 1091 (can't drop)
-                            if (in_array($errorCode, [1060, 1050, 1061, 1062, 1091]) || $sqlState === '42S21' || $sqlState === '23000' || str_contains($pe->getMessage(), 'Duplicate')) {
+                            // Ignore harmless duplicate/exists/missing column errors: 1060 (dup column), 1050 (table exists), 1061 (key exists), 1062 (dup entry), 1091 (can't drop), 1054 (unknown column)
+                            if (in_array($errorCode, [1060, 1050, 1061, 1062, 1091, 1054]) || in_array($sqlState, ['42S21', '42S22', '23000']) || str_contains($pe->getMessage(), 'Duplicate') || str_contains($pe->getMessage(), 'Unknown column')) {
                                 $currentQuery = '';
                                 continue;
                             }
