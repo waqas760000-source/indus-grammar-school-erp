@@ -32,7 +32,17 @@ try {
     include __DIR__ . '/scratch/import_9th_bio_red.php';
     echo htmlspecialchars(ob_get_clean());
 
-    echo "\n=== Database sync & student seeding completed successfully! ===\n";
+    echo "\n=== Running Discount & Fee Ledger Repairs ===\n";
+    ob_start();
+    include __DIR__ . '/scratch/fix_all_discounts_and_ledgers.php';
+    echo htmlspecialchars(ob_get_clean());
+
+    echo "\n=== Syncing All 1,052 Student Ledgers ===\n";
+    ob_start();
+    include __DIR__ . '/scratch/sync_all_1052_ledgers.php';
+    echo htmlspecialchars(ob_get_clean());
+
+    echo "\n=== Database sync & student fee seeding completed successfully! ===\n";
     echo '</pre>';
     echo '<div class="alert alert-success mt-3">✅ All student records & database migrations are synced on live!</div>';
     echo '<a href="dashboard.php" class="btn btn-success btn-lg mt-2">Go to Dashboard</a>';
