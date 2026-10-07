@@ -81,7 +81,6 @@ try {
             s.guardian_phone, 
             s.guardian_email, 
             s.address, 
-            s.cnic_bform,
             c.class_name, 
             c.section,
             d.roll_no, 
@@ -534,7 +533,7 @@ $printTimestamp = date('d-m-Y H:i:s');
                                 <td class="lbl">Birthdate:</td>
                                 <td class="val"><?php echo htmlspecialchars($dobFormatted); ?></td>
                                 <td class="lbl">Std CNIC:</td>
-                                <td class="val"><?php echo htmlspecialchars($std['cnic_no'] ?: $std['cnic_bform']); ?></td>
+                                <td class="val"><?php echo htmlspecialchars($std['cnic_no'] ?: ($std['guardian_cnic'] ?? '')); ?></td>
                             </tr>
                             <tr>
                                 <td class="lbl">Passport No:</td>
