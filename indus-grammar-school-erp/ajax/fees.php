@@ -325,12 +325,52 @@ switch ($action) {
         }
         break;
 
+    // ── Add Manual Pending Dues to Ledger ──
+    case 'add_pending_dues':
+        AuthMiddleware::requirePermission('fee_manage');
+        $studentId = (int)($_POST['student_id'] ?? 0);
+        $amount    = max(0, (float)($_POST['amount'] ?? 0));
+        $title     = sanitize($_POST['title'] ?? 'Pending Dues');
+        $dueDate   = sanitize($_POST['due_date'] ?? date('Y-m-d'));
+        $remarks   = sanitize($_POST['remarks'] ?? '');
+
+        if ($studentId <= 0 || $amount <= 0) {
+            jsonResponse(['success' => false, 'message' => 'Please select a valid student and enter a positive dues amount.']);
+        }
+
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->prepare("
+                INSERT INTO fee_ledger 
+                (student_id, month, academic_year, tuition_fee, total_payable, paid_amount, status, due_date, remarks)
+                VALUES 
+                (:sid, :m, :yr, :amt, :payable, 0.00, 'Pending', :due, :rem)
+            ");
+            $ok = $stmt->execute([
+                'sid'     => $studentId,
+                'm'       => $title,
+                'yr'      => CURRENT_ACADEMIC_YEAR,
+                'amt'     => $amount,
+                'payable' => $amount,
+                'due'     => $dueDate,
+                'rem'     => $remarks
+            ]);
+            if ($ok) {
+                auditLog('Pending Dues Added', "Manual pending dues of Rs. $amount added for student ID $studentId.");
+            }
+            jsonResponse(['success' => $ok, 'message' => $ok ? 'Pending dues added successfully.' : 'Failed to add pending dues.']);
+        } catch (Exception $ex) {
+            jsonResponse(['success' => false, 'message' => $ex->getMessage()]);
+        }
+        break;
+
     // ── Collect Fee Payment ──
     case 'collect_payment':
         AuthMiddleware::requirePermission('fee_collect');
-        $rawChallan = $_POST['challan_id'] ?? '';
-        $studentId  = (int)($_POST['student_id'] ?? 0);
-        $ledgerId   = 0;
+        $rawChallan     = $_POST['challan_id'] ?? '';
+        $studentId      = (int)($_POST['student_id'] ?? 0);
+        $pendingDuesAmt = max(0, (float)($_POST['pending_dues'] ?? 0));
+        $ledgerId       = 0;
 
         if (is_string($rawChallan) && str_starts_with($rawChallan, 'new_month:')) {
             $monthName = trim(substr($rawChallan, 10));
@@ -349,6 +389,66 @@ switch ($action) {
 
         if ($ledgerId <= 0) {
             jsonResponse(['success' => false, 'message' => 'Please select a valid fee month to collect payment.']);
+        }
+
+        // Process manually added pending dues if specified
+        if ($pendingDuesAmt > 0 && $studentId > 0) {
+            try {
+                $db = Database::getConnection();
+                $prevL = $db->prepare("
+                    SELECT * FROM fee_ledger 
+                    WHERE student_id = :sid AND id != :lid AND status IN ('Pending', 'Partial') 
+                    ORDER BY due_date ASC
+                ");
+                $prevL->execute(['sid' => $studentId, 'lid' => $ledgerId]);
+                $unpaidLedgers = $prevL->fetchAll();
+
+                $remDuesToApply = $pendingDuesAmt;
+                foreach ($unpaidLedgers as $uLedger) {
+                    if ($remDuesToApply <= 0) break;
+                    $uDue = max(0, (float)$uLedger['total_payable'] - (float)$uLedger['paid_amount']);
+                    if ($uDue > 0) {
+                        $applyAmt = min($remDuesToApply, $uDue);
+                        Fee::recordPayment([
+                            'ledger_id'        => $uLedger['id'],
+                            'amount_paid'      => $applyAmt,
+                            'payment_date'     => sanitize($_POST['payment_date'] ?? date('Y-m-d')),
+                            'payment_method'   => sanitize($_POST['payment_method'] ?? 'Cash'),
+                            'reference_number' => sanitize($_POST['reference_number'] ?? ''),
+                            'remarks'          => 'Manual Pending Dues Payment: ' . sanitize($_POST['remarks'] ?? ''),
+                        ]);
+                        $remDuesToApply -= $applyAmt;
+                    }
+                }
+
+                if ($remDuesToApply > 0) {
+                    $insDues = $db->prepare("
+                        INSERT INTO fee_ledger 
+                        (student_id, month, academic_year, tuition_fee, total_payable, paid_amount, status, due_date, remarks)
+                        VALUES 
+                        (:sid, 'Pending Dues (Manual)', :yr, :amt, :payable, 0.00, 'Pending', :due, 'Manually added pending dues')
+                    ");
+                    $insDues->execute([
+                        'sid'     => $studentId,
+                        'yr'      => CURRENT_ACADEMIC_YEAR,
+                        'amt'     => $remDuesToApply,
+                        'payable' => $remDuesToApply,
+                        'due'     => date('Y-m-d')
+                    ]);
+                    $newLid = (int)$db->lastInsertId();
+
+                    Fee::recordPayment([
+                        'ledger_id'        => $newLid,
+                        'amount_paid'      => $remDuesToApply,
+                        'payment_date'     => sanitize($_POST['payment_date'] ?? date('Y-m-d')),
+                        'payment_method'   => sanitize($_POST['payment_method'] ?? 'Cash'),
+                        'reference_number' => sanitize($_POST['reference_number'] ?? ''),
+                        'remarks'          => 'Manual Pending Dues Payment: ' . sanitize($_POST['remarks'] ?? ''),
+                    ]);
+                }
+            } catch (Exception $ex) {
+                error_log("Manual pending dues processing error: " . $ex->getMessage());
+            }
         }
 
         $result = $feeService->collectFeePayment([
@@ -408,7 +508,8 @@ switch ($action) {
             $allLedgers = $ledgStmt->fetchAll();
 
             $pendingFees = [];
-            $prevBalance = 0.00;
+            $rawPrevBalance = 0.00;
+            $currentMonthPayable = 0.00;
             
             $admissionFee = 0.00;
             $tuitionFee = 0.00;
@@ -416,9 +517,7 @@ switch ($action) {
             $fineAmount = 0.00;
             $discountAmount = 0.00;
             
-            $totalPayable = 0.00;
             $paidAmount = 0.00;
-            
             $existingMonthsMap = [];
 
             foreach ($allLedgers as $row) {
@@ -433,6 +532,8 @@ switch ($action) {
                     $remaining = 0.00;
                 }
 
+                $isCurrentMonth = (strcasecmp(trim($row['month']), $currentMonthStr) === 0);
+
                 if ($row['status'] !== 'Paid' || $remaining > 0) {
                     $pendingFees[] = [
                         'id'                => $row['id'],
@@ -444,27 +545,34 @@ switch ($action) {
                         'remaining_balance' => $remaining,
                         'status'            => $row['status'],
                         'due_date'          => $row['due_date'],
-                        'is_upcoming'       => false
+                        'is_upcoming'       => false,
+                        'is_current_month'  => $isCurrentMonth
                     ];
 
-                    if (strcasecmp($row['month'], $currentMonthStr) === 0) {
+                    if ($isCurrentMonth) {
                         $admissionFee   += (float)$row['admission_fee'];
                         $tuitionFee     += ((float)$row['tuition_fee'] + (float)$row['computer_fee'] + (float)$row['exam_fee'] + (float)$row['transport_fee'] + (float)$row['security_deposit'] + (float)$row['other_charges']);
                         $annualCharges  += (float)$row['annual_charges'];
                         $fineAmount     += ((float)$row['fine_amount'] + $lateFine);
                         $discountAmount += (float)$row['discount_amount'];
+                        $currentMonthPayable += $remaining;
                     } else {
-                        $prevBalance    += $remaining;
+                        $rawPrevBalance += $remaining;
                     }
-
-                    $totalPayable += $remaining;
                 }
                 
                 $paidAmount += (float)$row['paid_amount'];
             }
             
+            // Sort pending fees so current month (October) is listed FIRST
+            usort($pendingFees, function($a, $b) {
+                if (!empty($a['is_current_month']) && empty($b['is_current_month'])) return -1;
+                if (empty($a['is_current_month']) && !empty($b['is_current_month'])) return 1;
+                return 0;
+            });
+
             // Generate upcoming advance months if unbilled
-            for ($i = 0; $i <= 3; $i++) {
+            for ($i = 1; $i <= 3; $i++) {
                 $mName = date('F Y', strtotime("+$i month"));
                 $mKey  = strtolower(trim($mName));
                 if (!isset($existingMonthsMap[$mKey])) {
@@ -478,11 +586,14 @@ switch ($action) {
                         'remaining_balance' => $estMonthlyFee,
                         'status'            => 'Advance Option',
                         'due_date'          => date('Y-m-15', strtotime("+$i month")),
-                        'is_upcoming'       => true
+                        'is_upcoming'       => true,
+                        'is_current_month'  => false
                     ];
                 }
             }
 
+            // Total payable by default is ONLY the current month (October) fee!
+            $totalPayable = $currentMonthPayable;
             $remainingBalance = $totalPayable;
 
             // 3. Fetch transaction payment history
@@ -504,10 +615,11 @@ switch ($action) {
                     'admission_fee'     => $admissionFee,
                     'tuition_fee'       => $tuitionFee,
                     'annual_charges'    => $annualCharges,
-                    'previous_balance'  => $prevBalance,
+                    'previous_balance'  => 0.00, // 0.00 by default so past fees don't auto-show in current bill
+                    'raw_prev_balance'  => $rawPrevBalance, // Raw prior balance available for manual toggle
                     'fine'              => $fineAmount,
                     'discount'          => $discountAmount,
-                    'total_payable'     => $totalPayable,
+                    'total_payable'     => $totalPayable, // October month fee only by default
                     'paid_amount'       => $paidAmount,
                     'remaining_balance' => $remainingBalance
                 ],

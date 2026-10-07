@@ -452,11 +452,13 @@ $recentPayments = $recentPaymentsStmt->fetchAll();
                 </div>
             </div>
             <div class="d-flex flex-wrap gap-2 align-items-center">
-                <a href="challan.php" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm"><i class="fa-solid fa-calculator me-1"></i>Fee Ledger Sheets</a>
+                <button type="button" class="btn btn-sm btn-light text-primary rounded-2 px-3 py-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#addPendingDuesModal"><i class="fa-solid fa-plus-circle me-1"></i>Add Pending Dues</button>
+                <a href="challan.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-calculator me-1"></i>Fee Ledger Sheets</a>
                 <a href="receipts.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-receipt me-1"></i>Receipts Log</a>
                 <a href="dues.php" class="btn btn-sm btn-outline-light rounded-2 px-3 py-2 fw-semibold"><i class="fa-solid fa-clock-rotate-left me-1"></i>Defaulters List</a>
+            </div>
+        </div>
     </div>
-</div>
 
 <?php
 $fSettings = [];
@@ -699,14 +701,28 @@ $currentMonthName = date('F Y');
                                     </div>
                                 </div>
 
+                                <!-- Manual Pending Dues / Arrears (Optional) -->
+                                <div class="col-md-6">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <label class="form-label mb-0 text-danger fw-bold"><i class="fa-solid fa-plus-circle me-1"></i>Add Pending Dues / Arrears (Rs.)</label>
+                                        <button type="button" class="btn btn-sm btn-link text-primary p-0 text-decoration-none small fw-bold" data-bs-toggle="modal" data-bs-target="#addPendingDuesModal"><i class="fa-solid fa-pen-to-square me-1"></i>+ New Entry</button>
+                                    </div>
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-danger-subtle text-danger fw-bold">Rs.</span>
+                                        <input type="number" step="0.01" min="0" id="pendingDuesInput" name="pending_dues" class="form-control fw-bold border-danger-subtle" placeholder="0.00" value="0.00">
+                                        <button type="button" id="btnClearPendingDues" class="btn btn-outline-danger fw-semibold" title="Clear Pending Dues Amount"><i class="fa-solid fa-xmark me-1"></i>Clear Dues</button>
+                                    </div>
+                                    <div class="form-text text-muted small">Optional: Enter pending dues to collect along with October fee. Click Clear Dues to reset.</div>
+                                </div>
+
                                 <!-- Payment Date -->
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label">Payment Date <span class="text-danger">*</span></label>
                                     <input type="date" name="payment_date" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
                                 </div>
 
                                 <!-- Payment Method -->
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label class="form-label">Payment Method <span class="text-danger">*</span></label>
                                     <select name="payment_method" class="form-select fw-semibold" required>
                                         <option value="Cash" selected>Cash Desk 💵</option>
@@ -742,9 +758,14 @@ $currentMonthName = date('F Y');
 
                 <!-- Month Breakdown Ledger Table (Pending Dues) -->
                 <div class="card card-custom mb-4">
-                    <div class="card-header-custom d-flex align-items-center justify-content-between">
+                    <div class="card-header-custom d-flex flex-wrap align-items-center justify-content-between gap-2">
                         <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-list-check me-2 text-primary"></i>Pending Fees Breakdown</h5>
-                        <span class="badge bg-danger-subtle text-danger px-3 py-1 rounded-pill fw-semibold" id="pendingCountBadge">0 Unpaid Items</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-3 py-1.5 rounded-pill shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPendingDuesModal">
+                                <i class="fa-solid fa-plus-circle me-1"></i>+ Add Previous Fees / Dues Record
+                            </button>
+                            <span class="badge bg-danger-subtle text-danger px-3 py-1 rounded-pill fw-semibold" id="pendingCountBadge">0 Unpaid Items</span>
+                        </div>
                     </div>
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -886,6 +907,55 @@ $currentMonthName = date('F Y');
     </div>
 </div>
 
+<!-- Add Manual Pending Dues Modal -->
+<div class="modal fade" id="addPendingDuesModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px;">
+            <div class="modal-header bg-dark text-white border-0 py-3">
+                <h5 class="modal-title fw-bold text-white"><i class="fa-solid fa-clock-rotate-left me-2 text-warning"></i>Add Manual Pending Dues</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="addPendingDuesForm">
+                <input type="hidden" name="csrf_token" value="<?php echo csrfToken(); ?>">
+                <input type="hidden" name="action" value="add_pending_dues">
+                <input type="hidden" id="modalDuesStudentId" name="student_id" value="">
+                
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Student Record</label>
+                        <input type="text" id="modalDuesStudentName" class="form-control bg-light fw-bold" readonly value="Select a student first">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Dues Title / Description <span class="text-danger">*</span></label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Previous Session Dues" required value="Previous Pending Dues">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Dues Amount (Rs.) <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <span class="input-group-text fw-bold">Rs.</span>
+                            <input type="number" step="0.01" min="1" name="amount" class="form-control fw-bold fs-5 text-danger" placeholder="0.00" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Due Date</label>
+                        <input type="date" name="due_date" class="form-control" value="<?php echo date('Y-m-d'); ?>">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Remarks / Reason</label>
+                        <input type="text" name="remarks" class="form-control" placeholder="e.g. Added manually by cashier">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light border-0 py-2.5">
+                    <button type="button" class="btn btn-secondary px-4 fw-semibold" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4 fw-bold" id="btnSubmitAddDues">
+                        <i class="fa-solid fa-check-circle me-1"></i>Save Pending Dues
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     const searchInput = document.getElementById("studentSearchInput");
@@ -1019,6 +1089,16 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("stAcademicType").textContent = st.academic_type || "School";
         document.getElementById("stStatus").textContent = st.status || "Active";
 
+        // Update Modal Student Reference
+        const mSid = document.getElementById("modalDuesStudentId");
+        const mSname = document.getElementById("modalDuesStudentName");
+        if (mSid) mSid.value = st.id;
+        if (mSname) mSname.value = `${st.first_name} ${st.last_name} (Adm: ${st.admission_no || 'N/A'})`;
+
+        // Reset Manual Pending Dues Input
+        const pendingDuesInput = document.getElementById("pendingDuesInput");
+        if (pendingDuesInput) pendingDuesInput.value = "0.00";
+
         // Avatar
         const photoWrap = document.getElementById("studentPhotoWrapper");
         if (st.doc_student_photo) {
@@ -1043,11 +1123,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 const opt = document.createElement("option");
                 opt.value = pf.id;
                 opt.dataset.balance = pf.remaining_balance;
-                const labelStatus = pf.is_upcoming ? 'Advance Option' : pf.status;
+                const labelStatus = pf.is_upcoming ? 'Advance Option' : (pf.is_current_month ? 'Current Month Fee' : pf.status);
                 opt.textContent = `${pf.month} — Due: Rs. ${parseFloat(pf.remaining_balance).toFixed(2)} (${labelStatus})`;
                 challanSelect.appendChild(opt);
             });
-            // Auto select first available pending or advance month
+            // Auto select first available pending (October fee by default)
             challanSelect.selectedIndex = 1;
             amountPaidInput.value = parseFloat(challanSelect.options[1].dataset.balance).toFixed(2);
         } else {
@@ -1144,7 +1224,9 @@ document.addEventListener("DOMContentLoaded", function() {
     // Quick Select Month Helper
     window.quickSelectMonth = function(id, balance) {
         challanSelect.value = id;
-        amountPaidInput.value = parseFloat(balance).toFixed(2);
+        const pendingDuesInput = document.getElementById("pendingDuesInput");
+        const duesVal = pendingDuesInput ? parseFloat(pendingDuesInput.value || 0) : 0;
+        amountPaidInput.value = (parseFloat(balance) + duesVal).toFixed(2);
         challanSelect.scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
 
@@ -1152,7 +1234,9 @@ document.addEventListener("DOMContentLoaded", function() {
     btnFillExact?.addEventListener("click", function() {
         const selectedOpt = challanSelect.options[challanSelect.selectedIndex];
         if (selectedOpt && selectedOpt.dataset.balance) {
-            amountPaidInput.value = parseFloat(selectedOpt.dataset.balance).toFixed(2);
+            const pendingDuesInput = document.getElementById("pendingDuesInput");
+            const duesVal = pendingDuesInput ? parseFloat(pendingDuesInput.value || 0) : 0;
+            amountPaidInput.value = (parseFloat(selectedOpt.dataset.balance) + duesVal).toFixed(2);
         }
     });
 
@@ -1160,9 +1244,78 @@ document.addEventListener("DOMContentLoaded", function() {
     challanSelect.addEventListener("change", function() {
         const selectedOpt = this.options[this.selectedIndex];
         if (selectedOpt && selectedOpt.dataset.balance) {
-            amountPaidInput.value = parseFloat(selectedOpt.dataset.balance).toFixed(2);
+            const pendingDuesInput = document.getElementById("pendingDuesInput");
+            const duesVal = pendingDuesInput ? parseFloat(pendingDuesInput.value || 0) : 0;
+            amountPaidInput.value = (parseFloat(selectedOpt.dataset.balance) + duesVal).toFixed(2);
         }
     });
+
+    // Pending Dues Input Dynamic Calculator
+    const pendingDuesInput = document.getElementById("pendingDuesInput");
+    if (pendingDuesInput) {
+        pendingDuesInput.addEventListener("input", function() {
+            const selectedOpt = challanSelect.options[challanSelect.selectedIndex];
+            const monthBal = (selectedOpt && selectedOpt.dataset.balance) ? parseFloat(selectedOpt.dataset.balance) : 0;
+            const duesVal = parseFloat(this.value || 0);
+            amountPaidInput.value = (monthBal + duesVal).toFixed(2);
+        });
+    }
+
+    // Clear Pending Dues Button Listener
+    const btnClearPendingDues = document.getElementById("btnClearPendingDues");
+    if (btnClearPendingDues && pendingDuesInput) {
+        btnClearPendingDues.addEventListener("click", function() {
+            pendingDuesInput.value = "0.00";
+            const selectedOpt = challanSelect.options[challanSelect.selectedIndex];
+            const monthBal = (selectedOpt && selectedOpt.dataset.balance) ? parseFloat(selectedOpt.dataset.balance) : 0;
+            amountPaidInput.value = monthBal.toFixed(2);
+        });
+    }
+
+    // Add Pending Dues Modal Form Submit Handler
+    const addPendingDuesForm = document.getElementById("addPendingDuesForm");
+    if (addPendingDuesForm) {
+        addPendingDuesForm.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const sid = document.getElementById("modalDuesStudentId")?.value;
+            if (!sid || parseInt(sid) <= 0) {
+                alert("Please search and select a student first.");
+                return;
+            }
+            const btnSubmit = document.getElementById("btnSubmitAddDues");
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = `<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...`;
+
+            const formData = new FormData(addPendingDuesForm);
+            fetch("<?php echo APP_URL; ?>/ajax/fees.php", {
+                method: "POST",
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle me-1"></i>Save Pending Dues`;
+                if (data.new_csrf_token) {
+                    document.querySelectorAll('input[name="csrf_token"]').forEach(el => el.value = data.new_csrf_token);
+                }
+                if (data.success) {
+                    alert(data.message || "Pending dues added successfully!");
+                    const modalEl = document.getElementById("addPendingDuesModal");
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    addPendingDuesForm.reset();
+                    selectStudent(sid); // Refresh student view!
+                } else {
+                    alert(data.message || "Failed to add pending dues.");
+                }
+            })
+            .catch(err => {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = `<i class="fa-solid fa-check-circle me-1"></i>Save Pending Dues`;
+                alert("An error occurred while saving pending dues.");
+            });
+        });
+    }
 
     // Form Submit Handler
     paymentForm.addEventListener("submit", function(e) {
@@ -1202,6 +1355,8 @@ document.addEventListener("DOMContentLoaded", function() {
             if (data.success) {
                 // Reset form fields
                 amountPaidInput.value = "";
+                const pendingDuesInput = document.getElementById("pendingDuesInput");
+                if (pendingDuesInput) pendingDuesInput.value = "0.00";
                 const refInput = paymentForm.querySelector('input[name="reference_number"]');
                 const remInput = paymentForm.querySelector('input[name="remarks"]');
                 if (refInput) refInput.value = "";
