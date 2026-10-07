@@ -41,8 +41,11 @@ try {
     // 2. Perform Full Production Database Backup
     echo "\n  [+] Generating Full Production Database Backup...\n";
     $backupDir = __DIR__ . '/storage/backups';
-    if (!is_dir($backupDir)) {
-        mkdir($backupDir, 0777, true);
+    if (!is_dir($backupDir) || !is_writable($backupDir)) {
+        @mkdir($backupDir, 0777, true);
+    }
+    if (!is_writable($backupDir)) {
+        $backupDir = sys_get_temp_dir() ?: '/tmp';
     }
     $backupFileName = 'live_backup_before_sync_' . date('Ymd_His') . '.sql';
     $backupFilePath = $backupDir . '/' . $backupFileName;
