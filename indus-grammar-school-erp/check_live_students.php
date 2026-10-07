@@ -8,7 +8,7 @@ try {
     $db = Database::getConnection();
 
     $classes = $db->query("SELECT * FROM classes")->fetchAll(PDO::FETCH_ASSOC);
-    $students = $db->query("SELECT id, admission_no, roll_no, first_name, last_name, class_id, academic_type, school_class, school_section, status FROM students")->fetchAll(PDO::FETCH_ASSOC);
+    $students = $db->query("SELECT s.id, s.admission_no, s.first_name, s.last_name, s.class_id, s.status, d.roll_no, d.academic_type, d.school_class, d.school_section FROM students s LEFT JOIN student_registration_details d ON s.id = d.student_id")->fetchAll(PDO::FETCH_ASSOC);
 
     echo json_encode([
         'classes' => $classes,
