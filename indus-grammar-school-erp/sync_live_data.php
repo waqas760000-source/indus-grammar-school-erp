@@ -4,6 +4,10 @@
  * Full Backup + Safe Upsert Sync + Verification Audit
  */
 
+set_time_limit(0);
+ini_set('memory_limit', '512M');
+ignore_user_abort(true);
+
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 
