@@ -332,9 +332,9 @@ $qrCodeUrl = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . 
             </div>
             <div class="avatar-box">
                 <?php if (!empty($student['doc_student_photo'])): ?>
-                    <img src="<?php echo APP_URL . '/' . $student['doc_student_photo']; ?>" alt="Photo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.png';">
+                    <img src="<?php echo getStudentPhotoUrl($student['doc_student_photo']); ?>" alt="Photo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.svg';">
                 <?php else: ?>
-                    <img src="<?php echo APP_URL; ?>/assets/images/default_student.png" alt="Avatar" onerror="this.onerror=null; this.src='https://placehold.co/150x200?text=No+Photo';">
+                    <img src="<?php echo APP_URL; ?>/assets/images/default_student.svg" alt="Avatar">
                 <?php endif; ?>
             </div>
             <div class="student-name-title"><?php echo htmlspecialchars($student['first_name'] . ' ' . $student['last_name']); ?></div>

@@ -100,8 +100,8 @@ $sumNetFee = 0;
 foreach ($students as $st) {
     $monthly = (float)($st['fee_monthly'] ?? 2500);
     $discount = (float)($st['fee_discount'] ?? 0);
-    $academy = (float)($st['fee_scholarship'] ?? 0); // or academy fee if applicable
-    $net = (float)($st['net_tuition_fee'] ?? ($st['std_tuition_fee'] ?? ($monthly - $discount)));
+    $academy = (float)($st['fee_scholarship'] ?? 0);
+    $net = max(0, $monthly - $discount);
 
     $sumStdFee += $monthly;
     $sumDiscount += $discount;
@@ -360,7 +360,7 @@ if (!empty($search_section)) {
                         $monthly = (float)($st['fee_monthly'] ?? 2500);
                         $discount = (float)($st['fee_discount'] ?? 0);
                         $academy = (float)($st['fee_scholarship'] ?? 0);
-                        $net = (float)($st['net_tuition_fee'] ?? ($st['std_tuition_fee'] ?? ($monthly - $discount)));
+                        $net = max(0, $monthly - $discount);
                 ?>
                     <tr>
                         <td class="text-center-col"><?php echo htmlspecialchars($secName); ?></td>

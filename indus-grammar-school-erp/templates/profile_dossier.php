@@ -526,7 +526,7 @@ $attPercent = ($totalAttDays > 0) ? round(($attendanceStats['Present'] / $totalA
                 </td>
                 <td class="lbl">Monthly Tuition Fee :</td>
                 <td class="val font-monospace fw-bold">
-                    Rs. <?php echo number_format((float)(($student['tuition_fee'] > 0) ? $student['tuition_fee'] : ($student['fee_monthly'] ?? 0)), 2); ?>
+                    Rs. <?php echo number_format(max(0, (float)($student['fee_monthly'] ?? 2500) - (float)($student['fee_discount'] ?? 0)), 2); ?>
                 </td>
             </tr>
             <tr>

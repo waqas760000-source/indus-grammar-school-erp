@@ -199,7 +199,7 @@ class Fee {
                   discount_reason = VALUES(discount_reason),
                   status = VALUES(status)
             ");
-            return $stmt->execute([
+            $ok = $stmt->execute([
                 'sid'    => $data['student_id'],
                 'fid'    => $data['fee_structure_id'],
                 'pct'    => $data['discount_percentage'] ?? 0.00,
@@ -207,6 +207,37 @@ class Fee {
                 'reason' => $data['discount_reason'] ?? '',
                 'status' => $data['status'] ?? 'Active'
             ]);
+
+            if ($ok) {
+                $sid = (int)$data['student_id'];
+                $pct = (float)($data['discount_percentage'] ?? 0.00);
+                $flat = (float)($data['discount_flat'] ?? 0.00);
+
+                $srdStmt = $db->prepare("SELECT fee_monthly FROM student_registration_details WHERE student_id = :sid");
+                $srdStmt->execute(['sid' => $sid]);
+                $feeMonthly = (float)$srdStmt->fetchColumn();
+                if ($feeMonthly <= 0) {
+                    $feeMonthly = 2500.00;
+                }
+
+                $discAmt = 0.00;
+                if ($pct > 0) {
+                    $discAmt = ($feeMonthly * $pct) / 100;
+                } elseif ($flat > 0) {
+                    $discAmt = $flat;
+                }
+
+                $tuitionFee = max(0, $feeMonthly - $discAmt);
+
+                $upSrd = $db->prepare("
+                    UPDATE student_registration_details 
+                    SET fee_discount = :disc, tuition_fee = :tuition 
+                    WHERE student_id = :sid
+                ");
+                $upSrd->execute(['disc' => $discAmt, 'tuition' => $tuitionFee, 'sid' => $sid]);
+            }
+
+            return $ok;
         } catch (PDOException $e) {
             error_log("Fee::assignFeeToStudent error: " . $e->getMessage());
             return false;
@@ -217,7 +248,6 @@ class Fee {
         try {
             $db = Database::getConnection();
             $assignment = self::getStudentAssignment($studentId);
-            if (!$assignment) return false;
 
             $pct = (float)($assignment['discount_percentage'] ?? 0);
             $flat = (float)($assignment['discount_flat'] ?? 0);
@@ -233,6 +263,11 @@ class Fee {
                     $disc = ($tuition * $pct) / 100;
                 } elseif ($flat > 0) {
                     $disc = $flat;
+                } else {
+                    $srdDisc = (float)($db->query("SELECT fee_discount FROM student_registration_details WHERE student_id = " . (int)$studentId)->fetchColumn() ?? 0);
+                    if ($srdDisc > 0) {
+                        $disc = $srdDisc;
+                    }
                 }
 
                 $gross = (float)$ledger['tuition_fee'] + (float)$ledger['admission_fee'] + (float)$ledger['computer_fee'] + 
@@ -250,6 +285,74 @@ class Fee {
             return false;
         }
     }
+
+    public static function syncAllStudentDiscounts() {
+        try {
+            $db = Database::getConnection();
+            $stmt = $db->query("
+                SELECT srd.student_id, srd.fee_monthly, srd.fee_discount, srd.tuition_fee,
+                       sfa.discount_percentage, sfa.discount_flat
+                FROM student_registration_details srd
+                LEFT JOIN student_fee_assignments sfa ON srd.student_id = sfa.student_id
+            ");
+            $records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $upSrd = $db->prepare("
+                UPDATE student_registration_details 
+                SET fee_discount = :disc, tuition_fee = :tuition 
+                WHERE student_id = :sid
+            ");
+
+            $upSfa = $db->prepare("
+                UPDATE student_fee_assignments 
+                SET discount_flat = :flat 
+                WHERE student_id = :sid
+            ");
+
+            foreach ($records as $r) {
+                $sid = (int)$r['student_id'];
+                $monthly = (float)$r['fee_monthly'];
+                if ($monthly <= 0) {
+                    $monthly = (float)$r['tuition_fee'] + (float)$r['fee_discount'];
+                    if ($monthly <= 0) $monthly = 2500.00;
+                }
+                $disc = (float)$r['fee_discount'];
+                $tuition = (float)$r['tuition_fee'];
+                $sfaPct = (float)($r['discount_percentage'] ?? 0);
+                $sfaFlat = (float)($r['discount_flat'] ?? 0);
+
+                $effectiveDisc = 0.00;
+                if ($disc > 0) {
+                    $effectiveDisc = $disc;
+                } elseif ($sfaFlat > 0) {
+                    $effectiveDisc = $sfaFlat;
+                } elseif ($sfaPct > 0 && $monthly > 0) {
+                    $effectiveDisc = ($monthly * $sfaPct) / 100;
+                } elseif ($monthly > 0 && $tuition > 0 && $tuition < $monthly) {
+                    $effectiveDisc = $monthly - $tuition;
+                }
+
+                $effectiveTuition = max(0, $monthly - $effectiveDisc);
+
+                $upSrd->execute([
+                    'disc' => $effectiveDisc,
+                    'tuition' => $effectiveTuition,
+                    'sid' => $sid
+                ]);
+
+                if ($effectiveDisc > 0 && $sfaFlat == 0 && $sfaPct == 0) {
+                    self::ensureStudentAssignment($sid);
+                    $upSfa->execute(['sid' => $sid, 'flat' => $effectiveDisc]);
+                }
+            }
+            return true;
+        } catch (Exception $e) {
+            error_log("Fee::syncAllStudentDiscounts error: " . $e->getMessage());
+            return false;
+        }
+    }
+
+
 
     public static function getDiscountedStudents($filters = []) {
         try {

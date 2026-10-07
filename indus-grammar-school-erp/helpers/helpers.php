@@ -211,3 +211,27 @@ if (!function_exists('getSchoolLogoUrl')) {
         return '';
     }
 }
+
+/**
+ * Cleanly format student photo URL, handling Windows backslashes and default fallbacks.
+ *
+ * @param string|null $photoPath
+ * @return string
+ */
+if (!function_exists('getStudentPhotoUrl')) {
+    function getStudentPhotoUrl(?string $photoPath): string {
+        $defaultPhoto = APP_URL . '/assets/images/default_student.svg';
+        if (empty($photoPath)) {
+            return $defaultPhoto;
+        }
+        $cleanPath = ltrim(str_replace('\\', '/', trim($photoPath)), '/');
+        if (empty($cleanPath)) {
+            return $defaultPhoto;
+        }
+        if (!str_starts_with($cleanPath, 'uploads/') && !str_starts_with($cleanPath, 'assets/')) {
+            $cleanPath = 'uploads/students/' . $cleanPath;
+        }
+        return APP_URL . '/' . $cleanPath;
+    }
+}
+

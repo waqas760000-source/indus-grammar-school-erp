@@ -438,21 +438,7 @@ $printTimestamp = date('d-m-Y H:i:s');
     <!-- Render Each Student Profile Card -->
     <?php foreach ($students as $index => $std): ?>
         <?php
-        // Resolve student photo
-        $photoSrc = '';
-        if (!empty($std['doc_student_photo'])) {
-            $cleanPhotoPath = ltrim(str_replace('\\', '/', $std['doc_student_photo']), '/');
-            $fullDiskPhotoPath = __DIR__ . '/../' . $cleanPhotoPath;
-            if (file_exists($fullDiskPhotoPath)) {
-                $photoSrc = APP_URL . '/' . $cleanPhotoPath;
-            }
-        }
-        if (empty($photoSrc)) {
-            $photoSrc = APP_URL . '/assets/images/default_student.svg';
-            if (!file_exists(__DIR__ . '/../assets/images/default_student.svg')) {
-                $photoSrc = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="240" viewBox="0 0 200 240"><rect width="100%" height="100%" fill="%23f1f5f9"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="%2394a3b8">No Student Photo</text></svg>';
-            }
-        }
+        $photoSrc = getStudentPhotoUrl($std['doc_student_photo'] ?? '');
 
         // Family Group Query
         $familyGroupId = $std['std_id'];

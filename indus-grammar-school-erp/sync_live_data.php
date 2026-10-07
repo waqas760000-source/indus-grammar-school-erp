@@ -3159,6 +3159,18 @@ try {
         }
     }
 
+    // Drop restrictive UNIQUE constraints on student_registration_details that block bulk sync
+    try {
+        $srdIdx = $db->query("SHOW INDEX FROM student_registration_details WHERE Non_unique = 0 AND Key_name IN ('roll_no', 'cnic_no', 'bform_no')")->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($srdIdx as $idx) {
+            $keyName = $idx['Key_name'];
+            $db->exec("ALTER TABLE student_registration_details DROP INDEX `$keyName`");
+            echo "  [+] Dropped restrictive UNIQUE index `$keyName` from student_registration_details\n";
+        }
+    } catch (Exception $ie) {
+        echo "  [!] Index cleanup note: " . $ie->getMessage() . "\n";
+    }
+
     echo "\n=========================================================================\n";
     echo "   STEP 2: EXECUTING SAFE UPSERT DATA SYNCHRONIZATION (1,052 STUDENTS)   \n";
     echo "=========================================================================\n";
@@ -42038,6 +42050,12 @@ ON DUPLICATE KEY UPDATE `exam_type_id` = VALUES(`exam_type_id`), `student_id` = 
 
     $db->exec("SET FOREIGN_KEY_CHECKS = 1;");
     echo "  [✓] Successfully executed {$batchCount} data synchronization batches.\n";
+
+    echo "  [+] Recalculating and Synchronizing Student Fee Concessions & Discounts...\n";
+    require_once __DIR__ . '/models/Fee.php';
+    Fee::syncAllStudentDiscounts();
+    echo "  [✓] Fee Concessions & Discounts synchronized across all active students.\n";
+
 
     echo "\n=========================================================================\n";
     echo "   STEP 3: POST-SYNC PRODUCTION DATABASE AUDIT & VERIFICATION           \n";

@@ -664,7 +664,7 @@ include_once __DIR__ . '/../../includes/header.php';
                 <!-- Photo Upload Box -->
                 <div class="text-center">
                     <div style="width: 100px; height: 120px; border: 2px dashed #cbd5e1; border-radius: 8px; margin: 0 auto; overflow: hidden; position: relative; background: #f8fafc; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s;" onclick="document.getElementById('photoInput').click()" onmouseover="this.style.borderColor='#2563eb';" onmouseout="this.style.borderColor='#cbd5e1';">
-                        <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? APP_URL . '/' . $details['doc_student_photo'] : ''; ?>" style="width: 100%; height: 100%; object-fit: cover; <?php echo empty($details['doc_student_photo']) ? 'display:none;' : ''; ?>">
+                        <img id="photoPreview" src="<?php echo !empty($details['doc_student_photo']) ? getStudentPhotoUrl($details['doc_student_photo']) : ''; ?>" style="width: 100%; height: 100%; object-fit: cover; <?php echo empty($details['doc_student_photo']) ? 'display:none;' : ''; ?>">
                         <div id="photoPlaceholder" style="<?php echo !empty($details['doc_student_photo']) ? 'display:none;' : ''; ?>">
                             <i class="fa-solid fa-camera text-secondary fs-3 mb-1"></i>
                             <div class="small fw-bold text-muted" style="font-size: 0.7rem; line-height: 1.2;">Affix Student<br>Photo</div>
@@ -829,10 +829,10 @@ function triggerAutoSuggest(val) {
                 if (data && data.length > 0) {
                     let html = '';
                     data.forEach(item => {
-                        const photo = item.photo ? '<?php echo APP_URL; ?>/' + item.photo : '<?php echo APP_URL; ?>/assets/images/default-avatar.png';
+                        const photo = item.photo ? '<?php echo APP_URL; ?>/' + item.photo.replace(/\\/g, '/') : '<?php echo APP_URL; ?>/assets/images/default_student.svg';
                         html += `
                             <a href="registration.php?id=${item.id}" class="suggest-item">
-                                <img src="${photo}" class="suggest-avatar" onerror="this.src='<?php echo APP_URL; ?>/assets/images/default-avatar.png'">
+                                <img src="${photo}" class="suggest-avatar" onerror="this.src='<?php echo APP_URL; ?>/assets/images/default_student.svg'">
                                 <div class="flex-grow-1">
                                     <div class="fw-bold text-dark small">#${item.id} - ${item.name}</div>
                                     <div class="text-muted small" style="font-size: 0.78rem;">Code: <strong>${item.adm}</strong> | Class: ${item.class} (${item.sec}) | Father: ${item.father}</div>

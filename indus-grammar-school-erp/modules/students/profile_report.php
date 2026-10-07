@@ -540,7 +540,7 @@ if ($selectedId > 0) {
         <div class="d-flex align-items-center gap-3">
             <div class="student-avatar-box">
                 <?php if (!empty($student['doc_student_photo'])): ?>
-                    <img src="<?php echo APP_URL . '/' . htmlspecialchars($student['doc_student_photo']); ?>" alt="Student Photo">
+                    <img src="<?php echo getStudentPhotoUrl($student['doc_student_photo']); ?>" alt="Student Photo" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.svg';">
                 <?php else: ?>
                     <div class="text-center text-muted p-2">
                         <i class="fa-solid fa-user-graduate fa-3x text-secondary opacity-50 mb-1"></i>
@@ -1075,7 +1075,7 @@ if ($selectedId > 0) {
         <div style="text-align: right;">
             <div style="width: 90px; height: 90px; border: 2px solid #000; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-left: auto;">
                 <?php if (!empty($student['doc_student_photo'])): ?>
-                    <img src="<?php echo APP_URL . '/' . htmlspecialchars($student['doc_student_photo']); ?>" style="max-width: 100%; max-height: 100%;">
+                    <img src="<?php echo getStudentPhotoUrl($student['doc_student_photo']); ?>" style="max-width: 100%; max-height: 100%;" onerror="this.onerror=null; this.src='<?php echo APP_URL; ?>/assets/images/default_student.svg';">
                 <?php else: ?>
                     <span style="font-size: 8pt; color: #666; text-align: center;">No Photo Available</span>
                 <?php endif; ?>
