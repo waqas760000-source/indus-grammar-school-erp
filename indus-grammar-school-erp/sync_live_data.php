@@ -42,7 +42,7 @@ try {
         echo sprintf("  [PRE-SYNC] %-30s : %d rows\n", $tbl, $preSyncCounts[$tbl]);
     }
 
-    // 2. Perform Full Production Database Backup
+    // 2. Perform Full Production Database Backup using memory-efficient file stream
     echo "\n  [+] Generating Full Production Database Backup...\n";
     $backupDir = __DIR__ . '/storage/backups';
     if (!is_dir($backupDir) || !is_writable($backupDir)) {
@@ -54,25 +54,28 @@ try {
     $backupFileName = 'live_backup_before_sync_' . date('Ymd_His') . '.sql';
     $backupFilePath = $backupDir . '/' . $backupFileName;
 
-    $backupSql = "-- INDUS ERP PRODUCTION DATABASE BACKUP BEFORE 1052 SYNC\n-- Created At: " . date('Y-m-d H:i:s') . "\n\nSET FOREIGN_KEY_CHECKS = 0;\n\n";
-    $allDbTables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-    foreach ($allDbTables as $dt) {
-        $createTbl = $db->query("SHOW CREATE TABLE `$dt`")->fetch(PDO::FETCH_ASSOC);
-        $backupSql .= "DROP TABLE IF EXISTS `$dt`;\n" . $createTbl['Create Table'] . ";\n\n";
-        $tRows = $db->query("SELECT * FROM `$dt`")->fetchAll(PDO::FETCH_ASSOC);
-        if (!empty($tRows)) {
-            $tCols = array_keys($tRows[0]);
-            $qCols = implode(', ', array_map(fn($c) => "`$c`", $tCols));
-            foreach ($tRows as $tr) {
+    $handle = @fopen($backupFilePath, 'w');
+    if ($handle) {
+        fwrite($handle, "-- INDUS ERP PRODUCTION DATABASE BACKUP BEFORE 1052 SYNC\n-- Created At: " . date('Y-m-d H:i:s') . "\n\nSET FOREIGN_KEY_CHECKS = 0;\n\n");
+        $allDbTables = $db->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($allDbTables as $dt) {
+            $createTbl = $db->query("SHOW CREATE TABLE `$dt`")->fetch(PDO::FETCH_ASSOC);
+            fwrite($handle, "DROP TABLE IF EXISTS `$dt`;\n" . $createTbl['Create Table'] . ";\n\n");
+            $stmt = $db->query("SELECT * FROM `$dt`");
+            while ($tr = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $tCols = array_keys($tr);
+                $qCols = implode(', ', array_map(fn($c) => "`$c`", $tCols));
                 $tVals = array_map(fn($v) => $v === null ? 'NULL' : $db->quote((string)$v), array_values($tr));
-                $backupSql .= "INSERT INTO `$dt` ($qCols) VALUES (" . implode(', ', $tVals) . ");\n";
+                fwrite($handle, "INSERT INTO `$dt` ($qCols) VALUES (" . implode(', ', $tVals) . ");\n");
             }
+            fwrite($handle, "\n");
         }
-        $backupSql .= "\n";
+        fwrite($handle, "SET FOREIGN_KEY_CHECKS = 1;\n");
+        fclose($handle);
+        echo "  [✓] PRODUCTION BACKUP CREATED: " . $backupFileName . " (" . number_format(filesize($backupFilePath)) . " bytes)\n";
+    } else {
+        echo "  [!] Warning: Could not open backup file for writing.\n";
     }
-    $backupSql .= "SET FOREIGN_KEY_CHECKS = 1;\n";
-    file_put_contents($backupFilePath, $backupSql);
-    echo "  [✓] PRODUCTION BACKUP CREATED: " . $backupFileName . " (" . number_format(filesize($backupFilePath)) . " bytes)\n";
 
     echo "\n=========================================================================\n";
     echo "   STEP 2: EXECUTING SAFE UPSERT DATA SYNCHRONIZATION (1,052 STUDENTS)   \n";
@@ -38941,6 +38944,11 @@ ON DUPLICATE KEY UPDATE `exam_type_id` = VALUES(`exam_type_id`), `student_id` = 
         try {
             $db->exec($q);
             $batchCount++;
+            if ($batchCount % 20 === 0) {
+                echo "  [+] Executed {$batchCount} of " . count($queries) . " batches...\n";
+                if (ob_get_level()) @ob_flush();
+                @flush();
+            }
         } catch (Exception $qe) {
             echo "  [!] Warning on batch execution: " . $qe->getMessage() . "\n";
         }
